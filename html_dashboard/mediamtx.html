@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaMTX Camera Dashboard</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      :root {
+        --primary: #2563eb;
+        --primary-dark: #1d4ed8;
+        --success: #16a34a;
+        --danger: #dc2626;
+        --warning: #d97706;
+        --bg: #f5f7fb;
+        --card: #ffffff;
+        --border: #e5e7eb;
+        --text: #1f2937;
+        --muted: #6b7280;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Arial,
+          sans-serif;
+      }
+
+      /* HEADER */
+      header {
+        background: linear-gradient(135deg, #1e3a8a, #2563eb);
+        color: white;
+        padding: 18px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, .12);
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .back-btn {
+        color: white;
+        text-decoration: none;
+        border: 1px solid rgba(255, 255, 255, .35);
+        padding: 9px 15px;
+        border-radius: 7px;
+        font-size: 14px;
+        transition: .2s;
+      }
+
+      .back-btn:hover {
+        background: rgba(255, 255, 255, .12);
+      }
+
+      /* CONTAINER */
+      .container {
+        width: min(1100px, calc(100% - 30px));
+        margin: 30px auto;
+      }
+
+      .page-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 22px;
+      }
+
+      .page-title h2 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .page-title p {
+        margin: 5px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      /* CARD */
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, .04);
+        overflow: hidden;
+      }
+
+      .card-header {
+        padding: 17px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .card-title {
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .card-body {
+        padding: 20px;
+      }
+
+      /* FORM */
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.5fr;
+        gap: 18px;
+      }
+
+      .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 7px;
+      }
+
+      input,
+      select {
+        width: 100%;
+        height: 42px;
+        border: 1px solid #d1d5db;
+        border-radius: 7px;
+        padding: 0 12px;
+        font-size: 14px;
+        background: white;
+        color: var(--text);
+        outline: none;
+      }
+
+      input:focus,
+      select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, .1);
+      }
+
+      .help-text {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .form-actions {
+        margin-top: 18px;
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      /* BUTTON */
+      .btn {
+        border: 0;
+        border-radius: 7px;
+        padding: 9px 15px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: .2s;
+      }
+
+      .btn:disabled {
+        opacity: .6;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: var(--primary);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: var(--primary-dark);
+      }
+
+      .btn-light {
+        background: #f3f4f6;
+        color: #374151;
+      }
+
+      .btn-light:hover {
+        background: #e5e7eb;
+      }
+
+      .btn-danger {
+        background: white;
+        color: var(--danger);
+        border: 1px solid #fecaca;
+      }
+
+      .btn-danger:hover {
+        background: #fef2f2;
+      }
+
+      .btn-copy {
+        background: #eff6ff;
+        color: var(--primary);
+        border: 1px solid #bfdbfe;
+        padding: 7px 11px;
+      }
+
+      .btn-copy:hover {
+        background: #dbeafe;
+      }
+
+      /* ALERT */
+      .alert {
+        padding: 12px 15px;
+        border-radius: 7px;
+        margin-bottom: 18px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .alert.success {
+        display: block;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+      }
+
+      .alert.danger {
+        display: block;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+      }
+
+      /* CAMERA LIST */
+      /* =========================
+      SIMPLE CAMERA LIST
+    ========================= */
+      .camera-list {
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        overflow: hidden;
+      }
+
+      .camera-item {
+        background: #fff;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .camera-item:last-child {
+        border-bottom: none;
+      }
+
+      .camera-main {
+        min-height: 64px;
+        padding: 12px 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+      }
+
+      .camera-info {
+        min-width: 0;
+      }
+
+      .camera-name {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .camera-source {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 600px;
+      }
+
+      .camera-actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .camera-url {
+        display: none;
+        background: #f9fafb;
+        border-top: 1px solid var(--border);
+        padding: 12px 15px;
+      }
+
+      .camera-url.show {
+        display: block;
+      }
+
+      .url-row {
+        display: grid;
+        grid-template-columns: 65px 1fr auto;
+        gap: 7px;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+
+      .url-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .protocol {
+        font-size: 10px;
+        font-weight: 700;
+        text-align: center;
+        padding: 7px 4px;
+        border-radius: 5px;
+        background: #eee;
+      }
+
+      .protocol.webrtc {
+        background: #ecfdf5;
+        color: #047857;
+      }
+
+      .protocol.hls {
+        background: #eff6ff;
+        color: #1d4ed8;
+      }
+
+      .protocol.rtsp {
+        background: #fff7ed;
+        color: #c2410c;
+      }
+
+      .protocol.rtmp {
+        background: #fdf4ff;
+        color: #a21caf;
+      }
+
+      .url-input {
+        width: 100%;
+        height: 32px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 0 8px;
+        font-family: Consolas, Monaco, monospace;
+        font-size: 11px;
+        background: white;
+      }
+
+      .btn-small {
+        padding: 6px 9px;
+        font-size: 11px;
+        border-radius: 5px;
+      }
+
+      @media (max-width: 700px) {
+        .camera-main {
+          align-items: flex-start;
+        }
+
+        .camera-source {
+          max-width: 230px;
+        }
+
+        .camera-actions {
+          flex-direction: column;
+        }
+
+        .url-row {
+          grid-template-columns: 55px 1fr;
+        }
+
+        .url-row .btn-copy {
+          grid-column: 2;
+          width: 100%;
+        }
+      }
+
+      /* URL AREA */
+      .url-section {
+        border-top: 1px solid var(--border);
+        padding-top: 14px;
+      }
+
+      .url-title {
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 9px;
+      }
+
+      .url-row {
+        display: grid;
+        grid-template-columns: 120px 1fr auto;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .protocol {
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+        padding: 8px 6px;
+        border-radius: 6px;
+        background: #f3f4f6;
+        color: #374151;
+      }
+
+      .protocol.webrtc {
+        background: #ecfdf5;
+        color: #047857;
+      }
+
+      .protocol.hls {
+        background: #eff6ff;
+        color: #1d4ed8;
+      }
+
+      .protocol.rtsp {
+        background: #fff7ed;
+        color: #c2410c;
+      }
+
+      .protocol.rtmp {
+        background: #fdf4ff;
+        color: #a21caf;
+      }
+
+      .url-input {
+        height: 36px;
+        font-family: Consolas, Monaco, monospace;
+        font-size: 12px;
+        background: #f9fafb;
+      }
+
+      .empty {
+        text-align: center;
+        padding: 35px 20px;
+        color: var(--muted);
+      }
+
+      .loading {
+        text-align: center;
+        padding: 35px 20px;
+        color: var(--primary);
+      }
+
+      /* FOOTER */
+      .footer {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        padding: 10px 0 30px;
+      }
+
+      /* MOBILE */
+      @media (max-width: 700px) {
+        header {
+          padding: 15px;
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        header h1 {
+          font-size: 17px;
+        }
+
+        .container {
+          width: min(100% - 20px, 1100px);
+          margin: 20px auto;
+        }
+
+        .page-title {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .camera-top {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .url-row {
+          grid-template-columns: 85px 1fr;
+        }
+
+        .url-row .btn-copy {
+          grid-column: 2;
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>📹 MediaMTX - RTSP Stream Manager</h1>
+      <a href="index.html" class="back-btn"> ← Kembali ke Portal Utama </a>
+    </header>
+    <div class="container">
+      <!-- PAGE TITLE -->
+      <div class="page-title">
+        <div>
+          <h2>🎥 MediaMTX Manager</h2>
+          <p></p>
+        </div>
+      </div>
+      <!-- TAMBAH KAMERA -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"> ➕ Tambah Kamera RTSP Baru </div>
+        </div>
+        <div class="card-body">
+          <div id="alertBox" class="alert"></div>
+          <form id="addCameraForm">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="camName"> Stream Name </label>
+                <input type="text" id="camName" placeholder="contoh: camera01" required>
+                <div class="help-text"> Gunakan huruf kecil, angka, tanda - atau _. </div>
+              </div>
+              <div class="form-group">
+                <label for="camSource"> URL RTSP Stream </label>
+                <input type="text" id="camSource" placeholder="rtsp://username:password@192.168.1.100:554/stream" required>
+                <div class="help-text"> URL harus diawali dengan <b>rtsp://</b>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" id="btnSubmit" class="btn btn-primary"> ☁ Simpan Kamera </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <!-- DAFTAR KAMERA -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"> 📋 Daftar Kamera </div>
+          <button onclick="fetchCameras()" class="btn btn-light"> ↻ Refresh </button>
+        </div>
+        <div class="card-body">
+          <div id="cameraList" class="camera-list">
+            <div class="loading"> Memuat daftar kamera... </div>
+          </div>
+        </div>
+      </div>
+      <div class="footer"> MediaMTX Camera Dashboard </div>
+    </div>
+    <script>
+      const API_BASE = '';
+      /*
+       * KONFIGURASI PORT
+       *
+       * Silakan sesuaikan dengan MediaMTX Anda.
+       */
+      const HOST_IP = window.location.hostname;
+      const PORTS = {
+        webrtc: 8889,
+        hls: 8888,
+        rtsp: 8554,
+        rtmp: 1935
+      };
+      /*
+       * LOAD SAAT HALAMAN DIBUKA
+       */
+      document.addEventListener('DOMContentLoaded', fetchCameras);
+      /*
+       * ALERT
+       */
+      function showAlert(message, type = 'success') {
+        const alertBox = document.getElementById('alertBox');
+        alertBox.className = `alert ${type}`;
+        alertBox.innerText = message;
+        setTimeout(() => {
+          alertBox.className = 'alert';
+        }, 5000);
+      }
+      /*
+       * MEMBUAT URL STREAM
+       */
+      function getStreamUrl(camName, protocol) {
+        switch (protocol) {
+          case 'webrtc':
+            return `http://${HOST_IP}:${PORTS.webrtc}/${camName}`;
+          case 'hls':
+            return `http://${HOST_IP}:${PORTS.hls}/${camName}/index.m3u8`;
+          case 'rtsp':
+            return `rtsp://${HOST_IP}:${PORTS.rtsp}/${camName}`;
+          case 'rtmp':
+            return `rtmp://${HOST_IP}:${PORTS.rtmp}/${camName}`;
+          default:
+            return '';
+        }
+      }
+      /*
+       * COPY URL
+       */
+      async function copyStreamUrl(camName, protocol) {
+        const url = getStreamUrl(camName, protocol);
+        try {
+          await navigator.clipboard.writeText(url);
+          showAlert(`URL ${protocol.toUpperCase()} berhasil disalin.`, 'success');
+        } catch (err) {
+          /*
+           * Fallback browser lama
+           */
+          const textarea = document.createElement('textarea');
+          textarea.value = url;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          textarea.remove();
+          showAlert(`URL ${protocol.toUpperCase()} berhasil disalin.`, 'success');
+        }
+      }
+      /*
+       * GENERATE HTML URL STREAM
+       */
+      function renderStreamUrls(camName) {
+        const protocols = [{
+          id: 'webrtc',
+          name: 'WebRTC'
+        }, {
+          id: 'hls',
+          name: 'HLS'
+        }, {
+          id: 'rtsp',
+          name: 'RTSP'
+        }, {
+          id: 'rtmp',
+          name: 'RTMP'
+        }];
+        return protocols.map(protocol => {
+          const url = getStreamUrl(camName, protocol.id);
+          return `
+        
+							<div class="url-row">
+								<div class="protocol ${protocol.id}">
+            ${protocol.name}
+          </div>
+								<input
+            type="text"
+            class="url-input"
+            value="${url}"
+            readonly
+            onclick="this.select()"
+          >
+									<button
+            class="btn btn-copy"
+            onclick="copyStreamUrl('${escapeHtml(camName)}', '${protocol.id}')"
+          >
+            📋 Copy
+          </button>
+								</div>
+      `;
+        }).join('');
+      }
+      /*
+       * ESCAPE HTML
+       */
+      function escapeHtml(value) {
+        return String(value).replace(/&/g, '&amp;').replace(/ < /g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+        /*
+         * AMBIL DAFTAR KAMERA
+         */
+        function toggleCameraUrl(camName) {
+          const box = document.getElementById(`url-${camName}`);
+          const button = document.getElementById(`url-btn-${camName}`);
+          if (box.classList.contains('show')) {
+            box.classList.remove('show');
+            button.innerHTML = '🔗 URL';
+          } else {
+            box.classList.add('show');
+            button.innerHTML = '▲ Tutup';
+          }
+        }
+        async function fetchCameras() {
+          const cameraList = document.getElementById('cameraList');
+          cameraList.innerHTML = ` 
+							<div class="loading"> Memuat kamera... </div> `;
+          try {
+            const response = await fetch(`http://${window.location.hostname}:9997/v3/config/paths/list`);
+            if (!response.ok) {
+              throw new Error('Gagal mengambil data kamera');
+            }
+            const data = await response.json();
+            const items = data.items || [];
+            if (items.length === 0) {
+              cameraList.innerHTML = ` 
+							<div class="empty"> 📷 Belum ada kamera. </div> `;
+              return;
+            }
+            cameraList.innerHTML = items.map(cam => {
+              const name = escapeHtml(cam.name);
+              const source = escapeHtml(cam.source || 'all / ondemand');
+              return ` 
+							<div class="camera-item">
+								<!-- BARIS UTAMA -->
+								<div class="camera-main">
+									<div class="camera-info">
+										<div class="camera-name"> 📹 ${name} </div>
+										<div class="camera-source"> ${source} </div>
+									</div>
+									<div class="camera-actions">
+										<button class="btn btn-light btn-small" onclick="toggleCameraUrl('${name}')" id="url-btn-${name}" > 🔗 URL </button>
+										<button class="btn btn-danger btn-small" onclick="deleteCamera('${name}')" > 🗑 Hapus </button>
+									</div>
+								</div>
+								<!-- URL STREAM -->
+								<div class="camera-url" id="url-${name}" > ${renderStreamUrls(cam.name)} </div>
+							</div> `;
+            }).join('');
+          } catch (err) {
+            cameraList.innerHTML = ` 
+							<div class="empty"> ⚠️ Gagal memuat kamera 
+								<div style="margin-top:5px;"> ${escapeHtml(err.message)} </div>
+							</div> `;
+          }
+        }
+        /*
+         * TAMBAH KAMERA
+         */
+        document.getElementById('addCameraForm').addEventListener('submit', async function(e) {
+          e.preventDefault();
+          const btn = document.getElementById('btnSubmit');
+          const name = document.getElementById('camName').value.trim();
+          const source = document.getElementById('camSource').value.trim();
+          if (!name) {
+            showAlert('Stream name wajib diisi.', 'danger');
+            return;
+          }
+          if (!source.startsWith('rtsp://')) {
+            showAlert('URL kamera harus diawali rtsp://', 'danger');
+            return;
+          }
+          btn.disabled = true;
+          btn.innerHTML = '⏳ Menguji koneksi...';
+          try {
+            const response = await fetch(`${API_BASE}/api/add-camera`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                name,
+                source
+              })
+            });
+            const result = await response.json();
+            if (response.ok) {
+              showAlert(result.message || 'Kamera berhasil ditambahkan.', 'success');
+              document.getElementById('addCameraForm').reset();
+              fetchCameras();
+            } else {
+              showAlert(result.error || 'Gagal menambahkan kamera.', 'danger');
+            }
+          } catch (err) {
+            showAlert('Terjadi kesalahan koneksi ke server API.', 'danger');
+          } finally {
+            btn.disabled = false;
+            btn.innerHTML = '☁ Simpan Kamera';
+          }
+        });
+        /*
+         * HAPUS KAMERA
+         */
+        async function deleteCamera(name) {
+          if (!confirm(`Apakah Anda yakin ingin menghapus kamera "${name}"?`)) {
+            return;
+          }
+          try {
+            const response = await fetch(`${API_BASE}/api/remove-camera/${encodeURIComponent(name)}`, {
+              method: 'DELETE'
+            });
+            const result = await response.json();
+            if (response.ok) {
+              showAlert(result.message || 'Kamera berhasil dihapus.', 'success');
+              fetchCameras();
+            } else {
+              showAlert(result.error || 'Gagal menghapus kamera.', 'danger');
+            }
+          } catch (err) {
+            showAlert('Terjadi kesalahan saat menghapus kamera.', 'danger');
+          }
+        }
+    </script>
+  </body>
+</html>

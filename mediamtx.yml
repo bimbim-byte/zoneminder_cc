@@ -1,0 +1,20 @@
+api: true
+apiAddress: :9997
+apiAllowOrigin: '*'
+authMethod: internal
+authInternalUsers:
+- user: any
+  pass: null
+  ips: []
+  permissions:
+  - action: api
+  - action: read
+  - action: publish
+rtspAddress: :8554
+rtmpAddress: :1935
+hlsAddress: :8888
+webrtcAddress: :8889
+paths:
+  test-hikvision-sq-2:
+    source: rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101
+    sourceOnDemand: false

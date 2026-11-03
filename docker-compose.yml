@@ -1,0 +1,123 @@
+services:
+
+  # --------------------------------------------------------
+  # 1. ZoneMinder
+  # --------------------------------------------------------
+  zoneminder:
+    image: pppasantos/zoneminder:latest
+    container_name: zoneminder
+    restart: always
+    shm_size: "10g"
+
+    environment:
+      - TZ=Asia/Jakarta
+      - PHP_TIMEZONE=Asia/Jakarta
+
+    volumes:
+      - zoneminder_events:/var/lib/zoneminder/events
+      - zoneminder_images:/var/lib/zoneminder/images
+      - zoneminder_mysql:/var/lib/mysql
+      - ./zm-conf/apache-limit.conf:/etc/apache2/conf-enabled/apache-limit.conf
+
+
+  # --------------------------------------------------------
+  # 2. Nginx Reverse Proxy
+  # --------------------------------------------------------
+  reverse-proxy:
+    image: nginx:alpine
+    container_name: zm-nginx-proxy
+    restart: always
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/certs:/etc/nginx/certs
+
+    depends_on:
+      - zoneminder
+
+
+  # --------------------------------------------------------
+  # 3. MediaMTX
+  # --------------------------------------------------------
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx-test
+    restart: always
+
+    network_mode: host
+
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
+
+
+  # --------------------------------------------------------
+  # 4. Camera Dashboard
+  # --------------------------------------------------------
+  ui-interface:
+    build:
+      context: ./html_dashboard
+      dockerfile: Dockerfile
+
+    container_name: camera-dashboard
+    restart: always
+
+    network_mode: host
+
+    volumes:
+      - ./html_dashboard/index.html:/app/index.html
+      - ./mediamtx.yml:/opt/zoneminder/mediamtx.yml
+      - ./data:/app/data
+
+    environment:
+      - MQTT_LOG_FILE=/opt/zoneminder/data/mqtt_logs.json
+
+
+  # --------------------------------------------------------
+  # 5. MQTT Logger
+  # --------------------------------------------------------
+  mqtt-logger:
+    build:
+      context: ./cctv_checker
+      dockerfile: Dockerfile
+
+    container_name: mqtt_logger_service
+    restart: always
+
+    environment:
+      - MQTT_LOG_FILE=/opt/zoneminder/data/mqtt_logs.json
+
+      # GANTI dengan hostname HiveMQ Cloud Anda
+      - MQTT_BROKER_HOST=localhost
+      - MQTT_BROKER_PORT=8883
+
+    volumes:
+      - .data:/app/data
+
+  #------------------------------------------------------
+  #  6. Mosquitto MQTT
+  #-----------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto_broker
+    ports:
+      - "1883:1883"    # Port MQTT standar
+      - "9001:9001"    # Port MQTT WebSocket (opsional)
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      # (Opsional) Persistensi data dan log mosquitto jika diperlukan
+      # - ./mosquitto/data:/mosquitto/data
+      # - ./mosquitto/log:/mosquitto/log
+    restart: always
+
+# --------------------------------------------------------
+# Volumes
+# --------------------------------------------------------
+volumes:
+  zoneminder_events:
+  zoneminder_images:
+  zoneminder_mysql:
+  mqtt_shared_data:

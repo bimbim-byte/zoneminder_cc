@@ -1,0 +1,13 @@
+# Abaikan file data volume jika disimpan di folder lokal
+*.sql
+*.tar.gz
+
+# Abaikan Kunci SSL Private (Sangat Penting demi Keamanan)
+nginx/certs/*.key
+zm-conf/*.key
+*.key
+*.pem
+
+# Abaikan cache Python / OS
+__pycache__/
+.DS_Store

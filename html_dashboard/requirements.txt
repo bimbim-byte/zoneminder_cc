@@ -1,0 +1,7 @@
+Flask
+flask-cors
+requests
+PyYAML
+opencv-python-headless
+cryptography
+pyopenssl

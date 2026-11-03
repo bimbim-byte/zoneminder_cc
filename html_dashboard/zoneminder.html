@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZoneMinder Camera Registration</title>
+  <style>
+* { box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --text: #1f2937;
+  --muted: #6b7280;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Arial, sans-serif;
+}
+
+header {
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: white;
+  padding: 18px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 3px 12px rgba(0,0,0,.12);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.back-btn {
+  color: white;
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,.35);
+  padding: 9px 15px;
+  border-radius: 7px;
+  font-size: 14px;
+  transition: .2s;
+}
+
+.back-btn:hover { background: rgba(255,255,255,.12); }
+
+.container {
+  width: min(1100px, calc(100% - 30px));
+  margin: 30px auto;
+}
+
+.page-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 22px;
+}
+
+.page-title h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.page-title p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 22px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.04);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.card-body { padding: 20px; }
+
+.form-grid,
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.form-group.full-width { grid-column: 1 / -1; }
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 7px;
+  color: var(--text);
+}
+
+input, select {
+  width: 100%;
+  height: 42px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  padding: 0 12px;
+  font-size: 14px;
+  background: white;
+  color: var(--text);
+  outline: none;
+}
+
+input:focus, select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+
+input[readonly] { background: #f9fafb; }
+
+.help-text {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.form-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn {
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 15px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .2s;
+}
+
+.btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.btn-primary, .btn-green {
+  background: var(--primary);
+  color: white;
+}
+.btn-primary:hover, .btn-green:hover { background: var(--primary-dark); }
+
+.btn-light {
+  background: #f3f4f6;
+  color: #374151;
+}
+.btn-light:hover { background: #e5e7eb; }
+
+.btn-danger {
+  background: white;
+  color: var(--danger);
+  border: 1px solid #fecaca;
+}
+.btn-danger:hover { background: #fef2f2; }
+
+.btn-warning {
+  background: #fff7ed;
+  color: var(--warning);
+  border: 1px solid #fed7aa;
+}
+.btn-warning:hover { background: #ffedd5; }
+
+.btn-dark {
+  background: #374151;
+  color: white;
+}
+.btn-dark:hover { background: #1f2937; }
+
+.btn-blue {
+  background: var(--primary);
+  color: white;
+}
+.btn-blue:hover { background: var(--primary-dark); }
+
+.btn-small {
+  padding: 6px 9px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+.status-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid var(--primary);
+  border-radius: 7px;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-family: Consolas, Monaco, monospace;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #1e40af;
+  overflow-wrap: anywhere;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  min-width: 850px;
+}
+
+th, td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+th {
+  background: #f9fafb;
+  color: #374151;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+tr:last-child td { border-bottom: none; }
+
+tr.cam-disabled {
+  background-color: #f9fafb;
+  color: #9ca3af;
+}
+
+.badge {
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-block;
+  margin-right: 5px;
+}
+
+.badge-on {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.badge-off {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.quick-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.quick-controls select {
+  width: auto;
+  min-width: 105px;
+  height: 34px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.rtsp-path {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.action-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.empty,
+.loading {
+  text-align: center;
+  padding: 35px 20px;
+  color: var(--muted);
+}
+
+.loading { color: var(--primary); }
+
+.footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px 0 30px;
+}
+
+@media (max-width: 700px) {
+  header {
+    padding: 15px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  header h1 { font-size: 17px; }
+
+  .container {
+    width: min(100% - 20px, 1100px);
+    margin: 20px auto;
+  }
+
+  .page-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .form-grid, .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group.full-width { grid-column: auto; }
+
+  .form-actions {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  .form-actions .btn,
+  .card-body > .btn {
+    width: 100%;
+  }
+
+  .card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .quick-controls,
+  .action-group {
+    align-items: stretch;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛡️ ZoneMinder NVR Camera Management</h1>
+  <a href="index.html" class="back-btn">← Kembali ke Portal Utama</a>
+</header>
+
+<div class="container">
+  <div class="page-title">
+    <div>
+      <h2>🎥 ZoneMinder Camera Manager</h2>
+      <p>Kelola registrasi, status, fungsi, dan konfigurasi kamera RTSP.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🖥️ 1. System Status & CPU Load</div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="apiHostDisplay">ZoneMinder Server Host</label>
+          <input type="text" id="apiHostDisplay" readonly>
+        </div>
+        <div class="form-group">
+          <label for="tokenStatusDisplay">Status Autentikasi API</label>
+          <input type="text" id="tokenStatusDisplay" value="Memeriksa Autentikasi..." readonly style="font-weight:600;">
+        </div>
+      </div>
+      <div class="form-actions" style="justify-content:flex-start;">
+        <button class="btn btn-primary" onclick="loadCameras()">↻ Refresh List Kamera</button>
+        <button class="btn btn-dark" onclick="checkCpuLoad()">📊 Cek CPU Load</button>
+      </div>
+      <div id="statusDisplay" class="status-box" style="display:none;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">➕ 2. Pendaftaran Kamera RTSP ke ZoneMinder</div>
+    </div>
+    <div class="card-body">
+      <input type="hidden" id="originalId" value="">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="camId">ID Kamera (Custom)</label>
+          <input type="number" id="camId" placeholder="Kosongkan utk Auto ID">
+          <div class="help-text">Kosongkan jika ingin menggunakan ID otomatis.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="camName">Nama Kamera</label>
+          <input type="text" id="camName" placeholder="Kamera_Depan">
+        </div>
+
+        <div class="form-group full-width">
+          <label for="camPath">RTSP Path URL</label>
+          <input type="text" id="camPath" placeholder="rtsp://admin:pass@192.168.1.100:554/stream1">
+          <div class="help-text">Masukkan alamat RTSP kamera yang akan didaftarkan.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="camFunction">Fungsi Default</label>
+          <select id="camFunction">
+            <option value="None">None</option>
+            <option value="Monitor" selected>Monitor</option>
+            <option value="Modect">Modect</option>
+            <option value="Record">Record</option>
+            <option value="Mocord">Mocord</option>
+            <option value="Nodect">Nodect</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="camResolution">Resolusi Kamera</label>
+          <select id="camResolution">
+            <option value="1280x720">1280x720 (720p)</option>
+            <option value="1920x1080" selected>1920x1080 (1080p)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="camColorspace">Target Colorspace</label>
+          <select id="camColorspace">
+            <option value="1">8 bit greyscale</option>
+            <option value="3">24 bit color</option>
+            <option value="4" selected>32 bit color</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" id="btnSave" onclick="saveCamera()">☁ Simpan Kamera</button>
+        <button class="btn btn-light" id="btnCancel" style="display:none;" onclick="resetForm()">Batal</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📋 3. Daftar Kamera & Quick Controls</div>
+      <button class="btn btn-light" onclick="loadCameras()">↻ Refresh</button>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nama & Status</th>
+              <th>Shortcut Function & Off</th>
+              <th>RTSP Path</th>
+              <th>Resolusi</th>
+              <th>Aksi Kamera</th>
+            </tr>
+          </thead>
+          <tbody id="cameraTableBody">
+            <tr><td colspan="6" class="loading">Memuat data autentikasi...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">ZoneMinder Camera Dashboard</div>
+</div>
+
+<script>
+    const SERVER_IP = window.location.hostname;
+    const ZM_CONFIG = {
+        // Sesuaikan IP dan pastikan menggunakan HTTPS port 443 standar reverse proxy
+        host: 'https://10.121.35.108',
+        username: 'admin',
+        password: 'admin'
+    };
+
+    let currentToken = sessionStorage.getItem('zm_token') || '';
+    let existingIds = [];
+    let cameraDataStore = {};
+
+    async function authenticate() {
+        const tokenInput = document.getElementById('tokenStatusDisplay');
+        if (tokenInput) {
+            tokenInput.value = "Authenticating...";
+            tokenInput.style.color = "#d97706";
+        }
+
+        try {
+            const loginUrl = `${ZM_CONFIG.host}/zm/api/host/login.json`;
+            const params = new URLSearchParams();
+            params.append('user', ZM_CONFIG.username);
+            params.append('pass', ZM_CONFIG.password);
+
+            const res = await fetch(loginUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                credentials: 'include', // Wajib agar session cookie ikut tersimpan
+                body: params.toString()
+            });
+
+            const data = await res.json();
+            
+            // Perbaikan penangkapan struktur token dari API ZoneMinder
+            if (res.ok && data.success && (data.access_token || (data.credentials && data.credentials.access_token))) {
+                currentToken = data.access_token || data.credentials.access_token;
+                sessionStorage.setItem('zm_token', currentToken);
+                
+                if (tokenInput) {
+                    tokenInput.value = "Authenticated (Active Token)";
+                    tokenInput.style.color = "#28a745";
+                }
+                return currentToken;
+            } else {
+                if (tokenInput) {
+                    tokenInput.value = "Auth Failed";
+                    tokenInput.style.color = "#dc3545";
+                }
+                return null;
+            }
+        } catch (err) {
+            if (tokenInput) {
+                tokenInput.value = "Connection Error";
+                tokenInput.style.color = "#dc3545";
+            }
+            console.error('Auth Error:', err);
+            return null;
+        }
+    }
+
+    async function fetchWithAutoAuth(url, options = {}) {
+        if (!currentToken) await authenticate();
+        
+        // Pastikan opsi credentials selalu ikut terkirim pada fetch berikutnya
+        options.credentials = 'include';
+
+        let authenticatedUrl = `${url}${url.includes('?') ? '&' : '?'}token=${currentToken}`;
+        let response = await fetch(authenticatedUrl, options);
+
+        if (response.status === 401) {
+            const newToken = await authenticate();
+            if (newToken) {
+                authenticatedUrl = `${url.split('?')[0]}?token=${newToken}`;
+                response = await fetch(authenticatedUrl, options);
+            }
+        }
+        return response;
+    }
+
+    async function loadCameras() {
+        try {
+            const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors.json`);
+            const data = await res.json();
+            const tbody = document.getElementById('cameraTableBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            existingIds = [];
+            cameraDataStore = {};
+
+            if (!data.monitors || data.monitors.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">Belum ada kamera terdaftar.</td></tr>';
+                return;
+            }
+
+            data.monitors.forEach(item => {
+                const mon = item.Monitor;
+                existingIds.push(mon.Id.toString());
+                cameraDataStore[mon.Id] = mon;
+
+                const isEnabled = (mon.Enabled == '1' || mon.Enabled == 1) && mon.Function !== 'None';
+                const rowClass = isEnabled ? '' : 'cam-disabled';
+                const badgeHtml = isEnabled ? '<span class="badge badge-on">ON</span>' : '<span class="badge badge-off">OFF</span>';
+
+                tbody.innerHTML += `
+                    <tr class="${rowClass}">
+                        <td><b>${mon.Id}</b></td>
+                        <td>${badgeHtml} <b>${mon.Name}</b></td>
+                        <td>
+                            <div class="quick-controls"><select id="fnSelect_${mon.Id}">
+                                <option value="None" ${mon.Function == 'None' ? 'selected':''}>None</option>
+                                <option value="Monitor" ${mon.Function == 'Monitor' ? 'selected':''}>Monitor</option>
+                                <option value="Modect" ${mon.Function == 'Modect' ? 'selected':''}>Modect</option>
+                                <option value="Record" ${mon.Function == 'Record' ? 'selected':''}>Record</option>
+                                <option value="Mocord" ${mon.Function == 'Mocord' ? 'selected':''}>Mocord</option>
+                                <option value="Nodect" ${mon.Function == 'Nodect' ? 'selected':''}>Nodect</option>
+                            </select>
+                            <button class="btn btn-primary btn-small" onclick="quickSetFunction('${mon.Id}')">Set</button>
+                            <button class="btn btn-danger btn-small" onclick="quickTurnOff('${mon.Id}')">OFF</button></div>
+                        </td>
+                        <td><div class="rtsp-path" title="${mon.Path || '-'}">${mon.Path || '-'}</div></td>
+                        <td>${mon.Width}x${mon.Height}</td>
+                        <td><div class="action-group">
+                            <button class="btn btn-warning btn-small" onclick="editCamera('${mon.Id}')">Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteCamera('${mon.Id}')">Hapus</button>
+                            </div></td>
+                    </tr>
+                `;
+            });
+        } catch (err) {
+            console.error('Gagal memuat kamera ZM:', err);
+        }
+    }
+
+    async function quickSetFunction(id) {
+        const selectedFn = document.getElementById(`fnSelect_${id}`).value;
+        const params = new URLSearchParams();
+        params.append('Monitor[Function]', selectedFn);
+        params.append('Monitor[Enabled]', selectedFn === 'None' ? '0' : '1');
+
+        const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors/${id}.json`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        });
+
+        if (res.ok) loadCameras();
+    }
+
+    async function quickTurnOff(id) {
+        const params = new URLSearchParams();
+        params.append('Monitor[Function]', 'None');
+        params.append('Monitor[Enabled]', '0');
+
+        const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors/${id}.json`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        });
+
+        if (res.ok) loadCameras();
+    }
+
+    async function saveCamera() {
+        const inputId = document.getElementById('camId').value.trim();
+        const originalId = document.getElementById('originalId').value.trim();
+
+        if (inputId && inputId !== originalId && existingIds.includes(inputId)) {
+            return alert(`Error: ID ${inputId} sudah digunakan!`);
+        }
+
+        const camName = document.getElementById('camName').value.trim();
+        const camPath = document.getElementById('camPath').value.trim();
+        if (!camName || !camPath) return alert('Nama dan RTSP Path Wajib diisi!');
+
+        const [width, height] = document.getElementById('camResolution').value.split('x');
+
+        const params = new URLSearchParams();
+        if (inputId) params.append('Monitor[Id]', inputId);
+        params.append('Monitor[Name]', camName);
+        params.append('Monitor[Type]', 'Ffmpeg');
+        params.append('Monitor[Function]', document.getElementById('camFunction').value);
+        params.append('Monitor[Enabled]', '1');
+        params.append('Monitor[Path]', camPath);
+        params.append('Monitor[Method]', 'rtsp');
+        params.append('Monitor[Options]', 'rtsp_transport=tcp');
+        params.append('Monitor[Width]', width);
+        params.append('Monitor[Height]', height);
+        params.append('Monitor[Colours]', document.getElementById('camColorspace').value);
+        params.append('Monitor[TargetColorspace]', document.getElementById('camColorspace').value);
+        params.append('Monitor[MaxFPS]', '');
+        params.append('Monitor[AlarmMaxFPS]', '');
+        params.append('Monitor[ServerId]', '0');
+        params.append('Monitor[Controllable]', '0');
+        params.append('Monitor[DecoderColorspace]', '0');
+
+        let targetUrl = originalId 
+            ? `${ZM_CONFIG.host}/zm/api/monitors/${originalId}.json`
+            : `${ZM_CONFIG.host}/zm/api/monitors.json`;
+
+        const res = await fetchWithAutoAuth(targetUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        });
+
+        if (res.ok) {
+            alert(originalId ? 'Kamera diperbarui!' : 'Kamera ditambahkan!');
+            resetForm();
+            loadCameras();
+        } else {
+            alert('Gagal menyimpan kamera ke ZoneMinder.');
+        }
+    }
+
+    async function deleteCamera(id) {
+        if (!confirm(`Hapus kamera ID ${id}?`)) return;
+        const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors/${id}.json`, { method: 'DELETE' });
+        if (res.ok) loadCameras();
+    }
+
+    async function checkCpuLoad() {
+        const statusDiv = document.getElementById('statusDisplay');
+        try {
+            const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/host/getLoad.json`);
+            const data = await res.json();
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.innerHTML = `Server Load: [1 Min: ${data.load[0]}] | [5 Min: ${data.load[1]}] | [15 Min: ${data.load[2]}]`;
+            }
+        } catch (err) {
+            alert('Gagal mengambil CPU Load.');
+        }
+    }
+
+    function editCamera(id) {
+        const mon = cameraDataStore[id];
+        if (!mon) return;
+
+        document.getElementById('formTitle').innerText = `Edit Kamera (ID: ${id})`;
+        document.getElementById('originalId').value = id;
+        document.getElementById('camId').value = id;
+        document.getElementById('camName').value = mon.Name || '';
+        document.getElementById('camPath').value = mon.Path || '';
+        document.getElementById('camFunction').value = mon.Function || 'Monitor';
+        document.getElementById('camResolution').value = (`${mon.Width}x${mon.Height}` === '1280x720') ? '1280x720' : '1920x1080';
+        document.getElementById('camColorspace').value = mon.Colours || '4';
+
+        document.getElementById('btnSave').innerText = "Update Kamera";
+        document.getElementById('btnCancel').style.display = "inline-block";
+    }
+
+    function resetForm() {
+        document.getElementById('formTitle').innerText = "2. Pendaftaran Kamera RTSP ke ZoneMinder";
+        document.getElementById('originalId').value = "";
+        document.getElementById('camId').value = "";
+        document.getElementById('camName').value = "";
+        document.getElementById('camPath').value = "";
+        document.getElementById('btnSave').innerText = "Simpan Kamera";
+        document.getElementById('btnCancel').style.display = "none";
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const hostDisplay = document.getElementById('apiHostDisplay');
+        if (hostDisplay) hostDisplay.value = ZM_CONFIG.host;
+        
+        const token = await authenticate();
+        if (token) loadCameras();
+    });
+</script>
+</body>
+</html>
