@@ -1,88 +1,224 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MQTT Monitor File Log Viewer</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            margin: 0;
-            padding: 20px;
-        }
-        h2 { margin-top: 0; color: #569cd6; }
-        .info { font-size: 13px; color: #aaa; margin-bottom: 15px; }
-        #log-container {
-            background-color: #252526;
-            border: 1px solid #3c3c3c;
-            border-radius: 6px;
-            height: 550px;
-            overflow-y: auto;
-            padding: 10px;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 13px;
-        }
-        .log-entry { margin-bottom: 8px; padding: 6px; border-bottom: 1px solid #333; word-break: break-all; }
-        .time { color: #808080; }
-        .topic { color: #ce9178; font-weight: bold; }
-        .payload { color: #b5cea8; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live MQTT Camera Health Log</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      background-color: #0f172a;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-shrink: 0;
+    }
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .back-btn {
+      color: white;
+      text-decoration: none;
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: .2s;
+    }
+    .back-btn:hover { background: #334155; }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    .form-control {
+      padding: 7px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+    }
+    .form-control:focus { outline: none; border-color: #38bdf8; }
+    .btn {
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      background: #334155;
+      color: #fff;
+    }
+    .btn:hover { background: #475569; }
+    #log-container {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+    .log-entry {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+    .log-entry:hover { background: rgba(255,255,255,0.03); }
+    .time { color: #94a3b8; font-size: 11.5px; min-width: 140px; }
+    .topic { color: #f59e0b; font-weight: bold; min-width: 160px; }
+    .payload { color: #cbd5e1; flex: 1; }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .badge-online { background: #166534; color: #bbf7d0; }
+    .badge-offline { background: #991b1b; color: #fecaca; }
+  </style>
 </head>
 <body>
+  <header>
+    <h1>📡 Live MQTT Camera Health Log</h1>
+    <a href="index.html" class="back-btn">⬅ Kembali ke Portal</a>
+  </header>
 
-    <h2>MQTT Monitor Log Viewer (10 Hari Retensi)</h2>
-    <div class="info">
-        * Data diambil dari API Flask <code>/api/mqtt-logs</code> yang membaca file log MQTT. Log yang berumur lebih dari 10 hari otomatis dibersihkan.
-    </div>
+  <div class="toolbar">
+    <input type="text" id="searchInput" class="form-control" style="width: 260px;" placeholder="Cari topik atau kamera..." oninput="filterLogs()">
+    <button id="toggleBtn" class="btn" onclick="toggleAutoRefresh()">⏸ Pause Auto-Refresh</button>
+    <button class="btn" onclick="fetchLogsFromFile()">🔄 Refresh Sekarang</button>
+    <div id="statusCounter" style="margin-left: auto; font-size: 12px; color: #94a3b8;">Memuat data...</div>
+  </div>
 
-    <div id="log-container">Memuat log dari server...</div>
+  <div id="log-container">Memuat log dari server...</div>
 
-    <script>
-        // Menggunakan relative URL ke API endpoint Flask yang sama
-        const API_URL = "/api/mqtt-logs";
-        const logContainer = document.getElementById("log-container");
+  <script>
+    const API_URL = "/api/mqtt-logs";
+    let isAutoRefresh = true;
+    let refreshInterval = null;
+    let allLogs = [];
 
-        async function fetchLogsFromFile() {
-            try {
-                const response = await fetch(API_URL);
-                const logs = await response.json();
+    async function fetchLogsFromFile() {
+      try {
+        const response = await fetch(API_URL);
+        allLogs = await response.json();
+        renderLogs();
+      } catch (error) {
+        document.getElementById("log-container").innerHTML = `<span style="color:#ef4444;">Gagal mengambil log dari ${API_URL}: ${error.message}</span>`;
+      }
+    }
 
-                if (!Array.isArray(logs) || logs.length === 0) {
-                    logContainer.innerHTML = "<em>Belum ada log tersimpan.</em>";
-                    return;
-                }
+    function renderLogs() {
+      const container = document.getElementById("log-container");
+      const search = document.getElementById("searchInput").value.toLowerCase().trim();
+      const counter = document.getElementById("statusCounter");
 
-                let htmlContent = "";
-                logs.forEach(item => {
-                    htmlContent += `
-                        <div class="log-entry">
-                            <span class="time">[${escapeHtml(item.timestamp)}]</span> 
-                            <span class="topic">${escapeHtml(item.topic)}</span>: 
-                            <span class="payload">${escapeHtml(item.payload)}</span>
-                        </div>
-                    `;
-                });
+      if (!Array.isArray(allLogs) || allLogs.length === 0) {
+        container.innerHTML = "<em>Belum ada log aktivitas kamera yang terekam.</em>";
+        counter.innerText = "0 Entri Log";
+        return;
+      }
 
-                logContainer.innerHTML = htmlContent;
-            } catch (error) {
-                logContainer.innerHTML = `<span style="color:#f44747;">Gagal terhubung ke Flask API Log (${API_URL}). Pastikan server berjalan.</span>`;
-            }
+      let filtered = allLogs;
+      if (search) {
+        filtered = allLogs.filter(item => {
+          const t = (item.topic || '').toLowerCase();
+          const p = typeof item.payload === 'object' ? JSON.stringify(item.payload).toLowerCase() : String(item.payload || '').toLowerCase();
+          return t.includes(search) || p.includes(search);
+        });
+      }
+
+      counter.innerText = `Menampilkan ${filtered.length} dari ${allLogs.length} Entri Log`;
+
+      let html = "";
+      filtered.forEach(item => {
+        let payloadContent = "";
+        let statusBadge = "";
+
+        if (typeof item.payload === 'object' && item.payload !== null) {
+          const p = item.payload;
+          if (p.status === "ONLINE") {
+            statusBadge = '<span class="badge badge-online">ONLINE</span>';
+          } else if (p.status === "OFFLINE") {
+            statusBadge = '<span class="badge badge-offline">OFFLINE</span>';
+          }
+          payloadContent = `${statusBadge} <strong>${escapeHtml(p.name || '')}</strong>: ${escapeHtml(p.message || JSON.stringify(p))}`;
+        } else {
+          const raw = String(item.payload || '');
+          if (raw.includes("ONLINE")) statusBadge = '<span class="badge badge-online">ONLINE</span>';
+          if (raw.includes("OFFLINE")) statusBadge = '<span class="badge badge-offline">OFFLINE</span>';
+          payloadContent = `${statusBadge} ${escapeHtml(raw)}`;
         }
 
-        function escapeHtml(text) {
-            return String(text || '')
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+        html += `
+          <div class="log-entry">
+            <span class="time">[${escapeHtml(item.timestamp)}]</span>
+            <span class="topic">${escapeHtml(item.topic)}</span>
+            <span class="payload">${payloadContent}</span>
+          </div>
+        `;
+      });
 
-        fetchLogsFromFile();
-        // Auto-refresh log tiap 2 detik
-        setInterval(fetchLogsFromFile, 2000);
-    </script>
+      container.innerHTML = html;
+    }
+
+    function filterLogs() {
+      renderLogs();
+    }
+
+    function toggleAutoRefresh() {
+      isAutoRefresh = !isAutoRefresh;
+      const btn = document.getElementById("toggleBtn");
+      if (isAutoRefresh) {
+        btn.innerText = "⏸ Pause Auto-Refresh";
+        startAutoRefresh();
+      } else {
+        btn.innerText = "▶ Lanjutkan Auto-Refresh";
+        clearInterval(refreshInterval);
+      }
+    }
+
+    function startAutoRefresh() {
+      clearInterval(refreshInterval);
+      refreshInterval = setInterval(fetchLogsFromFile, 3000);
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    fetchLogsFromFile();
+    startAutoRefresh();
+  </script>
 </body>
 </html>

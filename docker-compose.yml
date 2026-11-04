@@ -1,13 +1,37 @@
 services:
 
   # --------------------------------------------------------
-  # 1. ZoneMinder
+  # 1. Reverse Proxy & Auto-SSL (Caddy)
+  # --------------------------------------------------------
+  caddy-proxy:
+    image: caddy:2-alpine
+    container_name: caddy_proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 (QUIC) support
+    volumes:
+      - ./caddy:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - cctv_net
+    depends_on:
+      - zoneminder
+      - ui-interface
+
+  # --------------------------------------------------------
+  # 2. ZoneMinder (NVR Core)
   # --------------------------------------------------------
   zoneminder:
     image: pppasantos/zoneminder:latest
     container_name: zoneminder
     restart: always
-    shm_size: "10g"
+    shm_size: "4g"
+
+    ports:
+      - "8082:80" # Akses langsung port ZoneMinder
 
     environment:
       - TZ=Asia/Jakarta
@@ -17,107 +41,101 @@ services:
       - zoneminder_events:/var/lib/zoneminder/events
       - zoneminder_images:/var/lib/zoneminder/images
       - zoneminder_mysql:/var/lib/mysql
-      - ./zm-conf/apache-limit.conf:/etc/apache2/conf-enabled/apache-limit.conf
+      - ./zm-conf/apache-limit.conf:/etc/apache2/conf-enabled/apache-limit.conf:ro
 
-
-  # --------------------------------------------------------
-  # 2. Nginx Reverse Proxy
-  # --------------------------------------------------------
-  reverse-proxy:
-    image: nginx:alpine
-    container_name: zm-nginx-proxy
-    restart: always
-
-    ports:
-      - "80:80"
-      - "443:443"
-
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - ./nginx/certs:/etc/nginx/certs
-
-    depends_on:
-      - zoneminder
-
+    networks:
+      - cctv_net
 
   # --------------------------------------------------------
-  # 3. MediaMTX
-  # --------------------------------------------------------
-  mediamtx:
-    image: bluenviron/mediamtx:latest
-    container_name: mediamtx-test
-    restart: always
-
-    network_mode: host
-
-    volumes:
-      - ./mediamtx.yml:/mediamtx.yml
-
-
-  # --------------------------------------------------------
-  # 4. Camera Dashboard
+  # 3. Camera Management Dashboard (UI Interface)
   # --------------------------------------------------------
   ui-interface:
     build:
       context: ./html_dashboard
       dockerfile: Dockerfile
-
     container_name: camera-dashboard
     restart: always
 
-    network_mode: host
+    ports:
+      - "8080:8080" # Akses langsung port dashboard
+
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8080
+      - ZM_HOST=http://zoneminder:80
+      - MQTT_LOG_FILE=/app/data/mqtt_logs.json
 
     volumes:
-      - ./html_dashboard/index.html:/app/index.html
-      - ./mediamtx.yml:/opt/zoneminder/mediamtx.yml
+      - ./html_dashboard:/app
       - ./data:/app/data
 
-    environment:
-      - MQTT_LOG_FILE=/opt/zoneminder/data/mqtt_logs.json
+    networks:
+      - cctv_net
 
+    depends_on:
+      - zoneminder
 
   # --------------------------------------------------------
-  # 5. MQTT Logger
+  # 4. Mosquitto MQTT Broker
   # --------------------------------------------------------
-  mqtt-logger:
-    build:
-      context: ./cctv_checker
-      dockerfile: Dockerfile
-
-    container_name: mqtt_logger_service
-    restart: always
-
-    environment:
-      - MQTT_LOG_FILE=/opt/zoneminder/data/mqtt_logs.json
-
-      # GANTI dengan hostname HiveMQ Cloud Anda
-      - MQTT_BROKER_HOST=localhost
-      - MQTT_BROKER_PORT=8883
-
-    volumes:
-      - .data:/app/data
-
-  #------------------------------------------------------
-  #  6. Mosquitto MQTT
-  #-----------------------------------------------------
   mosquitto:
     image: eclipse-mosquitto:latest
     container_name: mosquitto_broker
-    ports:
-      - "1883:1883"    # Port MQTT standar
-      - "9001:9001"    # Port MQTT WebSocket (opsional)
-    volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
-      # (Opsional) Persistensi data dan log mosquitto jika diperlukan
-      # - ./mosquitto/data:/mosquitto/data
-      # - ./mosquitto/log:/mosquitto/log
     restart: always
 
+    ports:
+      - "1883:1883"          # Port MQTT TCP
+      - "9001:9001"          # Port MQTT WebSocket
+
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+    networks:
+      - cctv_net
+
+  # --------------------------------------------------------
+  # 5. Camera Health Checker & MQTT Reporter Service
+  # --------------------------------------------------------
+  cctv-checker:
+    build:
+      context: ./cctv_checker
+      dockerfile: Dockerfile
+    container_name: cctv_checker_service
+    restart: always
+
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=1883
+      - MQTT_TOPIC=cctv/#
+      - ZM_HOST=http://zoneminder:80
+      - ZM_USER=admin
+      - ZM_PASS=admin
+      - CHECK_INTERVAL=60
+      - RTSP_TIMEOUT=3.0
+      - RETENTION_DAYS=10
+      - MQTT_LOG_FILE=/app/data/mqtt_logs.json
+
+    volumes:
+      - ./data:/app/data
+
+    networks:
+      - cctv_net
+
+    depends_on:
+      - mosquitto
+      - zoneminder
+
 # --------------------------------------------------------
-# Volumes
+# Networks & Volumes
 # --------------------------------------------------------
+networks:
+  cctv_net:
+    driver: bridge
+
 volumes:
   zoneminder_events:
   zoneminder_images:
   zoneminder_mysql:
-  mqtt_shared_data:
+  caddy_data:
+  caddy_config:

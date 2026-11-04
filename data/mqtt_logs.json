@@ -1,0 +1,278 @@
+[
+  {
+    "timestamp": "2026-11-04 01:49:22",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:49:22",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:48:22",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:48:22",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:47:22",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:47:22",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:46:22",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:46:22",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:45:21",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:45:20",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:44:20",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:44:20",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:44:20",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:44:20",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:44:20",
+    "topic": "cctv/status/monitor-1",
+    "payload": {
+      "timestamp": "2026-11-04 01:44:20",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:43:20",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:43:17",
+      "total_monitors": 2,
+      "online": 1,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:42:17",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:42:13",
+      "total_monitors": 2,
+      "online": 1,
+      "offline": 1,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:42:17",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:42:13",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:42:17",
+    "topic": "cctv/status/monitor-1",
+    "payload": {
+      "timestamp": "2026-11-04 01:42:13",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:41:13",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:41:13",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:40:13",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:40:13",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:40:13",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:40:13",
+      "monitor_id": "2",
+      "name": "Monitor-2",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:40:13",
+    "topic": "cctv/status/monitor-2",
+    "payload": {
+      "timestamp": "2026-11-04 01:40:13",
+      "monitor_id": "2",
+      "name": "Monitor-2",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:40:13",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:40:13",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:40:13",
+    "topic": "cctv/status/monitor-1",
+    "payload": {
+      "timestamp": "2026-11-04 01:40:13",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:39:13",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:39:06",
+      "total_monitors": 2,
+      "online": 0,
+      "offline": 2,
+      "status_changed": 2
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:39:13",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:39:06",
+      "monitor_id": "2",
+      "name": "Monitor-2",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:39:13",
+    "topic": "cctv/status/monitor-2",
+    "payload": {
+      "timestamp": "2026-11-04 01:39:06",
+      "monitor_id": "2",
+      "name": "Monitor-2",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:38:06",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:38:03",
+      "total_monitors": 1,
+      "online": 0,
+      "offline": 1,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:38:06",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:38:03",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:38:06",
+    "topic": "cctv/status/monitor-1",
+    "payload": {
+      "timestamp": "2026-11-04 01:38:03",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERPUTUS (OFFLINE)"
+    }
+  }
+]
