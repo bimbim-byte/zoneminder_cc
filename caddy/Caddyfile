@@ -1,0 +1,20 @@
+{
+    debug
+}
+
+:443 {
+    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
+
+    handle /zm* {
+        reverse_proxy zoneminder:80
+    }
+    handle /cgi-bin* {
+        reverse_proxy zoneminder:80
+    }
+    handle /mqtt {
+        reverse_proxy mosquitto:9001
+    }
+    handle {
+        reverse_proxy ui-interface:8080
+    }
+}

@@ -2,376 +2,354 @@ import json
 import os
 import re
 import requests
-import yaml
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__, static_folder=".")
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-ZM_BASE_URL = "http://127.0.0.1:80/zm/api"
-# Path file log MQTT (menyesuaikan jika menggunakan Docker atau lokal)
-MQTT_LOG_FILE = os.environ.get(
-    "MQTT_LOG_FILE", "/opt/zoneminder/data/mqtt_logs.json"
-)  # ganti ke 'mqtt_logs.json' jika dijalankan lokal tanpa docker
+# ==============================================================================
+# KONFIGURASI ENVIRONMENT
+# ==============================================================================
+ZM_HOST = os.environ.get("ZM_HOST", "http://zoneminder:80")
+ZM_BASE_URL = os.environ.get("ZM_BASE_URL", f"{ZM_HOST}/zm/api")
+ZM_USER = os.environ.get("ZM_USER", "admin")
+ZM_PASS = os.environ.get("ZM_PASS", "admin")
+
+MQTT_LOG_FILE = os.environ.get("MQTT_LOG_FILE", "/app/data/mqtt_logs.json")
+CHECKER_CONFIG_FILE = os.environ.get("CHECKER_CONFIG_FILE", "/app/data/checker_config.json")
+
+# Cache token auth ZM di memori
+ZM_TOKEN = None
 
 
-@app.route("/api/zm/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE"])
-def proxy_zm(subpath):
-  url = f"{ZM_BASE_URL}/{subpath}"
-
-  headers = {
-      key: value for key, value in request.headers if key.lower() != "host"
-  }
-
-  try:
-    resp = requests.request(
-        method=request.method,
-        url=url,
-        headers=headers,
-        data=request.get_data(),
-        params=request.args,
-        cookies=request.cookies,
-        allow_redirects=False,
-    )
-
-    excluded_headers = [
-        "content-encoding",
-        "content-length",
-        "transfer-encoding",
-        "connection",
-    ]
-    resp_headers = [
-        (name, value)
-        for (name, value) in resp.raw.headers.items()
-        if name.lower() not in excluded_headers
-    ]
-
-    response = Response(resp.content, resp.status_code, resp_headers)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = (
-        "GET, POST, PUT, DELETE, OPTIONS"
-    )
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
-
-  except Exception as e:
-    return jsonify({"error": str(e)}), 500
+# ==============================================================================
+# HELPER AUTH ZONEMINDER
+# ==============================================================================
+def get_zm_token():
+    """Mengambil Access Token dari ZoneMinder API."""
+    global ZM_TOKEN
+    login_url = f"{ZM_HOST}/zm/api/host/login.json"
+    try:
+        res = requests.post(
+            login_url,
+            data={"user": ZM_USER, "pass": ZM_PASS},
+            timeout=8,
+            verify=False
+        )
+        if res.status_code == 200:
+            data = res.json()
+            ZM_TOKEN = data.get("access_token")
+            return ZM_TOKEN
+    except Exception as e:
+        print(f"[ERROR AUTH ZM] {e}")
+    return ZM_TOKEN
 
 
-@app.after_request
-def after_request(response):
-  response.headers.add("Access-Control-Allow-Origin", "*")
-  response.headers.add(
-      "Access-Control-Allow-Headers", "Content-Type,Authorization"
-  )
-  response.headers.add(
-      "Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS"
-  )
-  return response
-
-
-# REST API MediaMTX v3
-MEDIAMTX_API = "http://127.0.0.1:9997/v3/config/paths"
-
-# Path mediamtx.yml di dalam container
-YML_PATH = "/opt/zoneminder/mediamtx.yml"
-
-# Konfigurasi ZoneMinder Internal
-ZM_HOST = "http://127.0.0.1:80"
-ZM_USER = "admin"
-ZM_PASS = "admin"
-
-
-@app.route("/zm/api/<path:path>", methods=["GET", "POST", "PUT", "DELETE"])
-def zm_api_proxy(path):
-  zm_url = f"{ZM_HOST}/zm/api/{path}"
-
-  resp = requests.request(
-      method=request.method,
-      url=zm_url,
-      headers={k: v for k, v in request.headers if k.lower() != "host"},
-      data=request.get_data(),
-      cookies=request.cookies,
-      allow_redirects=False,
-      params=request.args,
-  )
-
-  response = (
-      jsonify(resp.json())
-      if resp.headers.get("Content-Type") == "application/json"
-      else resp.content
-  )
-  return response, resp.status_code
-
-
-def save_camera_to_mediamtx(name: str, source: str) -> tuple[bool, str]:
-  try:
-    payload = {"name": name, "source": source, "sourceOnDemand": False}
-    api_res = requests.post(
-        f"{MEDIAMTX_API}/add/{name}", json=payload, timeout=5
-    )
-    print(f"[DEBUG API Response] {api_res.status_code}: {api_res.text}")
-  except Exception as e:
-    print(f"[WARN] MediaMTX API Unreachable: {e}")
-
-  if not os.path.exists(YML_PATH):
-    print(f"[ERROR YML] File TIDAK DITEMUKAN di path container: {YML_PATH}")
-    return False, f"File config tidak ditemukan di {YML_PATH}"
-
-  try:
-    with open(YML_PATH, "r") as f:
-      config = yaml.safe_load(f) or {}
-
-    if "paths" not in config or config["paths"] is None:
-      config["paths"] = {}
-
-    config["paths"][name] = {"source": source, "sourceOnDemand": False}
-
-    with open(YML_PATH, "w") as f:
-      yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-
-    print(f"[SUCCESS] Berhasil menambahkan kamera '{name}' ke {YML_PATH}")
-    return True, f"Kamera '{name}' berhasil disimpan ke mediamtx.yml!"
-
-  except Exception as e:
-    print(f"[ERROR Write YML] {str(e)}")
-    return False, f"Gagal menulis ke file YML: {str(e)}"
-
-
-def get_zm_token() -> str:
-  login_url = f"{ZM_HOST}/zm/api/host/login.json"
-  res = requests.post(
-      login_url, data={"user": ZM_USER, "pass": ZM_PASS}, timeout=5
-  )
-  if res.status_code != 200:
-    raise Exception("Gagal terhubung ke ZoneMinder API login")
-
-  data = res.json()
-  token = data.get("access_token") or data.get("credentials", {}).get(
-      "access_token"
-  )
-
-  if not token:
-    raise Exception("Token autentikasi ZoneMinder tidak ditemukan")
-
-  return token
-
-
-# --- STATIC FILE ROUTES ---
-
-
+# ==============================================================================
+# 1. SERVING STATIC FILES & PAGES
+# ==============================================================================
 @app.route("/")
 def index():
-  return send_from_directory(".", "index.html")
+    return send_from_directory(".", "index.html")
 
 
-@app.route("/index.html")
-def side_index():
-  return send_from_directory(".", "index.html")
+@app.route("/<path:filename>")
+def serve_static(filename):
+    if os.path.exists(os.path.join(".", filename)):
+        return send_from_directory(".", filename)
+    return jsonify({"error": "File tidak ditemukan"}), 404
 
 
-@app.route("/mediamtx.html")
-def mediamtx_page():
-  return send_from_directory(".", "mediamtx.html")
+# ==============================================================================
+# 2. API PROXY KE ZONEMINDER
+# ==============================================================================
+@app.route("/api/zm/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE"])
+@app.route("/zm/api/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE"])
+def proxy_zm(subpath):
+    url = f"{ZM_BASE_URL}/{subpath}"
+    headers = {k: v for k, v in request.headers if k.lower() != "host"}
 
-
-@app.route("/unified_add.html")
-def unified_add_page():
-  return send_from_directory(".", "unified_add.html")
-
-
-@app.route("/zoneminder.html")
-def zoneminder_page():
-  return send_from_directory(".", "zoneminder.html")
-
-
-# ROUTE TAMBAHAN UNTUK LOG DISPLAY HTML
-@app.route("/log_display.html")
-def log_display_page():
-  return send_from_directory(".", "log_display.html")
-
-
-# --- API ROUTES ---
-
-
-# API TAMBAHAN UNTUK MEMBACA FILE LOG MQTT
-@app.route("/api/mqtt-logs", methods=["GET"])
-def get_mqtt_logs():
-  """Membaca isi file log MQTT dan menyajikan dalam format JSON untuk log_display.html"""
-  if os.path.exists(MQTT_LOG_FILE):
     try:
-      with open(MQTT_LOG_FILE, "r", encoding="utf-8") as f:
-        logs = json.load(f)
-      return jsonify(logs)
+        resp = requests.request(
+            method=request.method,
+            url=url,
+            headers=headers,
+            data=request.get_data(),
+            params=request.args,
+            cookies=request.cookies,
+            allow_redirects=False,
+            timeout=15
+        )
+
+        excluded_headers = [
+            "content-encoding",
+            "content-length",
+            "transfer-encoding",
+            "connection",
+        ]
+        resp_headers = [
+            (name, value)
+            for (name, value) in resp.raw.headers.items()
+            if name.lower() not in excluded_headers
+        ]
+
+        response = Response(resp.content, resp.status_code, resp_headers)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
     except Exception as e:
-      return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
-  elif os.path.exists("mqtt_logs.json"):
-    # Fallback jika file berada di root folder proyek
-    try:
-      with open("mqtt_logs.json", "r", encoding="utf-8") as f:
-        logs = json.load(f)
-      return jsonify(logs)
-    except Exception as e:
-      return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
-  else:
-    return jsonify([])
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/add-camera", methods=["POST"])
-def add_camera():
-  data = request.json or {}
-  name = data.get("name", "").strip().lower()
-  source = data.get("source", "").strip()
+# ==============================================================================
+# 3. API PENDAFTARAN KAMERA TUNGGAL (DIRECT RTSP KE ZONEMINDER)
+# ==============================================================================
+@app.route("/api/zoneminder/add-camera", methods=["POST"])
+def add_single_camera():
+    """Mendaftarkan kamera langsung dengan RTSP URL ke ZoneMinder."""
+    data = request.json or {}
 
-  if not name or not source:
-    return jsonify({"error": "Data nama dan URL RTSP wajib diisi"}), 400
+    raw_name = data.get("name", "").strip()
+    source = data.get("source", "").strip()
+    zm_function = data.get("zmFunction", "Monitor")
+    width = str(data.get("width", "1920"))
+    height = str(data.get("height", "1080"))
+    max_fps = str(data.get("maxFps", ""))
+    colorspace = str(data.get("colorspace", "4"))
 
-  if not re.match(r"^[a-z0-9\-_]+$", name):
-    return (
-        jsonify(
-            {"error": "Nama kamera hanya boleh huruf, angka, (-), dan (_)"}
-        ),
-        400,
-    )
+    if not raw_name or not source:
+        return jsonify({"status": "error", "message": "Nama kamera dan URL RTSP wajib diisi!"}), 400
 
-  if not source.lower().startswith("rtsp://"):
-    return jsonify({"error": "URL RTSP harus diawali dengan rtsp://"}), 400
+    if not source.lower().startswith("rtsp://"):
+        return jsonify({"status": "error", "message": "URL kamera harus diawali dengan rtsp://"}), 400
 
-  success, msg = save_camera_to_mediamtx(name, source)
-  if not success:
-    return jsonify({"error": msg}), 500
+    clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", raw_name)
 
-  return jsonify({
-      "status": "success",
-      "message": f"Kamera '{name}' berhasil disimpan ke MediaMTX!",
-  })
-
-
-@app.route("/api/add-camera-dual", methods=["POST"])
-def add_camera_dual():
-  data = request.json or {}
-
-  raw_name = data.get("name", "").strip()
-  zm_name = raw_name
-  mediamtx_name = (
-      data.get("mediamtx_name", "").strip().lower() or zm_name.lower()
-  )
-
-  source = data.get("source", "").strip()
-  zm_function = data.get("zmFunction", "Monitor")
-  width = data.get("width", "1920")
-  height = data.get("height", "1080")
-
-  if not zm_name or not source:
-    return jsonify({"error": "Data nama dan URL RTSP wajib diisi"}), 400
-
-  if not re.match(r"^[a-zA-Z0-9\-_]+$", zm_name):
-    return (
-        jsonify(
-            {"error": "Nama kamera hanya boleh huruf, angka, (-), dan (_)"}
-        ),
-        400,
-    )
-
-  if not source.lower().startswith("rtsp://"):
-    return jsonify({"error": "URL RTSP harus diawali dengan rtsp://"}), 400
-
-  success, msg = save_camera_to_mediamtx(mediamtx_name, source)
-  if not success:
-    return jsonify({"error": f"Gagal di MediaMTX: {msg}"}), 500
-
-  try:
     token = get_zm_token()
-    server_ip = request.host.split(":")[0]
-    mediamtx_relay_url = f"rtsp://{server_ip}:8554/{mediamtx_name}"
+    auth_param = f"?token={token}" if token else ""
 
     zm_payload = {
-        "Monitor[Name]": zm_name,
+        "Monitor[Name]": clean_name,
         "Monitor[Type]": "Ffmpeg",
         "Monitor[Function]": zm_function,
         "Monitor[Enabled]": "1",
-        "Monitor[Path]": mediamtx_relay_url,
+        "Monitor[Path]": source,
         "Monitor[Method]": "rtsp",
         "Monitor[Options]": "rtsp_transport=tcp",
         "Monitor[Width]": width,
         "Monitor[Height]": height,
-        "Monitor[Colours]": "4",
+        "Monitor[Colours]": colorspace,
         "Monitor[TargetColorspace]": "4",
         "Monitor[ServerId]": "0",
     }
+    if max_fps:
+        zm_payload["Monitor[MaxFPS]"] = max_fps
 
-    zm_res = requests.post(
-        f"{ZM_HOST}/zm/api/monitors.json?token={token}",
-        data=zm_payload,
-        timeout=5,
-    )
+    try:
+        res = requests.post(
+            f"{ZM_HOST}/zm/api/monitors.json{auth_param}",
+            data=zm_payload,
+            timeout=10,
+            verify=False
+        )
 
-    if zm_res.status_code not in [200, 201]:
-      raise Exception(
-          f"ZoneMinder API Error ({zm_res.status_code}): {zm_res.text}"
-      )
+        if res.status_code in [200, 201]:
+            res_data = res.json()
+            return jsonify({
+                "status": "success",
+                "message": f"Kamera '{clean_name}' berhasil didaftarkan ke ZoneMinder!",
+                "data": res_data
+            }), 200
+        else:
+            return jsonify({
+                "status": "error",
+                "message": f"ZoneMinder API Error ({res.status_code}): {res.text}"
+            }), res.status_code
 
-    print(
-        f"[SUCCESS] Kamera '{zm_name}' (Path: {mediamtx_name}) Berhasil"
-        " Terdaftar di MediaMTX DAN ZoneMinder!"
-    )
-    return (
-        jsonify({
-            "status": "success",
-            "message": (
-                f"Kamera '{zm_name}' berhasil didaftarkan ke MediaMTX &"
-                " ZoneMinder!"
-            ),
-        }),
-        200,
-    )
-
-  except Exception as e:
-    print(f"[ERROR ZM Server-Side] {str(e)}")
-    return (
-        jsonify({
-            "error": f"MediaMTX Berhasil, tetapi ZoneMinder Gagal: {str(e)}"
-        }),
-        500,
-    )
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Koneksi ke ZoneMinder gagal: {str(e)}"}), 500
 
 
-@app.route("/api/remove-camera/<name>", methods=["DELETE"])
-def remove_camera(name):
-  name = name.strip().lower()
+# ==============================================================================
+# 4. API BURST ADD MASSAL (UPGRADED)
+# ==============================================================================
+@app.route("/api/zoneminder/burst-add", methods=["POST"])
+def burst_add_monitors():
+    """Menambahkan daftar kamera CCTV secara massal (Burst Add) ke ZoneMinder."""
+    data = request.json or {}
+    monitors = data.get("monitors", [])
 
-  try:
-    requests.delete(f"{MEDIAMTX_API}/delete/{name}", timeout=5)
-  except Exception as e:
-    print(f"[WARN] MediaMTX DELETE API Error: {e}")
+    if not monitors or not isinstance(monitors, list):
+        return jsonify({"status": "error", "message": "Tidak ada data kamera yang dikirim!"}), 400
 
-  if not os.path.exists(YML_PATH):
-    return (
-        jsonify({"error": f"File config tidak ditemukan di {YML_PATH}"}),
-        500,
-    )
+    token = get_zm_token()
+    auth_param = f"?token={token}" if token else ""
 
-  try:
-    with open(YML_PATH, "r") as f:
-      config = yaml.safe_load(f) or {}
+    results = []
+    success_count = 0
+    fail_count = 0
 
-    if "paths" in config and config["paths"] and name in config["paths"]:
-      del config["paths"][name]
+    for idx, item in enumerate(monitors):
+        monitor_data = item.get("Monitor", item)
+        name = monitor_data.get("Name", f"CCTV_{idx+1}")
+        clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(name).strip())
+        path = monitor_data.get("Path", "").strip()
 
-      with open(YML_PATH, "w") as f:
-        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        # Validasi dasar
+        if not path or not path.lower().startswith("rtsp://"):
+            fail_count += 1
+            results.append({
+                "name": clean_name,
+                "status": "failed",
+                "error": "URL RTSP tidak valid atau kosong"
+            })
+            continue
 
-      return jsonify({
-          "status": "success",
-          "message": f"Kamera '{name}' berhasil dihapus dari mediamtx.yml!",
-      })
+        # Format payload ZoneMinder
+        payload = {
+            "Monitor[Name]": clean_name,
+            "Monitor[Type]": monitor_data.get("Type", "Ffmpeg"),
+            "Monitor[Function]": monitor_data.get("Function", "Monitor"),
+            "Monitor[Enabled]": "1",
+            "Monitor[Path]": path,
+            "Monitor[Method]": "rtsp",
+            "Monitor[Options]": "rtsp_transport=tcp",
+            "Monitor[Width]": str(monitor_data.get("Width", "1920")),
+            "Monitor[Height]": str(monitor_data.get("Height", "1080")),
+            "Monitor[Colours]": str(monitor_data.get("Colours", "4")),
+            "Monitor[TargetColorspace]": "4",
+            "Monitor[ServerId]": "0"
+        }
+        if monitor_data.get("MaxFPS"):
+            payload["Monitor[MaxFPS]"] = str(monitor_data.get("MaxFPS"))
 
-  except Exception as e:
-    return jsonify({"error": f"Gagal update file YML: {str(e)}"}), 500
+        try:
+            res = requests.post(
+                f"{ZM_HOST}/zm/api/monitors.json{auth_param}",
+                data=payload,
+                timeout=10,
+                verify=False
+            )
+            res_json = res.json() if res.headers.get("content-type", "").startswith("application/json") else {}
+
+            if res.status_code in [200, 201] or "message" in res_json:
+                success_count += 1
+                results.append({"name": clean_name, "status": "success", "id": res_json.get("Id", "")})
+            else:
+                fail_count += 1
+                results.append({"name": clean_name, "status": "failed", "error": res.text[:120]})
+        except Exception as e:
+            fail_count += 1
+            results.append({"name": clean_name, "status": "failed", "error": str(e)})
+
+    return jsonify({
+        "status": "completed",
+        "total": len(monitors),
+        "success_count": success_count,
+        "fail_count": fail_count,
+        "details": results
+    })
 
 
+# ==============================================================================
+# 5. API MQTT LOGS
+# ==============================================================================
+@app.route("/api/mqtt-logs", methods=["GET"])
+def get_mqtt_logs():
+    """Membaca isi file log MQTT dan menyajikan dalam format JSON untuk log_display.html"""
+    if os.path.exists(MQTT_LOG_FILE):
+        try:
+            with open(MQTT_LOG_FILE, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+            return jsonify(logs)
+        except Exception as e:
+            return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
+    elif os.path.exists("mqtt_logs.json"):
+        try:
+            with open("mqtt_logs.json", "r", encoding="utf-8") as f:
+                logs = json.load(f)
+            return jsonify(logs)
+        except Exception as e:
+            return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
+    return jsonify([])
+
+
+# ==============================================================================
+# 6. API KONTROL CCTV CHECKER (TOGGLE AKTIF/MATI & DELAY INTERVAL)
+# ==============================================================================
+def get_checker_config():
+    default_cfg = {
+        "enabled": True,
+        "interval": 60,
+        "rtsp_timeout": 3.0,
+        "run_now": False,
+        "status": "Running",
+        "last_check": None
+    }
+    if os.path.exists(CHECKER_CONFIG_FILE):
+        try:
+            with open(CHECKER_CONFIG_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                default_cfg.update(saved)
+        except Exception:
+            pass
+    return default_cfg
+
+
+def save_checker_config(cfg):
+    try:
+        os.makedirs(os.path.dirname(CHECKER_CONFIG_FILE), exist_ok=True)
+        with open(CHECKER_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"[ERROR SAVE CHECKER CONFIG] {e}")
+        return False
+
+
+@app.route("/api/checker/config", methods=["GET", "POST"])
+def manage_checker_config():
+    """Endpoint untuk membaca dan memperbarui konfigurasi CCTV Checker."""
+    cfg = get_checker_config()
+
+    if request.method == "POST":
+        data = request.json or {}
+        if "enabled" in data:
+            cfg["enabled"] = bool(data["enabled"])
+            cfg["status"] = "Running" if cfg["enabled"] else "Paused"
+        if "interval" in data:
+            try:
+                new_interval = max(5, int(data["interval"]))
+                cfg["interval"] = new_interval
+            except (ValueError, TypeError):
+                pass
+        if "rtsp_timeout" in data:
+            try:
+                cfg["rtsp_timeout"] = max(1.0, float(data["rtsp_timeout"]))
+            except (ValueError, TypeError):
+                pass
+
+        save_checker_config(cfg)
+        return jsonify({"status": "success", "message": "Konfigurasi checker berhasil disimpan!", "config": cfg})
+
+    return jsonify(cfg)
+
+
+@app.route("/api/checker/run-now", methods=["POST"])
+def checker_run_now():
+    """Memicu CCTV Checker untuk segera melakukan pengecekan tanpa menunggu interval."""
+    cfg = get_checker_config()
+    cfg["run_now"] = True
+    save_checker_config(cfg)
+    return jsonify({"status": "success", "message": "Trigger pengecekan segera dikirim ke checker!"})
+
+
+# ==============================================================================
+# MAIN ENTRYPOINT
+# ==============================================================================
 if __name__ == "__main__":
-  print(f"[*] Target YAML File: {YML_PATH}")
-  # app.run(host='0.0.0.0', port=8081)
-  app.run(host="0.0.0.0", port=8081, ssl_context="adhoc", debug=True)
+    port = int(os.environ.get("PORT", 8080))
+    print(f"[*] Menjalankan Dashboard CCTV pada port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)

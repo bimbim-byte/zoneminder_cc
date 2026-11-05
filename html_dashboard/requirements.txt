@@ -1,7 +1,4 @@
-Flask
-flask-cors
-requests
-PyYAML
-opencv-python-headless
-cryptography
-pyopenssl
+Flask==3.0.3
+flask-cors==4.0.1
+requests==2.32.3
+urllib3==2.2.2

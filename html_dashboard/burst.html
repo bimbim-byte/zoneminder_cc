@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZoneMinder - Upgraded Burst Add CCTV</title>
+  <!-- Library SheetJS untuk Ekspor & Impor File Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+    .btn-back {
+      color: white;
+      text-decoration: none;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: .2s;
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.22); }
+
+    .main-layout {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      padding: 16px 24px;
+      gap: 14px;
+      overflow: hidden;
+    }
+
+    /* Tabs Bar */
+    .tabs-bar {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 6px;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      background: none;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: .2s;
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Top Grid */
+    .top-panel {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .card h3 {
+      font-size: 14px;
+      color: var(--primary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: .2s;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: #f1f5f9; }
+    .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+    .form-control {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      background: #fff;
+    }
+    textarea.form-control {
+      resize: vertical;
+      min-height: 70px;
+      font-family: monospace;
+      font-size: 11.5px;
+    }
+
+    /* Progress Bar */
+    .progress-container {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 10px;
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--success);
+      transition: width .2s;
+    }
+    .progress-text { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+    /* Table Section */
+    .table-section {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      min-height: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .table-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 8px 10px; border: 1px solid var(--border); text-align: left; }
+    th { position: sticky; top: 0; background: #0f172a; color: white; z-index: 5; }
+    tr:nth-child(even) { background: #f8fafc; }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-ok { background: #dcfce7; color: #166534; }
+    .badge-err { background: #fee2e2; color: #991b1b; }
+    .badge-pending { background: #f1f5f9; color: #475569; }
+    .btn-del {
+      background: #fee2e2;
+      color: #991b1b;
+      border: none;
+      padding: 3px 7px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🚀 ZoneMinder - Upgraded Burst Add CCTV</h1>
+    <div class="header-actions">
+      <div id="summaryCounter" style="font-size: 13px; opacity: .9;">Total: 0 Kamera</div>
+      <button id="btnSubmitAll" class="btn btn-success" disabled onclick="executeBurstAdd()">
+        ⚡ Daftarkan Semua ke ZoneMinder
+      </button>
+      <a href="index.html" class="btn-back">⬅ Portal</a>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Tabs -->
+    <div class="tabs-bar">
+      <button class="tab-btn active" onclick="switchTab('quick')">⚡ Opsi 1: Quick Paste List RTSP (Cepat)</button>
+      <button class="tab-btn" onclick="switchTab('excel')">📊 Opsi 2: Upload File Excel (.xlsx)</button>
+    </div>
+
+    <!-- Top Input Panels -->
+    <div class="top-panel">
+      <!-- Panel Input -->
+      <div class="card" id="panelQuick">
+        <h3>📝 Paste Daftar URL RTSP</h3>
+        <textarea id="rawRtspInput" class="form-control" placeholder="rtsp://admin:pass@192.168.1.101:554/ch1&#10;rtsp://admin:pass@192.168.1.102:554/ch1"></textarea>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <input type="text" id="prefixName" class="form-control" placeholder="Prefix (misal: CAM_LT1_)" value="CAM_LT1_">
+          <button class="btn btn-primary" onclick="parseQuickList()">Generate & Preview</button>
+        </div>
+      </div>
+
+      <div class="card" id="panelExcel" style="display: none;">
+        <h3>📥 Template & Upload Excel</h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <button class="btn btn-outline" style="flex: 1;" onclick="downloadExcelTemplate()">Unduh Format (.xlsx)</button>
+        </div>
+        <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="form-control" onchange="handleExcelUpload(event)">
+      </div>
+
+      <!-- Panduan & Pengaturan Global -->
+      <div class="card">
+        <h3>⚙️ Pengaturan Default & Panduan</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 12px;">
+          <div>
+            <label style="font-weight: 600;">Fungsi ZM:</label>
+            <select id="defaultFunc" class="form-control">
+              <option value="Monitor" selected>Monitor</option>
+              <option value="Modect">Modect</option>
+              <option value="Record">Record</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: 600;">Resolusi:</label>
+            <select id="defaultRes" class="form-control">
+              <option value="1920x1080" selected>1920 x 1080</option>
+              <option value="1280x720">1280 x 720</option>
+              <option value="640x480">640 x 480</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: 600;">Max FPS:</label>
+            <input type="number" id="defaultFps" class="form-control" placeholder="15">
+          </div>
+        </div>
+
+        <!-- Progress Box -->
+        <div id="progressBox" class="progress-container">
+          <div class="progress-bar-bg">
+            <div id="progressFill" class="progress-bar-fill"></div>
+          </div>
+          <div id="progressText" class="progress-text">Memproses 0 / 0 kamera...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table Preview Section -->
+    <div class="table-section">
+      <div class="table-header">
+        <h3 style="font-size: 14px; color: var(--text);">📋 Daftar Kamera yang Akan Didaftarkan</h3>
+        <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="clearAllRows()">Bersihkan Semua</button>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 40px;">No</th>
+              <th style="width: 180px;">Nama Kamera</th>
+              <th>URL RTSP Stream</th>
+              <th style="width: 110px;">Fungsi</th>
+              <th style="width: 110px;">Resolusi</th>
+              <th style="width: 70px;">FPS</th>
+              <th style="width: 110px;">Status</th>
+              <th style="width: 50px;">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="cameraTableBody">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--muted); padding: 30px;">
+                Belum ada data kamera. Paste daftar URL RTSP atau upload file Excel di atas.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let cameraList = [];
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (tab === 'quick') {
+        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+        document.getElementById('panelQuick').style.display = 'block';
+        document.getElementById('panelExcel').style.display = 'none';
+      } else {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('panelQuick').style.display = 'none';
+        document.getElementById('panelExcel').style.display = 'block';
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('cameraTableBody');
+      const submitBtn = document.getElementById('btnSubmitAll');
+      const summary = document.getElementById('summaryCounter');
+
+      if (cameraList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 30px;">Belum ada data kamera. Silakan masukkan data di atas.</td></tr>`;
+        submitBtn.disabled = true;
+        summary.innerText = "Total: 0 Kamera";
+        return;
+      }
+
+      let html = '';
+      cameraList.forEach((cam, idx) => {
+        const isUrlOk = cam.Path && cam.Path.toLowerCase().startsWith('rtsp://');
+        const badgeStatus = cam.executionStatus
+          ? (cam.executionStatus === 'SUCCESS' ? '<span class="badge badge-ok">✅ Berhasil</span>' : `<span class="badge badge-err" title="${cam.executionError || ''}">❌ Gagal</span>`)
+          : (isUrlOk ? '<span class="badge badge-pending">Siap</span>' : '<span class="badge badge-err">Invalid URL</span>');
+
+        html += `
+          <tr>
+            <td>${idx + 1}</td>
+            <td><input type="text" class="form-control" value="${cam.Name}" onchange="updateCamField(${idx}, 'Name', this.value)"></td>
+            <td><input type="text" class="form-control" value="${cam.Path}" onchange="updateCamField(${idx}, 'Path', this.value)"></td>
+            <td>
+              <select class="form-control" onchange="updateCamField(${idx}, 'Function', this.value)">
+                <option value="Monitor" ${cam.Function === 'Monitor' ? 'selected' : ''}>Monitor</option>
+                <option value="Modect" ${cam.Function === 'Modect' ? 'selected' : ''}>Modect</option>
+                <option value="Record" ${cam.Function === 'Record' ? 'selected' : ''}>Record</option>
+              </select>
+            </td>
+            <td>${cam.Width}x${cam.Height}</td>
+            <td>${cam.MaxFPS || '-'}</td>
+            <td>${badgeStatus}</td>
+            <td><button class="btn-del" onclick="deleteRow(${idx})">✕</button></td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+      submitBtn.disabled = false;
+      summary.innerText = `Total: ${cameraList.length} Kamera`;
+    }
+
+    function updateCamField(idx, field, val) {
+      if (cameraList[idx]) {
+        cameraList[idx][field] = val.trim();
+      }
+    }
+
+    function deleteRow(idx) {
+      cameraList.splice(idx, 1);
+      renderTable();
+    }
+
+    function clearAllRows() {
+      cameraList = [];
+      renderTable();
+    }
+
+    function parseQuickList() {
+      const raw = document.getElementById('rawRtspInput').value.trim();
+      if (!raw) return alert('Silakan paste minimal 1 URL RTSP');
+
+      const prefix = document.getElementById('prefixName').value.trim() || 'CAM_';
+      const func = document.getElementById('defaultFunc').value;
+      const [width, height] = document.getElementById('defaultRes').value.split('x');
+      const fps = document.getElementById('defaultFps').value.trim();
+
+      const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      lines.forEach((url, i) => {
+        const num = String(cameraList.length + 1).padStart(2, '0');
+        cameraList.push({
+          Name: `${prefix}${num}`,
+          Type: 'Ffmpeg',
+          Function: func,
+          Path: url,
+          Width: width,
+          Height: height,
+          MaxFPS: fps,
+          Colours: '4'
+        });
+      });
+
+      document.getElementById('rawRtspInput').value = '';
+      renderTable();
+    }
+
+    function downloadExcelTemplate() {
+      const data = [
+        { Name: "CAM_LOBBY_01", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.10:554/ch1", Width: 1920, Height: 1080, "Max FPS": 15 },
+        { Name: "CAM_PARKIR_02", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.11:554/ch1", Width: 1920, Height: 1080, "Max FPS": 15 }
+      ];
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Format CCTV");
+      XLSX.writeFile(wb, "Template_Burst_Add_CCTV.xlsx");
+    }
+
+    function handleExcelUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+        rows.forEach((r, idx) => {
+          cameraList.push({
+            Name: r['Name'] || `CCTV_${cameraList.length + 1}`,
+            Type: r['Type'] || 'Ffmpeg',
+            Function: r['Function'] || 'Monitor',
+            Path: r['Source Path'] || r['Path'] || '',
+            Width: String(r['Width'] || '1920'),
+            Height: String(r['Height'] || '1080'),
+            MaxFPS: String(r['Max FPS'] || ''),
+            Colours: '4'
+          });
+        });
+
+        event.target.value = '';
+        renderTable();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    async function executeBurstAdd() {
+      if (cameraList.length === 0) return;
+
+      const submitBtn = document.getElementById('btnSubmitAll');
+      const progressBox = document.getElementById('progressBox');
+      const progressFill = document.getElementById('progressFill');
+      const progressText = document.getElementById('progressText');
+
+      submitBtn.disabled = true;
+      progressBox.style.display = 'flex';
+      progressFill.style.width = '10%';
+      progressText.innerText = `Mengirim ${cameraList.length} kamera ke ZoneMinder...`;
+
+      try {
+        const payload = cameraList.map(c => ({
+          Monitor: {
+            Name: c.Name,
+            Type: c.Type || 'Ffmpeg',
+            Function: c.Function || 'Monitor',
+            Path: c.Path,
+            Width: c.Width,
+            Height: c.Height,
+            MaxFPS: c.MaxFPS,
+            Colours: '4'
+          }
+        }));
+
+        const res = await fetch('/api/zoneminder/burst-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ monitors: payload })
+        });
+
+        const data = await res.json();
+        progressFill.style.width = '100%';
+
+        if (res.ok && data.status === 'completed') {
+          progressText.innerText = `Selesai: ${data.success_count} Sukses, ${data.fail_count} Gagal.`;
+          
+          // Tandai status pada baris tabel
+          if (Array.isArray(data.details)) {
+            data.details.forEach((det, idx) => {
+              if (cameraList[idx]) {
+                cameraList[idx].executionStatus = det.status === 'success' ? 'SUCCESS' : 'FAILED';
+                cameraList[idx].executionError = det.error || '';
+              }
+            });
+          }
+          renderTable();
+          alert(`Pendaftaran Selesai!\n🟢 Berhasil: ${data.success_count}\n🔴 Gagal: ${data.fail_count}`);
+        } else {
+          progressText.innerText = `Error: ${data.message || 'Gagal'}`;
+          alert(`Error: ${data.message}`);
+        }
+      } catch (err) {
+        progressText.innerText = `Gagal mengirim request: ${err.message}`;
+        alert(`Gagal menghubungi server: ${err.message}`);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
+
