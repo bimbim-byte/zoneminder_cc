@@ -1,0 +1,62 @@
+# ==============================================================================
+# 1. Kredensial, Kunci Privat & Sertifikat SSL (PENTING / SENSITIF)
+# ==============================================================================
+caddy/certs/*.key
+caddy/certs/*.pem
+caddy/certs/*.crt
+caddy/certs/*.csr
+!caddy/certs/.gitkeep
+!caddy/certs/openssl.cnf
+
+# ==============================================================================
+# 2. File Log & Data Runtime Kamera (Menghindari Kebocoran IP & Password RTSP)
+# ==============================================================================
+data/*.json
+data/*.log
+!data/.gitkeep
+mqtt_logs.json
+checker_config.json
+
+# ==============================================================================
+# 3. Environment Variables & Secret Files
+# ==============================================================================
+.env
+.env.*
+*.env
+
+# ==============================================================================
+# 4. Python Cache & Virtual Environments
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+
+# ==============================================================================
+# 5. OS & IDE System Files
+# ==============================================================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+.idea/
+.vscode/
+.continue/
+*.sublime-workspace
+*.sublime-project
+
+# ==============================================================================
+# 6. File Backup & Temporary Files
+# ==============================================================================
+*.bak
+*.tmp
+*.temp
+*~
+*.swp
+*.swo
+
