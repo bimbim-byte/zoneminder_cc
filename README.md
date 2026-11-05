@@ -2,6 +2,8 @@
 
 Sistem manajemen kamera CCTV terpusat berbasis **ZoneMinder NVR** dengan antarmuka web modern (*Single Page Application*), reverse proxy aman berbasis **HTTPS (Caddy)**, pendaftaran kamera massal (*Burst Add* via teks & Excel), serta deteksi keaktifan kamera otomatis berbasis *TCP Socket RTSP* yang dilaporkan secara *real-time* melalui broker **Mosquitto MQTT**.
 
+> 💡 **Panduan Pemula Lengkap:** Bagi pengguna baru yang membutuhkan tutorial langkah-demi-langkah Command Prompt / terminal dari awal, silakan baca **[PANDUAN_PENGGUNAAN.md](PANDUAN_PENGGUNAAN.md)**.
+
 ---
 
 ## 📋 Daftar Isi
