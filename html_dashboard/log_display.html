@@ -1,88 +1,874 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MQTT Monitor File Log Viewer</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            margin: 0;
-            padding: 20px;
-        }
-        h2 { margin-top: 0; color: #569cd6; }
-        .info { font-size: 13px; color: #aaa; margin-bottom: 15px; }
-        #log-container {
-            background-color: #252526;
-            border: 1px solid #3c3c3c;
-            border-radius: 6px;
-            height: 550px;
-            overflow-y: auto;
-            padding: 10px;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 13px;
-        }
-        .log-entry { margin-bottom: 8px; padding: 6px; border-bottom: 1px solid #333; word-break: break-all; }
-        .time { color: #808080; }
-        .topic { color: #ce9178; font-weight: bold; }
-        .payload { color: #b5cea8; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZoneMinder - Live MQTT Health Log & Notification Hub</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-back {
+      color: white;
+      text-decoration: none;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: .2s;
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.22); }
+
+    .main-layout {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      padding: 16px 24px;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    /* Tabs Bar */
+    .tabs-bar {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 6px;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 7px 16px;
+      background: none;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: .2s;
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Top Grid */
+    .top-panel {
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card h3 {
+      font-size: 14px;
+      color: var(--primary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .form-control {
+      width: 100%;
+      height: 34px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: .2s;
+      height: 34px;
+    }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-warning { background: var(--warning); color: white; }
+    .btn-warning:hover { background: #b45309; }
+    .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: #f1f5f9; }
+
+    .btn-small {
+      height: 28px;
+      padding: 0 10px;
+      font-size: 11.5px;
+      border-radius: 4px;
+    }
+
+    /* Checker Box */
+    .checker-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+
+    /* Summary Stat Cards */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .stat-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat-box .stat-val {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    .stat-box .stat-lbl {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* Table Section */
+    .table-section {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      min-height: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .table-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #0f172a;
+      color: white;
+      font-weight: 600;
+      z-index: 5;
+      white-space: nowrap;
+    }
+    tr:nth-child(even) { background: #f8fafc; }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-ok { background: #dcfce7; color: #166534; }
+    .badge-err { background: #fee2e2; color: #991b1b; }
+    .badge-running { background: #dcfce7; color: #15803d; }
+    .badge-paused { background: #fef3c7; color: #b45309; }
+    .badge-pending { background: #f1f5f9; color: #475569; }
+
+    /* Tutorial Panel Details */
+    .tutorial-content {
+      padding: 14px 18px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .param-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      font-size: 12px;
+    }
+    .param-table th, .param-table td {
+      border: 1px solid var(--border);
+      padding: 7px 10px;
+      text-align: left;
+    }
+    .param-table th { background: #0f172a; color: white; }
+    .param-table td { background: #fff; }
+
+    .code-box {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 11.5px;
+      color: #0f172a;
+      overflow-x: auto;
+      margin: 6px 0 12px;
+      line-height: 1.5;
+    }
+    .step-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      padding: 10px 14px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 8px;
+      font-size: 12.5px;
+    }
+    .step-card h4 { margin: 0 0 4px; color: var(--text); font-size: 13px; font-weight: 600; }
+
+    @media (max-width: 900px) {
+      body { height: auto; overflow: auto; }
+      .top-panel { grid-template-columns: 1fr; }
+      .main-layout { overflow: visible; }
+      .table-wrapper { height: 400px; }
+    }
+  </style>
 </head>
 <body>
 
-    <h2>MQTT Monitor Log Viewer (10 Hari Retensi)</h2>
-    <div class="info">
-        * Data diambil dari API Flask <code>/api/mqtt-logs</code> yang membaca file log MQTT. Log yang berumur lebih dari 10 hari otomatis dibersihkan.
+  <header>
+    <h1>📡 ZoneMinder - Live MQTT Health Log & Notification Hub</h1>
+    <div class="header-actions">
+      <div id="logCountHeader" style="font-size: 13px; opacity: .9;">0 Entri Log</div>
+      <button id="toggleRefreshBtn" class="btn btn-outline btn-small" onclick="toggleAutoRefresh()">
+        ⏸ Pause Auto-Refresh
+      </button>
+      <button class="btn btn-primary btn-small" onclick="fetchLogsFromFile()">
+        🔄 Refresh
+      </button>
+      <a href="/zm/" target="_blank" class="btn-back">🖥️ ZoneMinder Web (/zm/)</a>
+      <a href="index.html" class="btn-back">⬅ Portal</a>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Tabs Bar -->
+    <div class="tabs-bar">
+      <button class="tab-btn active" id="tabBtnLog" onclick="switchTab('log')">📋 Live Stream Log Kamera MQTT</button>
+      <button class="tab-btn" id="tabBtnGuide" onclick="switchTab('guide')">📘 Panduan Notifikasi HP Android / iOS & Device Lain</button>
     </div>
 
-    <div id="log-container">Memuat log dari server...</div>
+    <!-- Top Grid Panels -->
+    <div class="top-panel">
+      <!-- Panel 1: Kontrol CCTV Health Checker -->
+      <div class="card">
+        <h3>
+          <span>⚙️ Kendali CCTV Health Checker</span>
+          <span id="checkerStatusBadge" class="badge badge-running">Memuat Status...</span>
+        </h3>
 
-    <script>
-        // Menggunakan relative URL ke API endpoint Flask yang sama
-        const API_URL = "/api/mqtt-logs";
-        const logContainer = document.getElementById("log-container");
+        <div class="checker-grid">
+          <div>
+            <label style="font-size:11px; font-weight:600; display:block; margin-bottom:4px; color:var(--muted);">Operasional Checker</label>
+            <button id="btnToggleChecker" class="btn btn-warning" style="width:100%; height:32px; font-size:12px;" onclick="toggleCheckerActive()">
+              ⏸ Jeda Checker
+            </button>
+          </div>
 
-        async function fetchLogsFromFile() {
-            try {
-                const response = await fetch(API_URL);
-                const logs = await response.json();
+          <div>
+            <label style="font-size:11px; font-weight:600; display:block; margin-bottom:4px; color:var(--muted);">Trigger Manual</label>
+            <button id="btnRunNow" class="btn btn-success" style="width:100%; height:32px; font-size:12px;" onclick="triggerRunNow()">
+              ⚡ Cek Semua Sekarang
+            </button>
+          </div>
 
-                if (!Array.isArray(logs) || logs.length === 0) {
-                    logContainer.innerHTML = "<em>Belum ada log tersimpan.</em>";
-                    return;
-                }
+          <div style="grid-column: 1 / -1;">
+            <label for="checkerIntervalInput" style="font-size:11px; font-weight:600; display:block; margin-bottom:4px; color:var(--muted);">Delay Interval Pengecekan (Detik)</label>
+            <div style="display:flex; gap:6px;">
+              <input type="number" id="checkerIntervalInput" class="form-control" min="5" max="3600" value="60" style="width:80px; height:32px;">
+              <button class="btn btn-primary" style="flex:1; height:32px; font-size:12px;" onclick="updateCheckerInterval()">💾 Simpan Interval</button>
+            </div>
+          </div>
+        </div>
 
-                let htmlContent = "";
-                logs.forEach(item => {
-                    htmlContent += `
-                        <div class="log-entry">
-                            <span class="time">[${escapeHtml(item.timestamp)}]</span> 
-                            <span class="topic">${escapeHtml(item.topic)}</span>: 
-                            <span class="payload">${escapeHtml(item.payload)}</span>
-                        </div>
-                    `;
-                });
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--muted);">
+          <span id="checkerLastRunText">Terakhir diperiksa: -</span>
+          <span>Topic: <code>cctv/events</code></span>
+        </div>
+      </div>
 
-                logContainer.innerHTML = htmlContent;
-            } catch (error) {
-                logContainer.innerHTML = `<span style="color:#f44747;">Gagal terhubung ke Flask API Log (${API_URL}). Pastikan server berjalan.</span>`;
-            }
+      <!-- Panel 2: Live Summary Statistik & Broker Info -->
+      <div class="card">
+        <h3>
+          <span>📊 Status Kesehatan Kamera & Broker MQTT</span>
+          <span class="badge badge-ok">Mosquitto Online</span>
+        </h3>
+
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-lbl">Total Kamera</div>
+            <div class="stat-val" id="statTotal" style="color:var(--primary);">-</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-lbl">Online</div>
+            <div class="stat-val" id="statOnline" style="color:var(--success);">-</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-lbl">Offline</div>
+            <div class="stat-val" id="statOffline" style="color:var(--danger);">-</div>
+          </div>
+        </div>
+
+        <div style="font-size:11px; color:var(--muted); background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
+          <span>Host: <b id="displayHostIp">&lt;IP_SERVER&gt;</b> &bull; TCP Port: <b>1883</b> &bull; WS: <b>9001</b></span>
+          <span>Topik Utama: <code>cctv/events</code></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Section: TAB 1 - Log Table Preview -->
+    <div class="table-section" id="panelLogTable">
+      <div class="table-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size:14px; color:var(--text); margin-bottom:0;">📋 Live Log Event & Status Kamera</h3>
+          <span id="filteredCountBadge" class="badge badge-ok">0 Entri</span>
+        </div>
+
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" id="searchInput" class="form-control" style="width:200px; height:28px; font-size:11.5px;" placeholder="🔍 Cari kamera / pesan..." oninput="filterLogs()">
+          <select id="filterStatus" class="form-control" style="width:130px; height:28px; font-size:11.5px;" onchange="filterLogs()">
+            <option value="ALL">Semua Status</option>
+            <option value="ONLINE">Hanya ONLINE</option>
+            <option value="OFFLINE">Hanya OFFLINE</option>
+            <option value="SUMMARY">Hanya Summary</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 150px;">Waktu</th>
+              <th style="width: 170px;">Topik MQTT</th>
+              <th style="width: 100px;">Status</th>
+              <th>Pesan / Rincian Payload</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr>
+              <td colspan="4" style="text-align: center; color: var(--muted); padding: 30px;">
+                Memuat data log dari Mosquitto broker...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Bottom Section: TAB 2 - Tutorial Guide Section -->
+    <div class="table-section" id="panelTutorial" style="display:none;">
+      <div class="table-header">
+        <h3 style="font-size:14px; color:var(--text); margin-bottom:0;">📘 Panduan Integrasi: Pasang Notifikasi CCTV MQTT di HP Android / iOS & Device Lain</h3>
+        <button class="btn btn-primary btn-small" onclick="switchTab('log')">⬅ Kembali ke Log</button>
+      </div>
+
+      <div class="table-wrapper tutorial-content">
+        <p style="font-size:12.5px; color:var(--muted); margin-bottom:12px;">
+          Terima notifikasi popup dan nada dering seketika saat ada kamera CCTV yang mati atau kembali online menggunakan broker Mosquitto MQTT:
+        </p>
+
+        <h4 style="font-size:13px; color:var(--primary); margin-bottom:6px;">1. Parameter Koneksi Broker Mosquitto MQTT</h4>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Nilai / Konfigurasi</th>
+              <th>Keterangan</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Broker Host</b></td>
+              <td><code id="displayHostGuide">&lt;IP_SERVER&gt;</code> (IP Komputer Server)</td>
+              <td>Gunakan IP LAN komputer server untuk diakses dari HP / device lain di satu WiFi.</td>
+            </tr>
+            <tr>
+              <td><b>Port TCP (Native MQTT)</b></td>
+              <td><code>1883</code></td>
+              <td><b>Wajib untuk:</b> Aplikasi HP (MQTT Dash / IoT MQTT Panel), Home Assistant, Python, ESP32.</td>
+            </tr>
+            <tr>
+              <td><b>Port WebSocket (WSS)</b></td>
+              <td><code>9001</code> atau <code>443 (/mqtt)</code></td>
+              <td>Khusus aplikasi web / browser client.</td>
+            </tr>
+            <tr>
+              <td><b>Autentikasi</b></td>
+              <td><i>Anonymous (Tanpa User & Password)</i></td>
+              <td>Kosongkan kolom username dan password di aplikasi penerima.</td>
+            </tr>
+            <tr>
+              <td><b>Topik Notifikasi Utama</b></td>
+              <td><code>cctv/events</code></td>
+              <td><b>(Sangat Direkomendasikan)</b> Mengirim sinyal saat status kamera beralih ONLINE / OFFLINE.</td>
+            </tr>
+            <tr>
+              <td><b>Topik Status Spesifik</b></td>
+              <td><code>cctv/status/+</code></td>
+              <td>Status individual per kamera (contoh: <code>cctv/status/kamera_depan</code>).</td>
+            </tr>
+            <tr>
+              <td><b>Topik Ringkasan (Summary)</b></td>
+              <td><code>cctv/summary</code></td>
+              <td>Data berkala total kamera online & offline.</td>
+            </tr>
+            <tr>
+              <td><b>Topik Trigger Remote</b></td>
+              <td><code>cctv/control/run_now</code></td>
+              <td>Publish pesan kosong ke topik ini dari HP untuk memicu cek kamera saat itu juga.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4 style="font-size:13px; color:var(--primary); margin:14px 0 6px;">2. Contoh Struktur Payload JSON (Topic: <code>cctv/events</code>)</h4>
+        <div class="code-box">{
+  "timestamp": "2026-11-05 10:15:00",
+  "monitor_id": "2",
+  "name": "Kamera_Gerbang_Utama",
+  "status": "OFFLINE",
+  "rtsp_url": "rtsp://admin:pass@192.168.1.100:554/stream1",
+  "message": "Kamera 'Kamera_Gerbang_Utama' TERPUTUS (OFFLINE)"
+}</div>
+
+        <h4 style="font-size:13px; color:var(--primary); margin:14px 0 6px;">3. Cara Pasang di Aplikasi HP Android / iOS (Contoh: MQTT Dash)</h4>
+        <div class="step-card">
+          <h4>Langkah 1: Unduh Aplikasi MQTT Client</h4>
+          <p style="margin:0; color:var(--muted);">Buka Google Play Store atau Apple App Store, lalu instal <b>MQTT Dash</b> atau <b>IoT MQTT Panel</b>.</p>
+        </div>
+        <div class="step-card">
+          <h4>Langkah 2: Tambahkan Koneksi Broker Baru</h4>
+          <p style="margin:0; color:var(--muted);">
+            - <b>Name:</b> ZoneMinder CCTV Alert<br>
+            - <b>Address / Host:</b> Masukkan IP LAN Komputer Server ini (Contoh: <code>192.168.1.50</code>)<br>
+            - <b>Port:</b> <code>1883</code> &bull; <b>Client ID:</b> Bebas / Acak<br>
+            - Simpan (Save) dan pastikan ikon berubah hijau (Connected).
+          </p>
+        </div>
+        <div class="step-card">
+          <h4>Langkah 3: Buat Tile / Notifikasi Alarm</h4>
+          <p style="margin:0; color:var(--muted);">
+            - Tambahkan widget baru bertipe <b>Text / Log</b>.<br>
+            - Masukkan Topic: <code>cctv/events</code><br>
+            - Aktifkan fitur <b>"Enable notifications on receive"</b>.<br>
+            - HP Anda kini akan bergetar dan membunyikan alarm setiap kali koneksi CCTV mati atau pulih kembali!
+          </p>
+        </div>
+
+        <h4 style="font-size:13px; color:var(--primary); margin:14px 0 6px;">4. Script Contoh Python Listener untuk PC / Laptop Lain</h4>
+        <div class="code-box">import paho.mqtt.client as mqtt
+import json
+
+BROKER = "192.168.1.50"  # Ganti dengan IP komputer server ZoneMinder Anda
+PORT = 1883
+
+def on_message(client, userdata, msg):
+    try:
+        data = json.loads(msg.payload.decode())
+        print(f"[{data.get('timestamp')}] {data.get('status')}: {data.get('message')}")
+    except Exception:
+        print(f"[{msg.topic}] {msg.payload.decode()}")
+
+client = mqtt.Client()
+client.on_message = on_message
+client.connect(BROKER, PORT, 60)
+client.subscribe("cctv/events")
+print("[*] Mendengarkan notifikasi ZoneMinder CCTV... Tekan Ctrl+C untuk berhenti.")
+client.loop_forever()</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "/api/mqtt-logs";
+    let isAutoRefresh = true;
+    let refreshInterval = null;
+    let allLogs = [];
+    let checkerConfig = { enabled: true, interval: 60 };
+
+    // =========================================================================
+    // 1. TABS MANAGEMENT
+    // =========================================================================
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const pLog = document.getElementById('panelLogTable');
+      const pGuide = document.getElementById('panelTutorial');
+
+      if (tab === 'log') {
+        document.getElementById('tabBtnLog').classList.add('active');
+        pLog.style.display = 'flex';
+        pGuide.style.display = 'none';
+      } else {
+        document.getElementById('tabBtnGuide').classList.add('active');
+        pLog.style.display = 'none';
+        pGuide.style.display = 'flex';
+      }
+    }
+
+    // =========================================================================
+    // 2. CCTV CHECKER CONTROLLER API
+    // =========================================================================
+    async function loadCheckerConfig() {
+      try {
+        const res = await fetch('/api/checker/config');
+        if (res.ok) {
+          checkerConfig = await res.json();
+          renderCheckerStatus();
+        }
+      } catch (e) {
+        console.error('Error fetching checker config:', e);
+      }
+    }
+
+    function renderCheckerStatus() {
+      const badge = document.getElementById('checkerStatusBadge');
+      const btnToggle = document.getElementById('btnToggleChecker');
+      const intervalInput = document.getElementById('checkerIntervalInput');
+      const lastRunText = document.getElementById('checkerLastRunText');
+
+      if (intervalInput && checkerConfig.interval) {
+        intervalInput.value = checkerConfig.interval;
+      }
+
+      if (lastRunText) {
+        lastRunText.innerText = checkerConfig.last_check 
+          ? `Terakhir diperiksa: ${checkerConfig.last_check}`
+          : "Terakhir diperiksa: -";
+      }
+
+      if (checkerConfig.enabled) {
+        if (badge) {
+          badge.className = "badge badge-running";
+          badge.innerText = "🟢 Berjalan (Active)";
+        }
+        if (btnToggle) {
+          btnToggle.className = "btn btn-warning";
+          btnToggle.innerText = "⏸ Jeda (Pause)";
+        }
+      } else {
+        if (badge) {
+          badge.className = "badge badge-paused";
+          badge.innerText = "⏸ Dinonaktifkan";
+        }
+        if (btnToggle) {
+          btnToggle.className = "btn btn-success";
+          btnToggle.innerText = "▶ Aktifkan";
+        }
+      }
+    }
+
+    async function toggleCheckerActive() {
+      const newStatus = !checkerConfig.enabled;
+      try {
+        const res = await fetch('/api/checker/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: newStatus })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          checkerConfig = data.config || checkerConfig;
+          checkerConfig.enabled = newStatus;
+          renderCheckerStatus();
+        }
+      } catch (e) {
+        alert('Gagal mengubah status checker: ' + e.message);
+      }
+    }
+
+    async function updateCheckerInterval() {
+      const input = document.getElementById('checkerIntervalInput');
+      const val = parseInt(input.value);
+      if (isNaN(val) || val < 5) {
+        return alert('Interval minimal adalah 5 detik!');
+      }
+
+      try {
+        const res = await fetch('/api/checker/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interval: val })
+        });
+        if (res.ok) {
+          alert(`Interval pengecekan berhasil diubah menjadi ${val} detik!`);
+          await loadCheckerConfig();
+        }
+      } catch (e) {
+        alert('Gagal menyimpan interval: ' + e.message);
+      }
+    }
+
+    async function triggerRunNow() {
+      const btn = document.getElementById('btnRunNow');
+      const origText = btn ? btn.innerText : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Memeriksa...";
+      }
+
+      try {
+        const res = await fetch('/api/checker/run-now', { method: 'POST' });
+        if (res.ok) {
+          alert('Pemeriksaan kamera RTSP sedang berjalan!');
+          setTimeout(async () => {
+            await loadCheckerConfig();
+            await fetchLogsFromFile();
+          }, 2500);
+        }
+      } catch (e) {
+        alert('Gagal mengirim trigger: ' + e.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = origText;
+        }
+      }
+    }
+
+    // =========================================================================
+    // 3. LOG VIEWER & SEARCH/FILTER
+    // =========================================================================
+    async function fetchLogsFromFile() {
+      try {
+        const response = await fetch(API_URL);
+        allLogs = await response.json();
+        renderLogs();
+      } catch (error) {
+        document.getElementById("logTableBody").innerHTML = `<tr><td colspan="4" style="color:#ef4444; text-align:center; padding:20px;">Gagal mengambil log: ${error.message}</td></tr>`;
+      }
+    }
+
+    function renderLogs() {
+      const tbody = document.getElementById("logTableBody");
+      const search = (document.getElementById("searchInput").value || '').toLowerCase().trim();
+      const filterStatus = document.getElementById("filterStatus").value;
+      const counterHeader = document.getElementById("logCountHeader");
+      const badgeFiltered = document.getElementById("filteredCountBadge");
+
+      if (!Array.isArray(allLogs) || allLogs.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='4' style='color:var(--muted); text-align:center; padding:30px;'>Belum ada log aktivitas kamera yang terekam.</td></tr>";
+        if (counterHeader) counterHeader.innerText = "0 Entri Log";
+        if (badgeFiltered) badgeFiltered.innerText = "0 Entri";
+        return;
+      }
+
+      if (counterHeader) counterHeader.innerText = `${allLogs.length} Entri Log`;
+
+      // Update Live Stats from latest summary entry if present
+      for (let item of allLogs) {
+        if (item.topic === "cctv/summary" && typeof item.payload === "object" && item.payload !== null) {
+          document.getElementById('statTotal').innerText = item.payload.total_monitors ?? "-";
+          document.getElementById('statOnline').innerText = item.payload.online ?? "-";
+          document.getElementById('statOffline').innerText = item.payload.offline ?? "-";
+          break;
+        }
+      }
+
+      let filtered = allLogs.filter(item => {
+        const t = (item.topic || '').toLowerCase();
+        const p = typeof item.payload === 'object' ? JSON.stringify(item.payload).toLowerCase() : String(item.payload || '').toLowerCase();
+
+        if (filterStatus === "ONLINE" && !p.includes('"online"') && !p.includes('online')) return false;
+        if (filterStatus === "OFFLINE" && !p.includes('"offline"') && !p.includes('offline')) return false;
+        if (filterStatus === "SUMMARY" && !t.includes('summary')) return false;
+
+        if (search) {
+          return t.includes(search) || p.includes(search);
+        }
+        return true;
+      });
+
+      if (badgeFiltered) badgeFiltered.innerText = `${filtered.length} dari ${allLogs.length} Entri`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='4' style='color:var(--muted); text-align:center; padding:30px;'>Tidak ada log yang sesuai dengan filter pencarian.</td></tr>";
+        return;
+      }
+
+      let html = "";
+      filtered.forEach(item => {
+        let payloadContent = "";
+        let statusBadge = "";
+
+        if (typeof item.payload === 'object' && item.payload !== null) {
+          const p = item.payload;
+          if (p.status === "ONLINE") {
+            statusBadge = '<span class="badge badge-ok">ONLINE</span>';
+          } else if (p.status === "OFFLINE") {
+            statusBadge = '<span class="badge badge-err">OFFLINE</span>';
+          } else if (p.total_monitors !== undefined) {
+            statusBadge = '<span class="badge badge-pending">SUMMARY</span>';
+          }
+
+          if (p.total_monitors !== undefined) {
+            payloadContent = `📊 <b>Ringkasan:</b> Total ${p.total_monitors} Kamera | <span style="color:#16a34a; font-weight:600;">Online: ${p.online}</span> | <span style="color:#dc2626; font-weight:600;">Offline: ${p.offline}</span>`;
+          } else {
+            payloadContent = `<strong>${escapeHtml(p.name || '')}</strong>: ${escapeHtml(p.message || JSON.stringify(p))}`;
+          }
+        } else {
+          const raw = String(item.payload || '');
+          if (raw.includes("ONLINE")) statusBadge = '<span class="badge badge-ok">ONLINE</span>';
+          if (raw.includes("OFFLINE")) statusBadge = '<span class="badge badge-err">OFFLINE</span>';
+          payloadContent = escapeHtml(raw);
         }
 
-        function escapeHtml(text) {
-            return String(text || '')
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+        html += `
+          <tr>
+            <td style="font-family:monospace; color:var(--muted); font-size:11.5px; white-space:nowrap;">${escapeHtml(item.timestamp)}</td>
+            <td><code style="color:var(--warning); font-size:11.5px; font-weight:600;">${escapeHtml(item.topic)}</code></td>
+            <td>${statusBadge}</td>
+            <td style="word-break:break-word;">${payloadContent}</td>
+          </tr>
+        `;
+      });
 
-        fetchLogsFromFile();
-        // Auto-refresh log tiap 2 detik
-        setInterval(fetchLogsFromFile, 2000);
-    </script>
+      tbody.innerHTML = html;
+    }
+
+    function filterLogs() {
+      renderLogs();
+    }
+
+    function toggleAutoRefresh() {
+      isAutoRefresh = !isAutoRefresh;
+      const btn = document.getElementById("toggleRefreshBtn");
+      if (isAutoRefresh) {
+        btn.innerText = "⏸ Pause Auto-Refresh";
+        startAutoRefresh();
+      } else {
+        btn.innerText = "▶ Lanjutkan Auto-Refresh";
+        clearInterval(refreshInterval);
+      }
+    }
+
+    function startAutoRefresh() {
+      clearInterval(refreshInterval);
+      refreshInterval = setInterval(fetchLogsFromFile, 3000);
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // =========================================================================
+    // INITIALIZATION
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      const hostIp = window.location.hostname || "<IP_SERVER>";
+      const hostEl = document.getElementById('displayHostIp');
+      const hostGuide = document.getElementById('displayHostGuide');
+      if (hostEl) hostEl.innerText = hostIp;
+      if (hostGuide) hostGuide.innerText = hostIp;
+
+      fetchLogsFromFile();
+      startAutoRefresh();
+      loadCheckerConfig();
+
+      setInterval(loadCheckerConfig, 10000);
+    });
+  </script>
 </body>
 </html>

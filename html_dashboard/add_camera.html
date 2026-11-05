@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tambah Kamera Tunggal - ZoneMinder</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    header {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      padding: 16px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    header h1 { margin: 0; font-size: 19px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .back-btn {
+      color: white;
+      text-decoration: none;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: .2s;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.22); }
+    .container {
+      width: min(720px, calc(100% - 32px));
+      margin: 28px auto;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.03);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: #fdfdfe;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .card-body { padding: 22px 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 14px;
+      color: var(--text);
+      background: #fff;
+      transition: border-color .2s;
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .form-hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+    .row { display: flex; gap: 14px; }
+    .col { flex: 1; }
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 7px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-submit:hover { background: var(--primary-dark); }
+    .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
+    .log-box {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    .log-success { color: #4ade80; }
+    .log-err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📹 Pendaftaran Kamera Tunggal (ZoneMinder)</h1>
+    <a href="index.html" class="back-btn">⬅ Kembali ke Portal</a>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-header">Form Registrasi Kamera Langsung (RTSP)</div>
+      <div class="card-body">
+        <form id="addCamForm" onsubmit="submitCamera(event)">
+          <div class="form-group">
+            <label for="camName">Nama Kamera (Monitor Name)</label>
+            <input type="text" id="camName" class="form-control" placeholder="Contoh: CAM_LOBBY_01" required>
+            <div class="form-hint">Gunakan huruf, angka, garis bawah (_), atau strip (-).</div>
+          </div>
+
+          <div class="form-group">
+            <label for="rtspUrl">URL RTSP Kamera</label>
+            <input type="text" id="rtspUrl" class="form-control" placeholder="rtsp://admin:password@192.168.1.50:554/ch1" required>
+            <div class="form-hint">Format lengkap RTSP stream kamera langsung (tanpa melalui proxy relay).</div>
+          </div>
+
+          <div class="row">
+            <div class="col form-group">
+              <label for="zmFunction">Fungsi ZoneMinder</label>
+              <select id="zmFunction" class="form-control">
+                <option value="Monitor" selected>Monitor (Live View)</option>
+                <option value="Modect">Modect (Motion Detect)</option>
+                <option value="Record">Record (Rekam Terus)</option>
+                <option value="Mocord">Mocord (Motion + Record)</option>
+                <option value="Nodect">Nodect</option>
+              </select>
+            </div>
+            <div class="col form-group">
+              <label for="resolution">Resolusi (Width x Height)</label>
+              <select id="resolution" class="form-control">
+                <option value="1920x1080" selected>1920 x 1080 (FHD)</option>
+                <option value="1280x720">1280 x 720 (HD)</option>
+                <option value="2560x1440">2560 x 1440 (2K)</option>
+                <option value="3840x2160">3840 x 2160 (4K)</option>
+                <option value="640x480">640 x 480 (VGA)</option>
+              </select>
+            </div>
+            <div class="col form-group">
+              <label for="maxFps">Max FPS (Opsional)</label>
+              <input type="number" id="maxFps" class="form-control" placeholder="Kosong = Default (15/25)" min="1" max="60">
+            </div>
+          </div>
+
+          <button type="submit" id="btnSubmit" class="btn-submit">
+            ➕ Daftarkan Kamera ke ZoneMinder
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📋 Log Status Pendaftaran</div>
+      <div class="card-body">
+        <div id="logBox" class="log-box">
+          <div>[READY] Masukkan nama dan URL RTSP kamera di atas lalu klik daftarkan.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function addLog(msg, type = 'info') {
+      const box = document.getElementById('logBox');
+      const time = new Date().toLocaleTimeString();
+      let cls = '';
+      if (type === 'err') cls = 'log-err';
+      if (type === 'success') cls = 'log-success';
+      box.innerHTML += `<div class="${cls}">[${time}] ${msg}</div>`;
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function submitCamera(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmit');
+      const name = document.getElementById('camName').value.trim();
+      const source = document.getElementById('rtspUrl').value.trim();
+      const func = document.getElementById('zmFunction').value;
+      const [width, height] = document.getElementById('resolution').value.split('x');
+      const maxFps = document.getElementById('maxFps').value.trim();
+
+      if (!source.toLowerCase().startsWith('rtsp://')) {
+        addLog('URL harus diawali dengan rtsp://', 'err');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Mendaftarkan ke ZoneMinder...';
+      addLog(`Mengirim data pendaftaran untuk '${name}'...`);
+
+      try {
+        const res = await fetch('/api/zoneminder/add-camera', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name,
+            source: source,
+            zmFunction: func,
+            width: width,
+            height: height,
+            maxFps: maxFps
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          addLog(`[SUCCESS] ${data.message} 🎉`, 'success');
+          document.getElementById('addCamForm').reset();
+        } else {
+          addLog(`[ERROR] ${data.message || 'Gagal mendaftarkan kamera'}`, 'err');
+        }
+      } catch (err) {
+        addLog(`[ERROR JARINGAN] ${err.message}`, 'err');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '➕ Daftarkan Kamera ke ZoneMinder';
+      }
+    }
+  </script>
+</body>
+</html>
+
