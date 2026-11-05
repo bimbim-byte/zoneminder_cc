@@ -24,7 +24,8 @@
       color: var(--text);
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
     }
     header {
       background: linear-gradient(135deg, #0f172a, #1e293b);
@@ -46,7 +47,7 @@
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
     .btn-back {
       color: white;
@@ -61,26 +62,36 @@
     }
     .btn-back:hover { background: rgba(255,255,255,0.22); }
 
-    .container {
-      width: min(1140px, calc(100% - 32px));
-      margin: 20px auto 40px;
+    .main-layout {
       display: flex;
       flex-direction: column;
-      gap: 16px;
       flex: 1;
+      padding: 16px 24px;
+      gap: 14px;
+      overflow: hidden;
     }
 
+    /* Top Grid */
+    .top-panel {
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 14px;
+      flex-shrink: 0;
+    }
     .card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 16px 20px;
+      padding: 14px 16px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .card h3 {
-      font-size: 14.5px;
+      font-size: 14px;
       color: var(--primary);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -91,7 +102,7 @@
     .form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
+      gap: 10px;
     }
     .form-group {
       display: flex;
@@ -99,19 +110,19 @@
     }
     .form-group.full-width { grid-column: 1 / -1; }
     .form-group label {
-      font-size: 12.5px;
+      font-size: 11.5px;
       font-weight: 600;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       color: var(--text);
     }
 
     .form-control {
       width: 100%;
-      height: 38px;
-      padding: 0 10px;
+      height: 34px;
+      padding: 0 8px;
       border: 1px solid var(--border);
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12px;
       background: #fff;
       color: var(--text);
       outline: none;
@@ -126,25 +137,19 @@
       color: var(--muted);
     }
 
-    .help-text {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 7px 14px;
+      padding: 6px 12px;
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
       border: none;
       cursor: pointer;
       transition: .2s;
-      height: 38px;
+      height: 34px;
     }
     .btn:disabled { opacity: .6; cursor: not-allowed; }
     .btn-primary { background: var(--primary); color: white; }
@@ -159,9 +164,9 @@
     .btn-danger:hover { background: #fca5a5; }
 
     .btn-small {
-      height: 28px;
+      height: 26px;
       padding: 0 8px;
-      font-size: 11.5px;
+      font-size: 11px;
       border-radius: 4px;
     }
 
@@ -169,50 +174,67 @@
       display: flex;
       justify-content: flex-end;
       gap: 8px;
-      margin-top: 14px;
+      margin-top: 10px;
     }
 
     /* Checker Box */
-    .checker-box {
+    .checker-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
       background: #f8fafc;
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 14px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 14px;
-      align-items: center;
+      padding: 12px;
+      margin-bottom: 10px;
     }
 
     /* Table Section */
     .table-section {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 14px 18px;
+      padding: 12px 16px;
+      min-height: 0;
       box-shadow: 0 2px 6px rgba(0,0,0,0.02);
     }
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
     .table-wrapper {
+      flex: 1;
+      overflow-y: auto;
       overflow-x: auto;
       border: 1px solid var(--border);
       border-radius: 6px;
-      margin-top: 10px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12.5px;
+      font-size: 12px;
     }
     th, td {
-      padding: 8px 10px;
+      padding: 7px 10px;
       border: 1px solid var(--border);
       text-align: left;
       vertical-align: middle;
     }
     th {
+      position: sticky;
+      top: 0;
       background: #0f172a;
       color: white;
       font-weight: 600;
+      z-index: 5;
       white-space: nowrap;
     }
     tr:nth-child(even) { background: #f8fafc; }
@@ -220,18 +242,18 @@
 
     .badge {
       display: inline-block;
-      padding: 2px 7px;
+      padding: 2px 6px;
       border-radius: 4px;
       font-size: 11px;
       font-weight: 600;
     }
     .badge-ok { background: #dcfce7; color: #166534; }
     .badge-err { background: #fee2e2; color: #991b1b; }
-    .badge-running { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-    .badge-paused { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .badge-running { background: #dcfce7; color: #15803d; }
+    .badge-paused { background: #fef3c7; color: #b45309; }
 
     .rtsp-path {
-      max-width: 280px;
+      max-width: 270px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -243,205 +265,179 @@
     .quick-controls, .action-group {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       flex-wrap: wrap;
     }
     .quick-controls select {
-      height: 28px;
-      font-size: 11.5px;
-      padding: 0 6px;
+      height: 26px;
+      font-size: 11px;
+      padding: 0 4px;
       border-radius: 4px;
       border: 1px solid var(--border);
-    }
-
-    .status-alert {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-left: 4px solid var(--primary);
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-weight: 600;
-      font-family: monospace;
-      font-size: 12px;
-      color: #1e40af;
-      margin-top: 10px;
-    }
-
-    footer {
-      text-align: center;
-      color: var(--muted);
-      font-size: 12px;
-      padding: 16px;
       background: #fff;
-      border-top: 1px solid var(--border);
-      margin-top: auto;
     }
 
-    @media (max-width: 768px) {
-      .form-grid { grid-template-columns: 1fr; }
-      .checker-box { grid-template-columns: 1fr; }
+    @media (max-width: 900px) {
+      body { height: auto; overflow: auto; }
+      .top-panel { grid-template-columns: 1fr; }
+      .main-layout { overflow: visible; }
+      .table-wrapper { height: 400px; }
     }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>🛡️ ZoneMinder - Camera Registration & Management</h1>
-  <div class="header-actions">
-    <a href="/zm/" target="_blank" class="btn-back">🖥️ ZoneMinder Web (/zm/)</a>
-    <a href="index.html" class="btn-back">⬅ Portal</a>
-  </div>
-</header>
-
-<div class="container">
-  <!-- 1. SYSTEM STATUS & AUTH -->
-  <div class="card">
-    <h3>
-      <span>🖥️ 1. Status Server & Autentikasi API ZoneMinder</span>
-      <button class="btn btn-outline btn-small" onclick="checkCpuLoad()">📊 Cek CPU Load</button>
-    </h3>
-    <div class="form-grid">
-      <div class="form-group">
-        <label>ZoneMinder Server Host</label>
-        <input type="text" id="apiHostDisplay" class="form-control" readonly>
-      </div>
-      <div class="form-group">
-        <label>Status Autentikasi API</label>
-        <input type="text" id="tokenStatusDisplay" class="form-control" value="Memeriksa Autentikasi..." readonly style="font-weight:600;">
-      </div>
+  <header>
+    <h1>🛡️ ZoneMinder - Camera Registration & Management</h1>
+    <div class="header-actions">
+      <div id="authStatusHeader" class="badge badge-ok">Memeriksa API...</div>
+      <a href="/zm/" target="_blank" class="btn-back">🖥️ ZoneMinder Web (/zm/)</a>
+      <a href="index.html" class="btn-back">⬅ Portal</a>
     </div>
-    <div id="statusDisplay" class="status-alert" style="display:none;"></div>
-  </div>
+  </header>
 
-  <!-- 2. CCTV HEALTH CHECKER CONTROL WIDGET -->
-  <div class="card" style="border-top: 3px solid var(--success);">
-    <h3>
-      <span>⚙️ 2. CCTV Health Checker Controller</span>
-      <span id="checkerStatusBadge" class="badge badge-running">Memuat Status...</span>
-    </h3>
-    <div class="checker-box">
-      <!-- Status & Toggle -->
-      <div>
-        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Status Operasional</label>
-        <button id="btnToggleChecker" class="btn btn-warning" style="width:100%;" onclick="toggleCheckerActive()">
-          ⏸ Jeda (Pause) Checker
-        </button>
-      </div>
+  <div class="main-layout">
+    <!-- Top Grid Panels -->
+    <div class="top-panel">
+      
+      <!-- Panel 1: Form Tambah & Edit Kamera -->
+      <div class="card" id="cameraFormCard">
+        <h3 id="formTitle">
+          <span>➕ Pendaftaran & Edit Kamera RTSP</span>
+          <span id="editModeNotice" style="font-size: 11px; color: var(--warning); display: none;">Mode Edit Aktif</span>
+        </h3>
+        <input type="hidden" id="originalId" value="">
 
-      <!-- Delay Interval Setting -->
-      <div>
-        <label for="checkerIntervalInput" style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Delay Pengecekan (Detik)</label>
-        <div style="display:flex; gap:6px;">
-          <input type="number" id="checkerIntervalInput" class="form-control" min="5" max="3600" value="60" style="width:85px;">
-          <button class="btn btn-primary" style="flex:1;" onclick="updateCheckerInterval()">💾 Simpan Delay</button>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="camId">ID Kamera (Custom/Auto)</label>
+            <input type="number" id="camId" class="form-control" placeholder="Kosongkan utk Auto">
+          </div>
+          <div class="form-group">
+            <label for="camName">Nama Kamera</label>
+            <input type="text" id="camName" class="form-control" placeholder="Kamera_Depan">
+          </div>
+          <div class="form-group full-width">
+            <label for="camPath">RTSP Path URL</label>
+            <input type="text" id="camPath" class="form-control" placeholder="rtsp://admin:pass@192.168.1.100:554/stream1">
+          </div>
+          <div class="form-group">
+            <label for="camFunction">Fungsi Default</label>
+            <select id="camFunction" class="form-control">
+              <option value="None">None</option>
+              <option value="Monitor" selected>Monitor</option>
+              <option value="Modect">Modect</option>
+              <option value="Record">Record</option>
+              <option value="Mocord">Mocord</option>
+              <option value="Nodect">Nodect</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="camResolution">Resolusi</label>
+            <select id="camResolution" class="form-control">
+              <option value="1280x720">1280 x 720 (720p)</option>
+              <option value="1920x1080" selected>1920 x 1080 (1080p)</option>
+            </select>
+          </div>
+          <input type="hidden" id="camColorspace" value="4">
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-outline" id="btnCancel" style="display:none;" onclick="resetForm()">Batal</button>
+          <button class="btn btn-primary" id="btnSave" onclick="saveCamera()">☁ Simpan Kamera</button>
         </div>
       </div>
 
-      <!-- Run Now Trigger -->
-      <div>
-        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Pemeriksaan Manual</label>
-        <button id="btnRunNow" class="btn btn-success" style="width:100%;" onclick="triggerRunNow()">
-          ⚡ Cek Semua Kamera Sekarang
-        </button>
+      <!-- Panel 2: CCTV Checker Controller & Server Health -->
+      <div class="card">
+        <h3>
+          <span>⚙️ Kontrol CCTV Health Checker & Status Server</span>
+          <span id="checkerStatusBadge" class="badge badge-running">Memuat Checker...</span>
+        </h3>
+
+        <div class="checker-grid">
+          <!-- Toggle & Trigger -->
+          <div>
+            <label style="font-size:11px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Status Checker Service</label>
+            <button id="btnToggleChecker" class="btn btn-warning" style="width:100%;" onclick="toggleCheckerActive()">
+              ⏸ Jeda (Pause) Checker
+            </button>
+          </div>
+
+          <!-- Trigger Sekarang -->
+          <div>
+            <label style="font-size:11px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Pemeriksaan Manual</label>
+            <button id="btnRunNow" class="btn btn-success" style="width:100%;" onclick="triggerRunNow()">
+              ⚡ Cek Semua Sekarang
+            </button>
+          </div>
+
+          <!-- Setting Interval -->
+          <div>
+            <label for="checkerIntervalInput" style="font-size:11px; font-weight:600; display:block; margin-bottom:4px; color:var(--muted);">Delay Interval Pengecekan</label>
+            <div style="display:flex; gap:6px;">
+              <input type="number" id="checkerIntervalInput" class="form-control" min="5" max="3600" value="60" style="width:75px;">
+              <button class="btn btn-primary" style="flex:1;" onclick="updateCheckerInterval()">💾 Set Detik</button>
+            </div>
+          </div>
+
+          <!-- CPU Load Info -->
+          <div>
+            <label style="font-size:11px; font-weight:600; display:block; margin-bottom:4px; color:var(--muted);">ZoneMinder Server Load</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="cpuLoadText" class="form-control" readonly value="Belum dicek" style="font-size:11px; font-family:monospace;">
+              <button class="btn btn-outline" onclick="checkCpuLoad()">📊 Cek</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--muted);">
+          <span id="checkerLastRunText">Terakhir diperiksa: -</span>
+          <span>Broker MQTT: <code>1883</code> &bull; Topic: <code>cctv/events</code></span>
+        </div>
       </div>
+
     </div>
 
-    <div style="margin-top:10px; font-size:11.5px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
-      <span id="checkerLastRunText">Terakhir diperiksa: -</span>
-      <span>Notifikasi MQTT aktif di broker (<code>cctv/events</code>)</span>
-    </div>
-  </div>
-
-  <!-- 3. FORM PENDAFTARAN & EDIT KAMERA -->
-  <div class="card" id="cameraFormCard">
-    <h3 id="formTitle">➕ 3. Pendaftaran Kamera RTSP ke ZoneMinder</h3>
-    <input type="hidden" id="originalId" value="">
-    <div class="form-grid">
-      <div class="form-group">
-        <label for="camId">ID Kamera (Custom / Monitor ID)</label>
-        <input type="number" id="camId" class="form-control" placeholder="Kosongkan utk Auto ID">
-        <div class="help-text" id="camIdHelp">Kosongkan jika ingin menggunakan ID otomatis berikutnya.</div>
+    <!-- Bottom Section: Daftar Kamera (Takes remaining screen height) -->
+    <div class="table-section">
+      <div class="table-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size:14px; color:var(--text); margin-bottom:0;">📋 Daftar Kamera Terdaftar di ZoneMinder</h3>
+          <span id="camCountBadge" class="badge badge-ok">0 Kamera</span>
+        </div>
+        
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" id="searchCameraInput" class="form-control" placeholder="🔍 Cari nama/ID..." style="width:180px; height:28px; font-size:11.5px;" oninput="filterCameraTable()">
+          <button class="btn btn-outline btn-small" onclick="loadCameras()">↻ Refresh List</button>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="camName">Nama Kamera</label>
-        <input type="text" id="camName" class="form-control" placeholder="Kamera_Depan">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 45px;">ID</th>
+              <th style="width: 180px;">Nama & Status</th>
+              <th style="width: 170px;">Shortcut Fungsi</th>
+              <th>RTSP Stream Path</th>
+              <th style="width: 110px;">Resolusi</th>
+              <th style="width: 110px;">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="cameraTableBody">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--muted); padding: 30px;">
+                Memuat data kamera dari ZoneMinder...
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
-      <div class="form-group full-width">
-        <label for="camPath">RTSP Path URL</label>
-        <input type="text" id="camPath" class="form-control" placeholder="rtsp://admin:pass@192.168.1.100:554/stream1">
-        <div class="help-text">Masukkan alamat RTSP stream kamera CCTV yang valid.</div>
-      </div>
-
-      <div class="form-group">
-        <label for="camFunction">Fungsi Default</label>
-        <select id="camFunction" class="form-control">
-          <option value="None">None</option>
-          <option value="Monitor" selected>Monitor</option>
-          <option value="Modect">Modect</option>
-          <option value="Record">Record</option>
-          <option value="Mocord">Mocord</option>
-          <option value="Nodect">Nodect</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="camResolution">Resolusi Kamera</label>
-        <select id="camResolution" class="form-control">
-          <option value="1280x720">1280 x 720 (720p)</option>
-          <option value="1920x1080" selected>1920 x 1080 (1080p)</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="camColorspace">Target Colorspace</label>
-        <select id="camColorspace" class="form-control">
-          <option value="1">8 bit greyscale</option>
-          <option value="3">24 bit color</option>
-          <option value="4" selected>32 bit color</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="form-actions">
-      <button class="btn btn-outline" id="btnCancel" style="display:none;" onclick="resetForm()">Batal</button>
-      <button class="btn btn-primary" id="btnSave" onclick="saveCamera()">☁ Simpan Kamera</button>
-    </div>
-  </div>
-
-  <!-- 4. DAFTAR KAMERA & QUICK CONTROLS -->
-  <div class="table-section">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h3 style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:0;">📋 4. Daftar Kamera Terdaftar & Quick Controls</h3>
-      <button class="btn btn-outline btn-small" onclick="loadCameras()">↻ Refresh List</button>
-    </div>
-
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 50px;">ID</th>
-            <th style="width: 180px;">Nama & Status</th>
-            <th style="width: 160px;">Shortcut Fungsi</th>
-            <th>RTSP Path</th>
-            <th style="width: 100px;">Resolusi</th>
-            <th style="width: 120px;">Aksi</th>
-          </tr>
-        </thead>
-        <tbody id="cameraTableBody">
-          <tr><td colspan="6" style="text-align:center; padding:25px; color:var(--muted);">Memuat data kamera dari ZoneMinder...</td></tr>
-        </tbody>
-      </table>
     </div>
   </div>
-</div>
 
-<footer>
-  ZoneMinder CCTV Management Hub &mdash; Light Enterprise Interface
-</footer>
-
-<script>
+  <script>
     const SERVER_HOST = window.location.origin;
     const ZM_CONFIG = {
         host: SERVER_HOST,
@@ -452,16 +448,17 @@
     let currentToken = sessionStorage.getItem('zm_token') || '';
     let existingIds = [];
     let cameraDataStore = {};
+    let allMonitorsCache = [];
     let checkerConfig = { enabled: true, interval: 60 };
 
     // =========================================================================
     // 1. AUTENTIKASI ZONEMINDER
     // =========================================================================
     async function authenticate() {
-        const tokenInput = document.getElementById('tokenStatusDisplay');
-        if (tokenInput) {
-            tokenInput.value = "Authenticating...";
-            tokenInput.style.color = "#d97706";
+        const headerBadge = document.getElementById('authStatusHeader');
+        if (headerBadge) {
+            headerBadge.className = "badge badge-paused";
+            headerBadge.innerText = "Authenticating...";
         }
 
         try {
@@ -483,30 +480,30 @@
                 currentToken = data.access_token;
                 sessionStorage.setItem('zm_token', currentToken);
                 
-                if (tokenInput) {
-                    tokenInput.value = `Authenticated (ZM v${data.version || '1.36'})`;
-                    tokenInput.style.color = "#16a34a";
+                if (headerBadge) {
+                    headerBadge.className = "badge badge-ok";
+                    headerBadge.innerText = `Connected (ZM v${data.version || '1.36'})`;
                 }
                 return currentToken;
             } else if (res.ok && (data.version || res.status === 200)) {
                 currentToken = data.access_token || "session-active";
-                if (tokenInput) {
-                    tokenInput.value = `Connected (ZM v${data.version || '1.36'})`;
-                    tokenInput.style.color = "#16a34a";
+                if (headerBadge) {
+                    headerBadge.className = "badge badge-ok";
+                    headerBadge.innerText = `Connected (ZM v${data.version || '1.36'})`;
                 }
                 return currentToken;
             } else {
-                if (tokenInput) {
-                    tokenInput.value = "Auth Failed";
-                    tokenInput.style.color = "#dc2626";
+                if (headerBadge) {
+                    headerBadge.className = "badge badge-err";
+                    headerBadge.innerText = "Auth Failed";
                 }
                 return null;
             }
         } catch (err) {
             console.error('Auth Error:', err);
-            if (tokenInput) {
-                tokenInput.value = "Connection Error";
-                tokenInput.style.color = "#dc2626";
+            if (headerBadge) {
+                headerBadge.className = "badge badge-err";
+                headerBadge.innerText = "Connection Error";
             }
             return null;
         }
@@ -542,66 +539,101 @@
     // =========================================================================
     async function loadCameras() {
         const tbody = document.getElementById('cameraTableBody');
+        const countBadge = document.getElementById('camCountBadge');
         if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--primary);">Memuat data kamera...</td></tr>';
 
         try {
             const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors.json`);
             const data = await res.json();
             
-            if (!tbody) return;
-            tbody.innerHTML = '';
             existingIds = [];
             cameraDataStore = {};
+            allMonitorsCache = [];
 
             if (!data.monitors || data.monitors.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--muted);">Belum ada kamera terdaftar di ZoneMinder.</td></tr>';
+                if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--muted);">Belum ada kamera terdaftar di ZoneMinder.</td></tr>';
+                if (countBadge) countBadge.innerText = "0 Kamera";
                 return;
             }
 
-            data.monitors.forEach(item => {
-                const mon = item.Monitor;
-                existingIds.push(mon.Id.toString());
-                cameraDataStore[mon.Id] = mon;
+            allMonitorsCache = data.monitors;
+            if (countBadge) countBadge.innerText = `${allMonitorsCache.length} Kamera`;
 
-                const isEnabled = (mon.Enabled == '1' || mon.Enabled == 1) && mon.Function !== 'None';
-                const rowClass = isEnabled ? '' : 'cam-disabled';
-                const badgeHtml = isEnabled ? '<span class="badge badge-ok">ON</span>' : '<span class="badge badge-err">OFF</span>';
-
-                tbody.innerHTML += `
-                    <tr class="${rowClass}">
-                        <td><b>${mon.Id}</b></td>
-                        <td>${badgeHtml} <b>${escapeHtml(mon.Name)}</b></td>
-                        <td>
-                            <div class="quick-controls">
-                                <select id="fnSelect_${mon.Id}">
-                                    <option value="None" ${mon.Function == 'None' ? 'selected':''}>None</option>
-                                    <option value="Monitor" ${mon.Function == 'Monitor' ? 'selected':''}>Monitor</option>
-                                    <option value="Modect" ${mon.Function == 'Modect' ? 'selected':''}>Modect</option>
-                                    <option value="Record" ${mon.Function == 'Record' ? 'selected':''}>Record</option>
-                                    <option value="Mocord" ${mon.Function == 'Mocord' ? 'selected':''}>Mocord</option>
-                                    <option value="Nodect" ${mon.Function == 'Nodect' ? 'selected':''}>Nodect</option>
-                                </select>
-                                <button class="btn btn-primary btn-small" onclick="quickSetFunction('${mon.Id}')">Set</button>
-                                <button class="btn btn-outline btn-small" onclick="quickTurnOff('${mon.Id}')">OFF</button>
-                            </div>
-                        </td>
-                        <td><div class="rtsp-path" title="${escapeHtml(mon.Path || '-')}">${escapeHtml(mon.Path || '-')}</div></td>
-                        <td>${mon.Width}x${mon.Height}</td>
-                        <td>
-                            <div class="action-group">
-                                <button class="btn btn-warning btn-small" onclick="editCamera('${mon.Id}')">✏️ Edit</button>
-                                <button class="btn btn-danger btn-small" onclick="deleteCamera('${mon.Id}')">🗑️ Hapus</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
+            renderCameraRows(allMonitorsCache);
         } catch (err) {
             console.error('Gagal memuat kamera ZM:', err);
             if (tbody) {
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:25px; color:#dc2626;">Gagal memuat data: ${err.message}</td></tr>`;
             }
         }
+    }
+
+    function renderCameraRows(monitors) {
+        const tbody = document.getElementById('cameraTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!monitors || monitors.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--muted);">Tidak ada kamera yang cocok dengan pencarian.</td></tr>';
+            return;
+        }
+
+        monitors.forEach(item => {
+            const mon = item.Monitor;
+            existingIds.push(mon.Id.toString());
+            cameraDataStore[mon.Id] = mon;
+
+            const isEnabled = (mon.Enabled == '1' || mon.Enabled == 1) && mon.Function !== 'None';
+            const rowClass = isEnabled ? '' : 'cam-disabled';
+            const badgeHtml = isEnabled ? '<span class="badge badge-ok">ON</span>' : '<span class="badge badge-err">OFF</span>';
+
+            tbody.innerHTML += `
+                <tr class="${rowClass}">
+                    <td><b>${mon.Id}</b></td>
+                    <td>${badgeHtml} <b>${escapeHtml(mon.Name)}</b></td>
+                    <td>
+                        <div class="quick-controls">
+                            <select id="fnSelect_${mon.Id}">
+                                <option value="None" ${mon.Function == 'None' ? 'selected':''}>None</option>
+                                <option value="Monitor" ${mon.Function == 'Monitor' ? 'selected':''}>Monitor</option>
+                                <option value="Modect" ${mon.Function == 'Modect' ? 'selected':''}>Modect</option>
+                                <option value="Record" ${mon.Function == 'Record' ? 'selected':''}>Record</option>
+                                <option value="Mocord" ${mon.Function == 'Mocord' ? 'selected':''}>Mocord</option>
+                                <option value="Nodect" ${mon.Function == 'Nodect' ? 'selected':''}>Nodect</option>
+                            </select>
+                            <button class="btn btn-primary btn-small" onclick="quickSetFunction('${mon.Id}')">Set</button>
+                            <button class="btn btn-outline btn-small" onclick="quickTurnOff('${mon.Id}')">OFF</button>
+                        </div>
+                    </td>
+                    <td><div class="rtsp-path" title="${escapeHtml(mon.Path || '-')}">${escapeHtml(mon.Path || '-')}</div></td>
+                    <td>${mon.Width}x${mon.Height}</td>
+                    <td>
+                        <div class="action-group">
+                            <button class="btn btn-warning btn-small" onclick="editCamera('${mon.Id}')">✏️ Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteCamera('${mon.Id}')">🗑️ Hapus</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function filterCameraTable() {
+        const query = (document.getElementById('searchCameraInput').value || '').toLowerCase().trim();
+        if (!query) {
+            renderCameraRows(allMonitorsCache);
+            return;
+        }
+
+        const filtered = allMonitorsCache.filter(item => {
+            const mon = item.Monitor;
+            const name = (mon.Name || '').toLowerCase();
+            const id = (mon.Id || '').toString();
+            const path = (mon.Path || '').toLowerCase();
+            return name.includes(query) || id.includes(query) || path.includes(query);
+        });
+
+        renderCameraRows(filtered);
     }
 
     async function quickSetFunction(id) {
@@ -643,6 +675,9 @@
         const formTitle = document.getElementById('formTitle');
         if (formTitle) formTitle.innerText = `✏️ Edit Kamera: ${mon.Name} (ID: ${id})`;
 
+        const notice = document.getElementById('editModeNotice');
+        if (notice) notice.style.display = "inline";
+
         document.getElementById('originalId').value = id;
         
         const camIdInput = document.getElementById('camId');
@@ -650,9 +685,6 @@
             camIdInput.value = id;
             camIdInput.readOnly = true;
         }
-
-        const helpText = document.getElementById('camIdHelp');
-        if (helpText) helpText.innerText = "ID kamera bersifat permanen saat mode edit.";
 
         document.getElementById('camName').value = mon.Name || '';
         document.getElementById('camPath').value = mon.Path || '';
@@ -674,8 +706,6 @@
             resSelect.value = resVal;
         }
 
-        document.getElementById('camColorspace').value = mon.Colours || '4';
-
         const btnSave = document.getElementById('btnSave');
         if (btnSave) {
             btnSave.innerText = "💾 Perbarui Kamera";
@@ -684,14 +714,14 @@
 
         const btnCancel = document.getElementById('btnCancel');
         if (btnCancel) btnCancel.style.display = "inline-flex";
-
-        const formCard = document.getElementById('cameraFormCard');
-        if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function resetForm() {
         const formTitle = document.getElementById('formTitle');
-        if (formTitle) formTitle.innerText = "➕ 3. Pendaftaran Kamera RTSP ke ZoneMinder";
+        if (formTitle) formTitle.innerText = "➕ Pendaftaran & Edit Kamera RTSP";
+
+        const notice = document.getElementById('editModeNotice');
+        if (notice) notice.style.display = "none";
 
         document.getElementById('originalId').value = "";
         
@@ -700,9 +730,6 @@
             camIdInput.value = "";
             camIdInput.readOnly = false;
         }
-
-        const helpText = document.getElementById('camIdHelp');
-        if (helpText) helpText.innerText = "Kosongkan jika ingin menggunakan ID otomatis.";
 
         document.getElementById('camName').value = "";
         document.getElementById('camPath').value = "";
@@ -742,7 +769,7 @@
         params.append('Monitor[Options]', 'rtsp_transport=tcp');
         params.append('Monitor[Width]', width || '1920');
         params.append('Monitor[Height]', height || '1080');
-        params.append('Monitor[Colours]', document.getElementById('camColorspace').value || '4');
+        params.append('Monitor[Colours]', '4');
         params.append('Monitor[TargetColorspace]', '4');
         params.append('Monitor[ServerId]', '0');
 
@@ -758,7 +785,7 @@
         const origText = saveBtn ? saveBtn.innerText : '';
         if (saveBtn) {
             saveBtn.disabled = true;
-            saveBtn.innerText = "Menyimpan ke ZoneMinder...";
+            saveBtn.innerText = "Menyimpan...";
         }
 
         try {
@@ -803,16 +830,15 @@
     }
 
     async function checkCpuLoad() {
-        const statusDiv = document.getElementById('statusDisplay');
+        const textEl = document.getElementById('cpuLoadText');
         try {
             const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/host/getLoad.json`);
             const data = await res.json();
-            if (statusDiv && data.load) {
-                statusDiv.style.display = 'block';
-                statusDiv.innerHTML = `ZoneMinder Server Load: [1 Min: ${data.load[0]}] | [5 Min: ${data.load[1]}] | [15 Min: ${data.load[2]}]`;
+            if (textEl && data.load) {
+                textEl.value = `1m: ${data.load[0]} | 5m: ${data.load[1]}`;
             }
         } catch (err) {
-            alert('Gagal mengambil CPU Load ZoneMinder.');
+            if (textEl) textEl.value = "Gagal membaca load";
         }
     }
 
@@ -844,7 +870,7 @@
         if (lastRunText) {
             lastRunText.innerText = checkerConfig.last_check 
                 ? `Terakhir diperiksa: ${checkerConfig.last_check}`
-                : "Terakhir diperiksa: Belum ada eksekusi";
+                : "Terakhir diperiksa: -";
         }
 
         if (checkerConfig.enabled) {
@@ -914,13 +940,13 @@
         const origText = btn ? btn.innerText : '';
         if (btn) {
             btn.disabled = true;
-            btn.innerText = "Memulai Pengecekan...";
+            btn.innerText = "Memeriksa...";
         }
 
         try {
             const res = await fetch('/api/checker/run-now', { method: 'POST' });
             if (res.ok) {
-                alert('Trigger pemeriksaan telah dikirim! Pengecekan kamera sedang berlangsung.');
+                alert('Pemeriksaan kamera RTSP sedang berjalan!');
                 setTimeout(loadCheckerConfig, 2500);
             }
         } catch (e) {
@@ -946,12 +972,10 @@
     // INITIALIZATION
     // =========================================================================
     document.addEventListener('DOMContentLoaded', async () => {
-        const hostDisplay = document.getElementById('apiHostDisplay');
-        if (hostDisplay) hostDisplay.value = ZM_CONFIG.host;
-        
         await authenticate();
         await loadCameras();
         await loadCheckerConfig();
+        checkCpuLoad();
 
         setInterval(loadCheckerConfig, 10000);
     });

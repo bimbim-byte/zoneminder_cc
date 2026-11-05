@@ -2,7 +2,7 @@
     debug
 }
 
-https://localhost:443, https://127.0.0.1:443 {
+:443 {
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 
     handle /zm* {
