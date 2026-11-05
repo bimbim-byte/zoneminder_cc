@@ -3,521 +3,448 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZoneMinder Camera Registration</title>
+  <title>ZoneMinder - Camera Registration & Management</title>
   <style>
-* { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn-back {
+      color: white;
+      text-decoration: none;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: .2s;
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.22); }
 
-:root {
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --success: #16a34a;
-  --danger: #dc2626;
-  --warning: #d97706;
-  --bg: #f5f7fb;
-  --card: #ffffff;
-  --border: #e5e7eb;
-  --text: #1f2937;
-  --muted: #6b7280;
-}
+    .container {
+      width: min(1140px, calc(100% - 32px));
+      margin: 20px auto 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Arial, sans-serif;
-}
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .card h3 {
+      font-size: 14.5px;
+      color: var(--primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-weight: 600;
+    }
 
-header {
-  background: linear-gradient(135deg, #1e3a8a, #2563eb);
-  color: white;
-  padding: 18px 30px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  box-shadow: 0 3px 12px rgba(0,0,0,.12);
-}
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .form-group.full-width { grid-column: 1 / -1; }
+    .form-group label {
+      font-size: 12.5px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
 
-header h1 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-}
+    .form-control {
+      width: 100%;
+      height: 38px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+    }
+    .form-control[readonly] {
+      background: #f8fafc;
+      color: var(--muted);
+    }
 
-.back-btn {
-  color: white;
-  text-decoration: none;
-  border: 1px solid rgba(255,255,255,.35);
-  padding: 9px 15px;
-  border-radius: 7px;
-  font-size: 14px;
-  transition: .2s;
-}
+    .help-text {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
 
-.back-btn:hover { background: rgba(255,255,255,.12); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: .2s;
+      height: 38px;
+    }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-warning { background: var(--warning); color: white; }
+    .btn-warning:hover { background: #b45309; }
+    .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: #f1f5f9; }
+    .btn-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .btn-danger:hover { background: #fca5a5; }
 
-.container {
-  width: min(1100px, calc(100% - 30px));
-  margin: 30px auto;
-}
+    .btn-small {
+      height: 28px;
+      padding: 0 8px;
+      font-size: 11.5px;
+      border-radius: 4px;
+    }
 
-.page-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 22px;
-}
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
 
-.page-title h2 {
-  margin: 0;
-  font-size: 24px;
-}
+    /* Checker Box */
+    .checker-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+      align-items: center;
+    }
 
-.page-title p {
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-}
+    /* Table Section */
+    .table-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    th, td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      background: #0f172a;
+      color: white;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    tr:nth-child(even) { background: #f8fafc; }
+    tr.cam-disabled { background-color: #f8fafc; color: #94a3b8; }
 
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  margin-bottom: 22px;
-  box-shadow: 0 4px 14px rgba(0,0,0,.04);
-  overflow: hidden;
-}
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-ok { background: #dcfce7; color: #166534; }
+    .badge-err { background: #fee2e2; color: #991b1b; }
+    .badge-running { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-paused { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
 
-.card-header {
-  padding: 17px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
+    .rtsp-path {
+      max-width: 280px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 11px;
+      color: var(--muted);
+    }
 
-.card-title {
-  font-size: 16px;
-  font-weight: 700;
-}
+    .quick-controls, .action-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .quick-controls select {
+      height: 28px;
+      font-size: 11.5px;
+      padding: 0 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
 
-.card-body { padding: 20px; }
+    .status-alert {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid var(--primary);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-weight: 600;
+      font-family: monospace;
+      font-size: 12px;
+      color: #1e40af;
+      margin-top: 10px;
+    }
 
-.form-grid,
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 16px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.form-group.full-width { grid-column: 1 / -1; }
-
-.form-group label {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 7px;
-  color: var(--text);
-}
-
-input, select {
-  width: 100%;
-  height: 42px;
-  border: 1px solid #d1d5db;
-  border-radius: 7px;
-  padding: 0 12px;
-  font-size: 14px;
-  background: white;
-  color: var(--text);
-  outline: none;
-}
-
-input:focus, select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
-}
-
-input[readonly] { background: #f9fafb; }
-
-.help-text {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.form-actions {
-  margin-top: 18px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.btn {
-  border: 0;
-  border-radius: 7px;
-  padding: 9px 15px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: .2s;
-}
-
-.btn:disabled {
-  opacity: .6;
-  cursor: not-allowed;
-}
-
-.btn-primary, .btn-green {
-  background: var(--primary);
-  color: white;
-}
-.btn-primary:hover, .btn-green:hover { background: var(--primary-dark); }
-
-.btn-light {
-  background: #f3f4f6;
-  color: #374151;
-}
-.btn-light:hover { background: #e5e7eb; }
-
-.btn-danger {
-  background: white;
-  color: var(--danger);
-  border: 1px solid #fecaca;
-}
-.btn-danger:hover { background: #fef2f2; }
-
-.btn-warning {
-  background: #fff7ed;
-  color: var(--warning);
-  border: 1px solid #fed7aa;
-}
-.btn-warning:hover { background: #ffedd5; }
-
-.btn-dark {
-  background: #374151;
-  color: white;
-}
-.btn-dark:hover { background: #1f2937; }
-
-.btn-blue {
-  background: var(--primary);
-  color: white;
-}
-.btn-blue:hover { background: var(--primary-dark); }
-
-.btn-small {
-  padding: 6px 9px;
-  font-size: 11px;
-  border-radius: 5px;
-}
-
-.status-box {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-left: 4px solid var(--primary);
-  border-radius: 7px;
-  padding: 10px 14px;
-  font-weight: 600;
-  font-family: Consolas, Monaco, monospace;
-  margin-top: 14px;
-  font-size: 12px;
-  color: #1e40af;
-  overflow-wrap: anywhere;
-}
-
-.table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0;
-  min-width: 850px;
-}
-
-th, td {
-  border-bottom: 1px solid var(--border);
-  padding: 10px 12px;
-  text-align: left;
-  font-size: 13px;
-  vertical-align: middle;
-}
-
-th {
-  background: #f9fafb;
-  color: #374151;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-tr:last-child td { border-bottom: none; }
-
-tr.cam-disabled {
-  background-color: #f9fafb;
-  color: #9ca3af;
-}
-
-.badge {
-  padding: 3px 7px;
-  border-radius: 5px;
-  font-size: 10px;
-  font-weight: 700;
-  display: inline-block;
-  margin-right: 5px;
-}
-
-.badge-on {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #bbf7d0;
-}
-
-.badge-off {
-  background: #f3f4f6;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
-}
-
-.quick-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.quick-controls select {
-  width: auto;
-  min-width: 105px;
-  height: 34px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
-.rtsp-path {
-  max-width: 280px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-family: Consolas, Monaco, monospace;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.action-group {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.empty,
-.loading {
-  text-align: center;
-  padding: 35px 20px;
-  color: var(--muted);
-}
-
-.loading { color: var(--primary); }
-
-.footer {
-  text-align: center;
-  color: var(--muted);
-  font-size: 12px;
-  padding: 10px 0 30px;
-}
-
-@media (max-width: 700px) {
-  header {
-    padding: 15px;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  header h1 { font-size: 17px; }
-
-  .container {
-    width: min(100% - 20px, 1100px);
-    margin: 20px auto;
-  }
-
-  .page-title {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .form-grid, .grid {
-    grid-template-columns: 1fr;
-  }
-
-  .form-group.full-width { grid-column: auto; }
-
-  .form-actions {
-    justify-content: stretch;
-    flex-direction: column;
-  }
-
-  .form-actions .btn,
-  .card-body > .btn {
-    width: 100%;
-  }
-
-  .card-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .quick-controls,
-  .action-group {
-    align-items: stretch;
-  }
-}
-</style>
+    @media (max-width: 768px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .checker-box { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
 
 <header>
-  <h1>🛡️ ZoneMinder NVR Camera Management</h1>
-  <a href="index.html" class="back-btn">← Kembali ke Portal Utama</a>
+  <h1>🛡️ ZoneMinder - Camera Registration & Management</h1>
+  <div class="header-actions">
+    <a href="/zm/" target="_blank" class="btn-back">🖥️ ZoneMinder Web (/zm/)</a>
+    <a href="index.html" class="btn-back">⬅ Portal</a>
+  </div>
 </header>
 
 <div class="container">
-  <div class="page-title">
-    <div>
-      <h2>🎥 ZoneMinder Camera Manager</h2>
-      <p>Kelola registrasi, status, fungsi, dan konfigurasi kamera RTSP.</p>
-    </div>
-  </div>
-
+  <!-- 1. SYSTEM STATUS & AUTH -->
   <div class="card">
-    <div class="card-header">
-      <div class="card-title">🖥️ 1. System Status & CPU Load</div>
+    <h3>
+      <span>🖥️ 1. Status Server & Autentikasi API ZoneMinder</span>
+      <button class="btn btn-outline btn-small" onclick="checkCpuLoad()">📊 Cek CPU Load</button>
+    </h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>ZoneMinder Server Host</label>
+        <input type="text" id="apiHostDisplay" class="form-control" readonly>
+      </div>
+      <div class="form-group">
+        <label>Status Autentikasi API</label>
+        <input type="text" id="tokenStatusDisplay" class="form-control" value="Memeriksa Autentikasi..." readonly style="font-weight:600;">
+      </div>
     </div>
-    <div class="card-body">
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="apiHostDisplay">ZoneMinder Server Host</label>
-          <input type="text" id="apiHostDisplay" readonly>
-        </div>
-        <div class="form-group">
-          <label for="tokenStatusDisplay">Status Autentikasi API</label>
-          <input type="text" id="tokenStatusDisplay" value="Memeriksa Autentikasi..." readonly style="font-weight:600;">
+    <div id="statusDisplay" class="status-alert" style="display:none;"></div>
+  </div>
+
+  <!-- 2. CCTV HEALTH CHECKER CONTROL WIDGET -->
+  <div class="card" style="border-top: 3px solid var(--success);">
+    <h3>
+      <span>⚙️ 2. CCTV Health Checker Controller</span>
+      <span id="checkerStatusBadge" class="badge badge-running">Memuat Status...</span>
+    </h3>
+    <div class="checker-box">
+      <!-- Status & Toggle -->
+      <div>
+        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Status Operasional</label>
+        <button id="btnToggleChecker" class="btn btn-warning" style="width:100%;" onclick="toggleCheckerActive()">
+          ⏸ Jeda (Pause) Checker
+        </button>
+      </div>
+
+      <!-- Delay Interval Setting -->
+      <div>
+        <label for="checkerIntervalInput" style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Delay Pengecekan (Detik)</label>
+        <div style="display:flex; gap:6px;">
+          <input type="number" id="checkerIntervalInput" class="form-control" min="5" max="3600" value="60" style="width:85px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="updateCheckerInterval()">💾 Simpan Delay</button>
         </div>
       </div>
-      <div class="form-actions" style="justify-content:flex-start;">
-        <button class="btn btn-primary" onclick="loadCameras()">↻ Refresh List Kamera</button>
-        <button class="btn btn-dark" onclick="checkCpuLoad()">📊 Cek CPU Load</button>
+
+      <!-- Run Now Trigger -->
+      <div>
+        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Pemeriksaan Manual</label>
+        <button id="btnRunNow" class="btn btn-success" style="width:100%;" onclick="triggerRunNow()">
+          ⚡ Cek Semua Kamera Sekarang
+        </button>
       </div>
-      <div id="statusDisplay" class="status-box" style="display:none;"></div>
+    </div>
+
+    <div style="margin-top:10px; font-size:11.5px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+      <span id="checkerLastRunText">Terakhir diperiksa: -</span>
+      <span>Notifikasi MQTT aktif di broker (<code>cctv/events</code>)</span>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">➕ 2. Pendaftaran Kamera RTSP ke ZoneMinder</div>
+  <!-- 3. FORM PENDAFTARAN & EDIT KAMERA -->
+  <div class="card" id="cameraFormCard">
+    <h3 id="formTitle">➕ 3. Pendaftaran Kamera RTSP ke ZoneMinder</h3>
+    <input type="hidden" id="originalId" value="">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="camId">ID Kamera (Custom / Monitor ID)</label>
+        <input type="number" id="camId" class="form-control" placeholder="Kosongkan utk Auto ID">
+        <div class="help-text" id="camIdHelp">Kosongkan jika ingin menggunakan ID otomatis berikutnya.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="camName">Nama Kamera</label>
+        <input type="text" id="camName" class="form-control" placeholder="Kamera_Depan">
+      </div>
+
+      <div class="form-group full-width">
+        <label for="camPath">RTSP Path URL</label>
+        <input type="text" id="camPath" class="form-control" placeholder="rtsp://admin:pass@192.168.1.100:554/stream1">
+        <div class="help-text">Masukkan alamat RTSP stream kamera CCTV yang valid.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="camFunction">Fungsi Default</label>
+        <select id="camFunction" class="form-control">
+          <option value="None">None</option>
+          <option value="Monitor" selected>Monitor</option>
+          <option value="Modect">Modect</option>
+          <option value="Record">Record</option>
+          <option value="Mocord">Mocord</option>
+          <option value="Nodect">Nodect</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="camResolution">Resolusi Kamera</label>
+        <select id="camResolution" class="form-control">
+          <option value="1280x720">1280 x 720 (720p)</option>
+          <option value="1920x1080" selected>1920 x 1080 (1080p)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="camColorspace">Target Colorspace</label>
+        <select id="camColorspace" class="form-control">
+          <option value="1">8 bit greyscale</option>
+          <option value="3">24 bit color</option>
+          <option value="4" selected>32 bit color</option>
+        </select>
+      </div>
     </div>
-    <div class="card-body">
-      <input type="hidden" id="originalId" value="">
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="camId">ID Kamera (Custom)</label>
-          <input type="number" id="camId" placeholder="Kosongkan utk Auto ID">
-          <div class="help-text">Kosongkan jika ingin menggunakan ID otomatis.</div>
-        </div>
 
-        <div class="form-group">
-          <label for="camName">Nama Kamera</label>
-          <input type="text" id="camName" placeholder="Kamera_Depan">
-        </div>
-
-        <div class="form-group full-width">
-          <label for="camPath">RTSP Path URL</label>
-          <input type="text" id="camPath" placeholder="rtsp://admin:pass@192.168.1.100:554/stream1">
-          <div class="help-text">Masukkan alamat RTSP kamera yang akan didaftarkan.</div>
-        </div>
-
-        <div class="form-group">
-          <label for="camFunction">Fungsi Default</label>
-          <select id="camFunction">
-            <option value="None">None</option>
-            <option value="Monitor" selected>Monitor</option>
-            <option value="Modect">Modect</option>
-            <option value="Record">Record</option>
-            <option value="Mocord">Mocord</option>
-            <option value="Nodect">Nodect</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="camResolution">Resolusi Kamera</label>
-          <select id="camResolution">
-            <option value="1280x720">1280x720 (720p)</option>
-            <option value="1920x1080" selected>1920x1080 (1080p)</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="camColorspace">Target Colorspace</label>
-          <select id="camColorspace">
-            <option value="1">8 bit greyscale</option>
-            <option value="3">24 bit color</option>
-            <option value="4" selected>32 bit color</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-actions">
-        <button class="btn btn-primary" id="btnSave" onclick="saveCamera()">☁ Simpan Kamera</button>
-        <button class="btn btn-light" id="btnCancel" style="display:none;" onclick="resetForm()">Batal</button>
-      </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" id="btnCancel" style="display:none;" onclick="resetForm()">Batal</button>
+      <button class="btn btn-primary" id="btnSave" onclick="saveCamera()">☁ Simpan Kamera</button>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">📋 3. Daftar Kamera & Quick Controls</div>
-      <button class="btn btn-light" onclick="loadCameras()">↻ Refresh</button>
+  <!-- 4. DAFTAR KAMERA & QUICK CONTROLS -->
+  <div class="table-section">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:0;">📋 4. Daftar Kamera Terdaftar & Quick Controls</h3>
+      <button class="btn btn-outline btn-small" onclick="loadCameras()">↻ Refresh List</button>
     </div>
-    <div class="card-body">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nama & Status</th>
-              <th>Shortcut Function & Off</th>
-              <th>RTSP Path</th>
-              <th>Resolusi</th>
-              <th>Aksi Kamera</th>
-            </tr>
-          </thead>
-          <tbody id="cameraTableBody">
-            <tr><td colspan="6" class="loading">Memuat data autentikasi...</td></tr>
-          </tbody>
-        </table>
-      </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 50px;">ID</th>
+            <th style="width: 180px;">Nama & Status</th>
+            <th style="width: 160px;">Shortcut Fungsi</th>
+            <th>RTSP Path</th>
+            <th style="width: 100px;">Resolusi</th>
+            <th style="width: 120px;">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="cameraTableBody">
+          <tr><td colspan="6" style="text-align:center; padding:25px; color:var(--muted);">Memuat data kamera dari ZoneMinder...</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
-
-  <div class="footer">ZoneMinder Camera Dashboard</div>
 </div>
 
+<footer>
+  ZoneMinder CCTV Management Hub &mdash; Light Enterprise Interface
+</footer>
+
 <script>
-    const SERVER_IP = window.location.hostname;
+    const SERVER_HOST = window.location.origin;
     const ZM_CONFIG = {
-        // Sesuaikan IP dan pastikan menggunakan HTTPS port 443 standar reverse proxy
-        host: window.location.origin,
+        host: SERVER_HOST,
         username: 'admin',
         password: 'admin'
     };
@@ -525,7 +452,11 @@ tr.cam-disabled {
     let currentToken = sessionStorage.getItem('zm_token') || '';
     let existingIds = [];
     let cameraDataStore = {};
+    let checkerConfig = { enabled: true, interval: 60 };
 
+    // =========================================================================
+    // 1. AUTENTIKASI ZONEMINDER
+    // =========================================================================
     async function authenticate() {
         const tokenInput = document.getElementById('tokenStatusDisplay');
         if (tokenInput) {
@@ -542,35 +473,41 @@ tr.cam-disabled {
             const res = await fetch(loginUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                credentials: 'include', // Wajib agar session cookie ikut tersimpan
+                credentials: 'include',
                 body: params.toString()
             });
 
-            const data = await res.json();
-            
-            // Perbaikan penangkapan struktur token dari API ZoneMinder
-            if (res.ok && data.success && (data.access_token || (data.credentials && data.credentials.access_token))) {
-                currentToken = data.access_token || data.credentials.access_token;
+            const data = await res.json().catch(() => ({}));
+
+            if (res.ok && data.access_token) {
+                currentToken = data.access_token;
                 sessionStorage.setItem('zm_token', currentToken);
                 
                 if (tokenInput) {
-                    tokenInput.value = "Authenticated (Active Token)";
-                    tokenInput.style.color = "#28a745";
+                    tokenInput.value = `Authenticated (ZM v${data.version || '1.36'})`;
+                    tokenInput.style.color = "#16a34a";
+                }
+                return currentToken;
+            } else if (res.ok && (data.version || res.status === 200)) {
+                currentToken = data.access_token || "session-active";
+                if (tokenInput) {
+                    tokenInput.value = `Connected (ZM v${data.version || '1.36'})`;
+                    tokenInput.style.color = "#16a34a";
                 }
                 return currentToken;
             } else {
                 if (tokenInput) {
                     tokenInput.value = "Auth Failed";
-                    tokenInput.style.color = "#dc3545";
+                    tokenInput.style.color = "#dc2626";
                 }
                 return null;
             }
         } catch (err) {
+            console.error('Auth Error:', err);
             if (tokenInput) {
                 tokenInput.value = "Connection Error";
-                tokenInput.style.color = "#dc3545";
+                tokenInput.style.color = "#dc2626";
             }
-            console.error('Auth Error:', err);
             return null;
         }
     }
@@ -578,35 +515,46 @@ tr.cam-disabled {
     async function fetchWithAutoAuth(url, options = {}) {
         if (!currentToken) await authenticate();
         
-        // Pastikan opsi credentials selalu ikut terkirim pada fetch berikutnya
         options.credentials = 'include';
+        let delimiter = url.includes('?') ? '&' : '?';
+        let authenticatedUrl = currentToken && currentToken !== 'session-active'
+            ? `${url}${delimiter}token=${currentToken}`
+            : url;
 
-        let authenticatedUrl = `${url}${url.includes('?') ? '&' : '?'}token=${currentToken}`;
         let response = await fetch(authenticatedUrl, options);
 
         if (response.status === 401) {
             const newToken = await authenticate();
-            if (newToken) {
-                authenticatedUrl = `${url.split('?')[0]}?token=${newToken}`;
+            if (newToken && newToken !== 'session-active') {
+                const base = url.split('?')[0];
+                const query = url.includes('?') ? url.substring(url.indexOf('?') + 1) : '';
+                const cleanQuery = query.replace(/(^|&)token=[^&]*/g, '').replace(/^&/, '');
+                const sep = cleanQuery ? '?' + cleanQuery + '&' : '?';
+                authenticatedUrl = `${base}${sep}token=${newToken}`;
                 response = await fetch(authenticatedUrl, options);
             }
         }
         return response;
     }
 
+    // =========================================================================
+    // 2. LOAD CAMERAS
+    // =========================================================================
     async function loadCameras() {
+        const tbody = document.getElementById('cameraTableBody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--primary);">Memuat data kamera...</td></tr>';
+
         try {
             const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors.json`);
             const data = await res.json();
-            const tbody = document.getElementById('cameraTableBody');
-            if (!tbody) return;
             
+            if (!tbody) return;
             tbody.innerHTML = '';
             existingIds = [];
             cameraDataStore = {};
 
             if (!data.monitors || data.monitors.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6">Belum ada kamera terdaftar.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--muted);">Belum ada kamera terdaftar di ZoneMinder.</td></tr>';
                 return;
             }
 
@@ -617,35 +565,42 @@ tr.cam-disabled {
 
                 const isEnabled = (mon.Enabled == '1' || mon.Enabled == 1) && mon.Function !== 'None';
                 const rowClass = isEnabled ? '' : 'cam-disabled';
-                const badgeHtml = isEnabled ? '<span class="badge badge-on">ON</span>' : '<span class="badge badge-off">OFF</span>';
+                const badgeHtml = isEnabled ? '<span class="badge badge-ok">ON</span>' : '<span class="badge badge-err">OFF</span>';
 
                 tbody.innerHTML += `
                     <tr class="${rowClass}">
                         <td><b>${mon.Id}</b></td>
-                        <td>${badgeHtml} <b>${mon.Name}</b></td>
+                        <td>${badgeHtml} <b>${escapeHtml(mon.Name)}</b></td>
                         <td>
-                            <div class="quick-controls"><select id="fnSelect_${mon.Id}">
-                                <option value="None" ${mon.Function == 'None' ? 'selected':''}>None</option>
-                                <option value="Monitor" ${mon.Function == 'Monitor' ? 'selected':''}>Monitor</option>
-                                <option value="Modect" ${mon.Function == 'Modect' ? 'selected':''}>Modect</option>
-                                <option value="Record" ${mon.Function == 'Record' ? 'selected':''}>Record</option>
-                                <option value="Mocord" ${mon.Function == 'Mocord' ? 'selected':''}>Mocord</option>
-                                <option value="Nodect" ${mon.Function == 'Nodect' ? 'selected':''}>Nodect</option>
-                            </select>
-                            <button class="btn btn-primary btn-small" onclick="quickSetFunction('${mon.Id}')">Set</button>
-                            <button class="btn btn-danger btn-small" onclick="quickTurnOff('${mon.Id}')">OFF</button></div>
+                            <div class="quick-controls">
+                                <select id="fnSelect_${mon.Id}">
+                                    <option value="None" ${mon.Function == 'None' ? 'selected':''}>None</option>
+                                    <option value="Monitor" ${mon.Function == 'Monitor' ? 'selected':''}>Monitor</option>
+                                    <option value="Modect" ${mon.Function == 'Modect' ? 'selected':''}>Modect</option>
+                                    <option value="Record" ${mon.Function == 'Record' ? 'selected':''}>Record</option>
+                                    <option value="Mocord" ${mon.Function == 'Mocord' ? 'selected':''}>Mocord</option>
+                                    <option value="Nodect" ${mon.Function == 'Nodect' ? 'selected':''}>Nodect</option>
+                                </select>
+                                <button class="btn btn-primary btn-small" onclick="quickSetFunction('${mon.Id}')">Set</button>
+                                <button class="btn btn-outline btn-small" onclick="quickTurnOff('${mon.Id}')">OFF</button>
+                            </div>
                         </td>
-                        <td><div class="rtsp-path" title="${mon.Path || '-'}">${mon.Path || '-'}</div></td>
+                        <td><div class="rtsp-path" title="${escapeHtml(mon.Path || '-')}">${escapeHtml(mon.Path || '-')}</div></td>
                         <td>${mon.Width}x${mon.Height}</td>
-                        <td><div class="action-group">
-                            <button class="btn btn-warning btn-small" onclick="editCamera('${mon.Id}')">Edit</button>
-                            <button class="btn btn-danger btn-small" onclick="deleteCamera('${mon.Id}')">Hapus</button>
-                            </div></td>
+                        <td>
+                            <div class="action-group">
+                                <button class="btn btn-warning btn-small" onclick="editCamera('${mon.Id}')">✏️ Edit</button>
+                                <button class="btn btn-danger btn-small" onclick="deleteCamera('${mon.Id}')">🗑️ Hapus</button>
+                            </div>
+                        </td>
                     </tr>
                 `;
             });
         } catch (err) {
             console.error('Gagal memuat kamera ZM:', err);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:25px; color:#dc2626;">Gagal memuat data: ${err.message}</td></tr>`;
+            }
         }
     }
 
@@ -678,22 +633,106 @@ tr.cam-disabled {
         if (res.ok) loadCameras();
     }
 
-    async function saveCamera() {
-        const inputId = document.getElementById('camId').value.trim();
-        const originalId = document.getElementById('originalId').value.trim();
+    // =========================================================================
+    // 3. EDIT & SAVE CAMERA
+    // =========================================================================
+    function editCamera(id) {
+        const mon = cameraDataStore[id];
+        if (!mon) return alert('Data kamera tidak ditemukan!');
 
-        if (inputId && inputId !== originalId && existingIds.includes(inputId)) {
-            return alert(`Error: ID ${inputId} sudah digunakan!`);
+        const formTitle = document.getElementById('formTitle');
+        if (formTitle) formTitle.innerText = `✏️ Edit Kamera: ${mon.Name} (ID: ${id})`;
+
+        document.getElementById('originalId').value = id;
+        
+        const camIdInput = document.getElementById('camId');
+        if (camIdInput) {
+            camIdInput.value = id;
+            camIdInput.readOnly = true;
+        }
+
+        const helpText = document.getElementById('camIdHelp');
+        if (helpText) helpText.innerText = "ID kamera bersifat permanen saat mode edit.";
+
+        document.getElementById('camName').value = mon.Name || '';
+        document.getElementById('camPath').value = mon.Path || '';
+        document.getElementById('camFunction').value = mon.Function || 'Monitor';
+
+        const resVal = `${mon.Width}x${mon.Height}`;
+        const resSelect = document.getElementById('camResolution');
+        if (resSelect) {
+            let exists = false;
+            for (let i = 0; i < resSelect.options.length; i++) {
+                if (resSelect.options[i].value === resVal) { exists = true; break; }
+            }
+            if (!exists && mon.Width && mon.Height) {
+                const opt = document.createElement('option');
+                opt.value = resVal;
+                opt.text = `${resVal} (Custom)`;
+                resSelect.add(opt);
+            }
+            resSelect.value = resVal;
+        }
+
+        document.getElementById('camColorspace').value = mon.Colours || '4';
+
+        const btnSave = document.getElementById('btnSave');
+        if (btnSave) {
+            btnSave.innerText = "💾 Perbarui Kamera";
+            btnSave.className = "btn btn-warning";
+        }
+
+        const btnCancel = document.getElementById('btnCancel');
+        if (btnCancel) btnCancel.style.display = "inline-flex";
+
+        const formCard = document.getElementById('cameraFormCard');
+        if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function resetForm() {
+        const formTitle = document.getElementById('formTitle');
+        if (formTitle) formTitle.innerText = "➕ 3. Pendaftaran Kamera RTSP ke ZoneMinder";
+
+        document.getElementById('originalId').value = "";
+        
+        const camIdInput = document.getElementById('camId');
+        if (camIdInput) {
+            camIdInput.value = "";
+            camIdInput.readOnly = false;
+        }
+
+        const helpText = document.getElementById('camIdHelp');
+        if (helpText) helpText.innerText = "Kosongkan jika ingin menggunakan ID otomatis.";
+
+        document.getElementById('camName').value = "";
+        document.getElementById('camPath').value = "";
+        document.getElementById('camFunction').value = "Monitor";
+
+        const btnSave = document.getElementById('btnSave');
+        if (btnSave) {
+            btnSave.innerText = "☁ Simpan Kamera";
+            btnSave.className = "btn btn-primary";
+        }
+
+        const btnCancel = document.getElementById('btnCancel');
+        if (btnCancel) btnCancel.style.display = "none";
+    }
+
+    async function saveCamera() {
+        const originalId = document.getElementById('originalId').value.trim();
+        const inputId = document.getElementById('camId').value.trim();
+
+        if (!originalId && inputId && existingIds.includes(inputId)) {
+            return alert(`Error: ID ${inputId} sudah digunakan oleh kamera lain!`);
         }
 
         const camName = document.getElementById('camName').value.trim();
         const camPath = document.getElementById('camPath').value.trim();
-        if (!camName || !camPath) return alert('Nama dan RTSP Path Wajib diisi!');
+        if (!camName || !camPath) return alert('Nama kamera dan RTSP Path Wajib diisi!');
 
-        const [width, height] = document.getElementById('camResolution').value.split('x');
+        const [width, height] = (document.getElementById('camResolution').value || '1920x1080').split('x');
 
         const params = new URLSearchParams();
-        if (inputId) params.append('Monitor[Id]', inputId);
         params.append('Monitor[Name]', camName);
         params.append('Monitor[Type]', 'Ffmpeg');
         params.append('Monitor[Function]', document.getElementById('camFunction').value);
@@ -701,39 +740,66 @@ tr.cam-disabled {
         params.append('Monitor[Path]', camPath);
         params.append('Monitor[Method]', 'rtsp');
         params.append('Monitor[Options]', 'rtsp_transport=tcp');
-        params.append('Monitor[Width]', width);
-        params.append('Monitor[Height]', height);
-        params.append('Monitor[Colours]', document.getElementById('camColorspace').value);
-        params.append('Monitor[TargetColorspace]', document.getElementById('camColorspace').value);
-        params.append('Monitor[MaxFPS]', '');
-        params.append('Monitor[AlarmMaxFPS]', '');
+        params.append('Monitor[Width]', width || '1920');
+        params.append('Monitor[Height]', height || '1080');
+        params.append('Monitor[Colours]', document.getElementById('camColorspace').value || '4');
+        params.append('Monitor[TargetColorspace]', '4');
         params.append('Monitor[ServerId]', '0');
-        params.append('Monitor[Controllable]', '0');
-        params.append('Monitor[DecoderColorspace]', '0');
 
         let targetUrl = originalId 
             ? `${ZM_CONFIG.host}/zm/api/monitors/${originalId}.json`
             : `${ZM_CONFIG.host}/zm/api/monitors.json`;
 
-        const res = await fetchWithAutoAuth(targetUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
-        });
+        if (!originalId && inputId) {
+            params.append('Monitor[Id]', inputId);
+        }
 
-        if (res.ok) {
-            alert(originalId ? 'Kamera diperbarui!' : 'Kamera ditambahkan!');
-            resetForm();
-            loadCameras();
-        } else {
-            alert('Gagal menyimpan kamera ke ZoneMinder.');
+        const saveBtn = document.getElementById('btnSave');
+        const origText = saveBtn ? saveBtn.innerText : '';
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerText = "Menyimpan ke ZoneMinder...";
+        }
+
+        try {
+            const res = await fetchWithAutoAuth(targetUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (res.ok || (data && (data.message === 'Saved' || data.Id))) {
+                alert(originalId ? `Kamera '${camName}' (ID: ${originalId}) berhasil diperbarui!` : `Kamera '${camName}' berhasil didaftarkan ke ZoneMinder!`);
+                resetForm();
+                await loadCameras();
+            } else {
+                alert('Gagal menyimpan kamera: ' + (data.message || JSON.stringify(data) || res.statusText));
+            }
+        } catch (err) {
+            alert('Terjadi kesalahan jaringan: ' + err.message);
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerText = origText;
+            }
         }
     }
 
     async function deleteCamera(id) {
-        if (!confirm(`Hapus kamera ID ${id}?`)) return;
-        const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors/${id}.json`, { method: 'DELETE' });
-        if (res.ok) loadCameras();
+        if (!confirm(`Apakah Anda yakin ingin menghapus kamera ID ${id}?`)) return;
+        try {
+            const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors/${id}.json`, { method: 'DELETE' });
+            if (res.ok) {
+                alert(`Kamera ID ${id} berhasil dihapus.`);
+                loadCameras();
+            } else {
+                alert(`Gagal menghapus kamera ID ${id}.`);
+            }
+        } catch (err) {
+            alert(`Error: ${err.message}`);
+        }
     }
 
     async function checkCpuLoad() {
@@ -741,48 +807,153 @@ tr.cam-disabled {
         try {
             const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/host/getLoad.json`);
             const data = await res.json();
-            if (statusDiv) {
+            if (statusDiv && data.load) {
                 statusDiv.style.display = 'block';
-                statusDiv.innerHTML = `Server Load: [1 Min: ${data.load[0]}] | [5 Min: ${data.load[1]}] | [15 Min: ${data.load[2]}]`;
+                statusDiv.innerHTML = `ZoneMinder Server Load: [1 Min: ${data.load[0]}] | [5 Min: ${data.load[1]}] | [15 Min: ${data.load[2]}]`;
             }
         } catch (err) {
-            alert('Gagal mengambil CPU Load.');
+            alert('Gagal mengambil CPU Load ZoneMinder.');
         }
     }
 
-    function editCamera(id) {
-        const mon = cameraDataStore[id];
-        if (!mon) return;
-
-        document.getElementById('formTitle').innerText = `Edit Kamera (ID: ${id})`;
-        document.getElementById('originalId').value = id;
-        document.getElementById('camId').value = id;
-        document.getElementById('camName').value = mon.Name || '';
-        document.getElementById('camPath').value = mon.Path || '';
-        document.getElementById('camFunction').value = mon.Function || 'Monitor';
-        document.getElementById('camResolution').value = (`${mon.Width}x${mon.Height}` === '1280x720') ? '1280x720' : '1920x1080';
-        document.getElementById('camColorspace').value = mon.Colours || '4';
-
-        document.getElementById('btnSave').innerText = "Update Kamera";
-        document.getElementById('btnCancel').style.display = "inline-block";
+    // =========================================================================
+    // 4. CCTV HEALTH CHECKER CONTROLLER
+    // =========================================================================
+    async function loadCheckerConfig() {
+        try {
+            const res = await fetch('/api/checker/config');
+            if (res.ok) {
+                checkerConfig = await res.json();
+                renderCheckerStatus();
+            }
+        } catch (e) {
+            console.error('Error fetching checker config:', e);
+        }
     }
 
-    function resetForm() {
-        document.getElementById('formTitle').innerText = "2. Pendaftaran Kamera RTSP ke ZoneMinder";
-        document.getElementById('originalId').value = "";
-        document.getElementById('camId').value = "";
-        document.getElementById('camName').value = "";
-        document.getElementById('camPath').value = "";
-        document.getElementById('btnSave').innerText = "Simpan Kamera";
-        document.getElementById('btnCancel').style.display = "none";
+    function renderCheckerStatus() {
+        const badge = document.getElementById('checkerStatusBadge');
+        const btnToggle = document.getElementById('btnToggleChecker');
+        const intervalInput = document.getElementById('checkerIntervalInput');
+        const lastRunText = document.getElementById('checkerLastRunText');
+
+        if (intervalInput && checkerConfig.interval) {
+            intervalInput.value = checkerConfig.interval;
+        }
+
+        if (lastRunText) {
+            lastRunText.innerText = checkerConfig.last_check 
+                ? `Terakhir diperiksa: ${checkerConfig.last_check}`
+                : "Terakhir diperiksa: Belum ada eksekusi";
+        }
+
+        if (checkerConfig.enabled) {
+            if (badge) {
+                badge.className = "badge badge-running";
+                badge.innerText = "🟢 Berjalan (Active)";
+            }
+            if (btnToggle) {
+                btnToggle.className = "btn btn-warning";
+                btnToggle.innerText = "⏸ Jeda (Pause) Checker";
+            }
+        } else {
+            if (badge) {
+                badge.className = "badge badge-paused";
+                badge.innerText = "⏸ Dinonaktifkan (Paused)";
+            }
+            if (btnToggle) {
+                btnToggle.className = "btn btn-success";
+                btnToggle.innerText = "▶ Aktifkan Checker";
+            }
+        }
     }
 
+    async function toggleCheckerActive() {
+        const newStatus = !checkerConfig.enabled;
+        try {
+            const res = await fetch('/api/checker/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: newStatus })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                checkerConfig = data.config || checkerConfig;
+                checkerConfig.enabled = newStatus;
+                renderCheckerStatus();
+            }
+        } catch (e) {
+            alert('Gagal mengubah status checker: ' + e.message);
+        }
+    }
+
+    async function updateCheckerInterval() {
+        const input = document.getElementById('checkerIntervalInput');
+        const val = parseInt(input.value);
+        if (isNaN(val) || val < 5) {
+            return alert('Interval minimal adalah 5 detik!');
+        }
+
+        try {
+            const res = await fetch('/api/checker/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interval: val })
+            });
+            if (res.ok) {
+                alert(`Interval pengecekan berhasil diubah menjadi ${val} detik!`);
+                await loadCheckerConfig();
+            }
+        } catch (e) {
+            alert('Gagal menyimpan interval: ' + e.message);
+        }
+    }
+
+    async function triggerRunNow() {
+        const btn = document.getElementById('btnRunNow');
+        const origText = btn ? btn.innerText : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = "Memulai Pengecekan...";
+        }
+
+        try {
+            const res = await fetch('/api/checker/run-now', { method: 'POST' });
+            if (res.ok) {
+                alert('Trigger pemeriksaan telah dikirim! Pengecekan kamera sedang berlangsung.');
+                setTimeout(loadCheckerConfig, 2500);
+            }
+        } catch (e) {
+            alert('Gagal mengirim trigger: ' + e.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = origText;
+            }
+        }
+    }
+
+    function escapeHtml(text) {
+        return String(text || '')
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // =========================================================================
+    // INITIALIZATION
+    // =========================================================================
     document.addEventListener('DOMContentLoaded', async () => {
         const hostDisplay = document.getElementById('apiHostDisplay');
         if (hostDisplay) hostDisplay.value = ZM_CONFIG.host;
         
-        const token = await authenticate();
-        if (token) loadCameras();
+        await authenticate();
+        await loadCameras();
+        await loadCheckerConfig();
+
+        setInterval(loadCheckerConfig, 10000);
     });
 </script>
 </body>
