@@ -1,8 +1,0 @@
-{
-  "enabled": true,
-  "interval": 300,
-  "rtsp_timeout": 3.0,
-  "run_now": false,
-  "status": "Running",
-  "last_check": "2026-11-05 02:53:13"
-}
