@@ -1,5 +1,2689 @@
 [
   {
+    "timestamp": "2026-11-05 02:53:13",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-05 02:53:13",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 5
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:12",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:11",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:11",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:11",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-05 02:48:11",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-05 02:48:11",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:58:01",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:57:46",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:52:46",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:52:31",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:47:30",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:47:15",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:42:15",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:42:00",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:36:59",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:36:44",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:31:43",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:31:28",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:26:28",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:26:13",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:12",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 5
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:12",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:12",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:09",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:09",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:06",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:06",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:03",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:03",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:00",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:21:00",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 07:20:56",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:15:56",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:15:53",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:10:52",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:10:50",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:05:49",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:05:48",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 07:00:47",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 07:00:45",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:55:44",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 06:55:44",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:50:43",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 06:50:43",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:45:43",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 06:45:42",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:42",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 5
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:42",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:42",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:41",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:41",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:41",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:41",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:41",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:41",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:40",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:40:40",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 06:40:40",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:40",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 5
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:40",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:40",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:40",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:40",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:40",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:40",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:39",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:39",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:39",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 06:35:39",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 06:35:38",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:24:54",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:24:53",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:19:53",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:19:53",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:14:53",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:14:52",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:13:52",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:13:50",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:12:49",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:12:49",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:11:49",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:11:48",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:10:47",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:10:47",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:09:46",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:09:46",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:08:45",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:08:44",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:07:44",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:07:43",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:06:43",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:06:42",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:05:41",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:05:41",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:04:40",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:04:39",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:03:38",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:03:38",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:02:37",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:02:37",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:01:36",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:01:35",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 03:00:34",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 03:00:34",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:59:33",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:59:33",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:58:32",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:58:32",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:57:31",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:57:28",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:56:28",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:56:27",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:55:26",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:55:25",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:54:25",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:54:22",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:53:21",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:53:21",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:52:20",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:52:20",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:51:19",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:51:19",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:50:18",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:50:17",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:49:16",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:49:16",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:48:15",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:48:13",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:47:13",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:47:12",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:46:12",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:46:11",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:45:11",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:45:11",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:10",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:44:09",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 02:44:09",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:43:18",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:43:11",
+      "total_monitors": 6,
+      "online": 4,
+      "offline": 2,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:43:16",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:43:11",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:43:16",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:43:11",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:42:11",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:42:10",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:41:10",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:41:09",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:09",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:40:08",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 02:40:08",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:36",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:35",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:39:35",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 02:39:35",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:32:15",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:32:14",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:31:13",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:31:13",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:30:12",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:30:12",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:29:12",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:29:11",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:28:11",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:28:10",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:27:10",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:27:09",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:26:09",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:26:09",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:25:08",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:25:08",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:24:07",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:24:06",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:23:06",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:23:06",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:22:21",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 02:22:21",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:21:54",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:21:53",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:20:53",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:20:52",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:19:52",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:19:51",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:19:52",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:19:51",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:19:52",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 02:19:51",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:18:51",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:18:47",
+      "total_monitors": 6,
+      "online": 4,
+      "offline": 2,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:18:51",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:18:47",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:18:50",
+    "topic": "cctv/status/monitor-2-edited",
+    "payload": {
+      "timestamp": "2026-11-04 02:18:47",
+      "monitor_id": "2",
+      "name": "Monitor-2-Edited",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2-Edited' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:17:47",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:17:47",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:16:47",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:16:47",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:15:47",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:15:44",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:15:47",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:15:44",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:15:47",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:15:44",
+      "monitor_id": "8",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://127.0.0.1:554/live",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:14:44",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:14:43",
+      "total_monitors": 6,
+      "online": 6,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:13:43",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:13:43",
+      "total_monitors": 6,
+      "online": 6,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:12:43",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:12:42",
+      "total_monitors": 6,
+      "online": 6,
+      "offline": 0,
+      "status_changed": 1
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:12:43",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:12:42",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:12:43",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 02:12:42",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:42",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "total_monitors": 6,
+      "online": 5,
+      "offline": 1,
+      "status_changed": 5
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:39",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:39",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:39",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:39",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:38",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:38",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:38",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "2",
+      "name": "Monitor-2",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:38",
+    "topic": "cctv/status/monitor-2",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "2",
+      "name": "Monitor-2",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:38",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:11:38",
+    "topic": "cctv/status/monitor-1",
+    "payload": {
+      "timestamp": "2026-11-04 02:11:38",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:38",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "total_monitors": 6,
+      "online": 0,
+      "offline": 6,
+      "status_changed": 6
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:38",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:38",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "2",
+      "name": "Monitor-2",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/status/monitor-2",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "2",
+      "name": "Monitor-2",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-2' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:10:37",
+    "topic": "cctv/status/monitor-1",
+    "payload": {
+      "timestamp": "2026-11-04 02:10:37",
+      "monitor_id": "1",
+      "name": "Monitor-1",
+      "status": "OFFLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Monitor-1' TERPUTUS (OFFLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:09:37",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:09:37",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:08:36",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:08:36",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:07:36",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:07:36",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:06:36",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:06:36",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:05:36",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:05:35",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:04:35",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:04:35",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:03:35",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:03:35",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:02:35",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:02:34",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:01:34",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:01:33",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 02:00:33",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 02:00:33",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:59:33",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:59:32",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 5
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:58:32",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:58:31",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:57:31",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:57:31",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:56:31",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:56:31",
+      "total_monitors": 7,
+      "online": 7,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:56:31",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:56:31",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:56:31",
+    "topic": "cctv/status/excel_cam_parkir_02",
+    "payload": {
+      "timestamp": "2026-11-04 01:56:31",
+      "monitor_id": "7",
+      "name": "EXCEL_CAM_PARKIR_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_PARKIR_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:56:31",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:56:31",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:56:31",
+    "topic": "cctv/status/excel_cam_lobby_01",
+    "payload": {
+      "timestamp": "2026-11-04 01:56:31",
+      "monitor_id": "6",
+      "name": "EXCEL_CAM_LOBBY_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'EXCEL_CAM_LOBBY_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:55:31",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:55:29",
+      "total_monitors": 5,
+      "online": 5,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:54:29",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:54:26",
+      "total_monitors": 5,
+      "online": 5,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:53:26",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:53:26",
+      "total_monitors": 5,
+      "online": 5,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:53:26",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:53:26",
+      "monitor_id": "5",
+      "name": "CAM_LT1_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:53:26",
+    "topic": "cctv/status/cam_lt1_02",
+    "payload": {
+      "timestamp": "2026-11-04 01:53:26",
+      "monitor_id": "5",
+      "name": "CAM_LT1_02",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.148:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_02' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:53:26",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:53:26",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:53:26",
+    "topic": "cctv/status/cam_lt1_01",
+    "payload": {
+      "timestamp": "2026-11-04 01:53:26",
+      "monitor_id": "4",
+      "name": "CAM_LT1_01",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'CAM_LT1_01' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:53:26",
+    "topic": "cctv/events",
+    "payload": {
+      "timestamp": "2026-11-04 01:53:26",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:53:26",
+    "topic": "cctv/status/test_cam",
+    "payload": {
+      "timestamp": "2026-11-04 01:53:26",
+      "monitor_id": "3",
+      "name": "Test_Cam",
+      "status": "ONLINE",
+      "rtsp_url": "rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101",
+      "message": "Kamera 'Test_Cam' TERHUBUNG (ONLINE)"
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:52:26",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:52:24",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:51:24",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:51:22",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
+    "timestamp": "2026-11-04 01:50:22",
+    "topic": "cctv/summary",
+    "payload": {
+      "timestamp": "2026-11-04 01:50:22",
+      "total_monitors": 2,
+      "online": 2,
+      "offline": 0,
+      "status_changed": 0
+    }
+  },
+  {
     "timestamp": "2026-11-04 01:49:22",
     "topic": "cctv/summary",
     "payload": {

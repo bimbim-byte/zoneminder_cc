@@ -1,0 +1,34 @@
+name: Example Config
+version: 1.0.0
+schema: v1
+
+models:
+  - name: HematDaya
+    provider: openai
+    model: HematDaya
+    apiBase: https://rf42zmg.abc-tunnel.us/v1
+    apiKey: sk-8be0da340bed370c-l88lnf-b7297d9d
+    roles:
+      - chat
+      - edit
+      - apply
+  
+  - name: bandel_banget
+    provider: openai
+    model: bandel_banget
+    apiBase: http://localhost:20128/v1
+    apiKey: sk-c6a37828f0625270-5bmcrv-61d0c00b
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: PewebMahal
+    provider: openai
+    model: PewebMahal
+    apiBase: https://rf42zmg.abc-tunnel.us/v1
+    apiKey: sk-8be0da340bed370c-l88lnf-b7297d9d
+    roles:
+      - chat
+      - edit
+      - apply

@@ -3,222 +3,714 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live MQTT Camera Health Log</title>
+  <title>ZoneMinder - Live MQTT Camera Health Log & Notification Hub</title>
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
-      background-color: #0f172a;
-      color: #e2e8f0;
-      margin: 0;
-      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      min-height: 100vh;
     }
     header {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      padding: 14px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 14px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
       flex-shrink: 0;
     }
-    h1 {
-      margin: 0;
-      font-size: 20px;
-      color: #38bdf8;
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
       display: flex;
       align-items: center;
       gap: 8px;
     }
-    .back-btn {
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn-back {
       color: white;
       text-decoration: none;
-      background: #1e293b;
-      border: 1px solid #334155;
-      padding: 6px 14px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 12px;
       border-radius: 6px;
       font-size: 13px;
+      font-weight: 500;
       transition: .2s;
     }
-    .back-btn:hover { background: #334155; }
-    .toolbar {
+    .btn-back:hover { background: rgba(255,255,255,0.22); }
+
+    .container {
+      width: min(1140px, calc(100% - 32px));
+      margin: 20px auto 40px;
       display: flex;
-      gap: 10px;
-      align-items: center;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .card h3 {
+      font-size: 14.5px;
+      color: var(--primary);
       margin-bottom: 12px;
-      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-weight: 600;
     }
-    .form-control {
-      padding: 7px 12px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      color: #fff;
-      font-size: 13px;
+
+    /* Checker Box */
+    .checker-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+      align-items: center;
     }
-    .form-control:focus { outline: none; border-color: #38bdf8; }
+
     .btn {
-      padding: 7px 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 14px;
       border-radius: 6px;
       font-size: 13px;
       font-weight: 600;
       border: none;
       cursor: pointer;
-      background: #334155;
-      color: #fff;
+      transition: .2s;
+      height: 38px;
     }
-    .btn:hover { background: #475569; }
-    #log-container {
-      background-color: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      flex: 1;
-      overflow-y: auto;
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-warning { background: var(--warning); color: white; }
+    .btn-warning:hover { background: #b45309; }
+    .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: #f1f5f9; }
+
+    .form-control {
+      height: 38px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-ok { background: #dcfce7; color: #166534; }
+    .badge-err { background: #fee2e2; color: #991b1b; }
+    .badge-running { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-paused { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+
+    /* Tutorial Section */
+    .tutorial-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tutorial-body {
+      margin-top: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+    .param-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px;
+      font-size: 12.5px;
+    }
+    .param-table th, .param-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .param-table th { background: #0f172a; color: white; font-weight: 600; }
+    .param-table td { background: #fff; }
+
+    .code-box {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 12px;
+      color: #0f172a;
+      overflow-x: auto;
+      margin: 8px 0 14px;
+      line-height: 1.5;
+    }
+    .step-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
       padding: 12px 14px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    .step-card h4 { margin: 0 0 5px; color: var(--text); font-size: 13.5px; font-weight: 600; }
+
+    /* Log Stream Section */
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    #log-container {
+      background-color: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      height: 480px;
+      overflow-y: auto;
+      padding: 10px 12px;
       font-size: 12.5px;
       line-height: 1.6;
     }
     .log-entry {
       padding: 6px 8px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid #f1f5f9;
       display: flex;
       align-items: baseline;
-      gap: 8px;
+      gap: 10px;
       font-family: 'Consolas', 'Courier New', monospace;
     }
-    .log-entry:hover { background: rgba(255,255,255,0.03); }
-    .time { color: #94a3b8; font-size: 11.5px; min-width: 140px; }
-    .topic { color: #f59e0b; font-weight: bold; min-width: 160px; }
-    .payload { color: #cbd5e1; flex: 1; }
-    .badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: bold;
+    .log-entry:hover { background: #f8fafc; }
+    .time { color: var(--muted); font-size: 11px; min-width: 140px; }
+    .topic { color: var(--warning); font-weight: bold; min-width: 160px; }
+    .payload { color: var(--text); flex: 1; overflow-wrap: anywhere; }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 16px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
     }
-    .badge-online { background: #166534; color: #bbf7d0; }
-    .badge-offline { background: #991b1b; color: #fecaca; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>📡 Live MQTT Camera Health Log</h1>
-    <a href="index.html" class="back-btn">⬅ Kembali ke Portal</a>
-  </header>
 
-  <div class="toolbar">
-    <input type="text" id="searchInput" class="form-control" style="width: 260px;" placeholder="Cari topik atau kamera..." oninput="filterLogs()">
-    <button id="toggleBtn" class="btn" onclick="toggleAutoRefresh()">⏸ Pause Auto-Refresh</button>
-    <button class="btn" onclick="fetchLogsFromFile()">🔄 Refresh Sekarang</button>
-    <div id="statusCounter" style="margin-left: auto; font-size: 12px; color: #94a3b8;">Memuat data...</div>
+<header>
+  <h1>📡 ZoneMinder - Live MQTT Health Log & Notification Hub</h1>
+  <div class="header-actions">
+    <a href="/zm/" target="_blank" class="btn-back">🖥️ ZoneMinder Web (/zm/)</a>
+    <a href="index.html" class="btn-back">⬅ Portal</a>
+  </div>
+</header>
+
+<div class="container">
+  <!-- 1. KONTROL CCTV CHECKER -->
+  <div class="card" style="border-top: 3px solid var(--success);">
+    <h3>
+      <span>⚙️ 1. Kendali Fitur CCTV Health Checker</span>
+      <span id="checkerStatusBadge" class="badge badge-running">Memuat Status...</span>
+    </h3>
+    <div class="checker-box">
+      <!-- Status & Toggle -->
+      <div>
+        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Status Operasional Checker</label>
+        <button id="btnToggleChecker" class="btn btn-warning" style="width:100%;" onclick="toggleCheckerActive()">
+          ⏸ Jeda (Pause) Checker
+        </button>
+      </div>
+
+      <!-- Ubah Delay Interval -->
+      <div>
+        <label for="checkerIntervalInput" style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Delay Pengecekan Ulang (Detik)</label>
+        <div style="display:flex; gap:6px;">
+          <input type="number" id="checkerIntervalInput" class="form-control" min="5" max="3600" value="60" style="width:85px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="updateCheckerInterval()">💾 Simpan Delay</button>
+        </div>
+      </div>
+
+      <!-- Trigger Cek Sekarang -->
+      <div>
+        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Pemeriksaan Manual</label>
+        <button id="btnRunNow" class="btn btn-success" style="width:100%;" onclick="triggerRunNow()">
+          ⚡ Cek Semua Kamera Sekarang
+        </button>
+      </div>
+    </div>
+    <div style="margin-top:10px; font-size:11.5px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+      <span id="checkerLastRunText">Terakhir diperiksa: -</span>
+      <span>💡 Konfigurasi tersinkronisasi otomatis dengan server latar belakang <code>cctv_checker</code>.</span>
+    </div>
   </div>
 
-  <div id="log-container">Memuat log dari server...</div>
+  <!-- 2. PANDUAN INTEGRASI NOTIFIKASI MQTT DI PERANGKAT LAIN -->
+  <div class="card" style="border-top: 3px solid var(--primary);">
+    <div class="tutorial-header" onclick="toggleTutorial()">
+      <h3 style="margin-bottom:0; width:100%;">
+        <span>📘 2. Panduan Integrasi: Pasang Notifikasi MQTT di HP Android / iOS & Device Lain</span>
+        <span id="tutorialToggleIcon" style="font-size:13px; font-weight:normal; color:var(--primary);">▲ Tutup Panduan</span>
+      </h3>
+    </div>
 
-  <script>
-    const API_URL = "/api/mqtt-logs";
-    let isAutoRefresh = true;
-    let refreshInterval = null;
-    let allLogs = [];
+    <div id="tutorialSection" class="tutorial-body">
+      <p style="margin-top:0; font-size:13px; color:var(--muted);">
+        Terima peringatan instan ketika kamera CCTV mati/terputus langsung ke ponsel Android, iPhone, tablet, atau sistem lain (Home Assistant, Telegram Bot, Node-RED, ESP32) menggunakan broker Mosquitto MQTT yang sudah aktif.
+      </p>
 
-    async function fetchLogsFromFile() {
-      try {
-        const response = await fetch(API_URL);
-        allLogs = await response.json();
-        renderLogs();
-      } catch (error) {
-        document.getElementById("log-container").innerHTML = `<span style="color:#ef4444;">Gagal mengambil log dari ${API_URL}: ${error.message}</span>`;
+      <h4 style="color:var(--text); font-size:13.5px; margin: 14px 0 6px;">1. Parameter Koneksi Broker Mosquitto MQTT</h4>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Nilai / Konfigurasi</th>
+            <th>Keterangan Penggunaan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Broker Host / IP</b></td>
+            <td><code id="displayHostIp">192.168.x.x</code> atau <code>localhost</code></td>
+            <td>Gunakan IP LAN komputer server untuk diakses dari HP/Device lain dalam satu jaringan WiFi.</td>
+          </tr>
+          <tr>
+            <td><b>Port TCP (Native MQTT)</b></td>
+            <td><code>1883</code></td>
+            <td><b>Wajib untuk:</b> Aplikasi HP (MQTT Dash / IoT MQTT Panel), Home Assistant, Python, ESP32.</td>
+          </tr>
+          <tr>
+            <td><b>Port WebSocket (WSS)</b></td>
+            <td><code>9001</code> / <code>443 (/mqtt)</code></td>
+            <td>Digunakan khusus untuk browser web atau aplikasi web client.</td>
+          </tr>
+          <tr>
+            <td><b>Autentikasi</b></td>
+            <td><i>Anonymous (Tanpa User & Password)</i></td>
+            <td>Kosongkan kolom username dan password di aplikasi penerima.</td>
+          </tr>
+          <tr>
+            <td><b>Topik Notifikasi (Event)</b></td>
+            <td><code>cctv/events</code></td>
+            <td><b>(Sangat Direkomendasikan)</b> Mengirim sinyal saat status kamera beralih ONLINE / OFFLINE.</td>
+          </tr>
+          <tr>
+            <td><b>Topik Ringkasan (Summary)</b></td>
+            <td><code>cctv/summary</code></td>
+            <td>Mengirim data total kamera, total online, dan total offline secara periodik.</td>
+          </tr>
+          <tr>
+            <td><b>Topik Wildcard (Semua)</b></td>
+            <td><code>cctv/#</code></td>
+            <td>Menerima seluruh pesan dari semua saluran CCTV.</td>
+          </tr>
+          <tr>
+            <td><b>Topik Trigger Remote</b></td>
+            <td><code>cctv/control/run_now</code></td>
+            <td>Kirim pesan kosong ke topik ini dari HP untuk memicu cek kamera jarak jauh.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4 style="color:var(--text); font-size:13.5px; margin: 14px 0 6px;">2. Contoh Struktur Payload JSON</h4>
+      <div class="code-box">{
+  "timestamp": "2026-11-04 09:30:15",
+  "monitor_id": "2",
+  "name": "Kamera_Gerbang_Utama",
+  "status": "OFFLINE",
+  "rtsp_url": "rtsp://admin:pass@192.168.1.100:554/stream1",
+  "message": "Kamera 'Kamera_Gerbang_Utama' TERPUTUS (OFFLINE)"
+}</div>
+
+      <h4 style="color:var(--text); font-size:13.5px; margin: 14px 0 6px;">3. Cara Pasang di Aplikasi HP Android / iOS (Contoh: MQTT Dash)</h4>
+      <div class="step-card">
+        <h4>Langkah 1: Unduh Aplikasi MQTT Client</h4>
+        <p style="margin:0; color:var(--muted);">Buka Google Play Store (Android) atau App Store (iOS), lalu instal aplikasi gratis seperti <b>MQTT Dash</b>, <b>IoT MQTT Panel</b>, atau <b>MQTT Tool</b>.</p>
+      </div>
+
+      <div class="step-card">
+        <h4>Langkah 2: Tambahkan Koneksi Broker Baru</h4>
+        <p style="margin:0; color:var(--muted);">
+          - <b>Name:</b> ZoneMinder CCTV Alert<br>
+          - <b>Address / Host:</b> Masukkan IP Server lokal komputer ini (Contoh: <code>192.168.1.50</code>)<br>
+          - <b>Port:</b> <code>1883</code><br>
+          - <b>Client ID:</b> Bebas / Acak<br>
+          - Simpan (Save) dan pastikan ikon koneksi berubah menjadi hijau (Connected).
+        </p>
+      </div>
+
+      <div class="step-card">
+        <h4>Langkah 3: Buat Tile / Notifikasi Alarm</h4>
+        <p style="margin:0; color:var(--muted);">
+          - Tambahkan widget baru bertipe <b>Text / Log</b> atau <b>Multi-State</b>.<br>
+          - Masukkan Topic: <code>cctv/events</code><br>
+          - Aktifkan fitur <b>"Enable notifications on receive"</b> atau <b>"Alert on OFFLINE"</b>.<br>
+          - Sekarang, setiap kali koneksi kamera CCTV mati atau hidup kembali, HP Anda akan bergetar dan memunculkan pop-up notifikasi!
+        </p>
+      </div>
+
+      <h4 style="color:var(--text); font-size:13.5px; margin: 14px 0 6px;">4. Script Contoh Python Listener untuk PC / Laptop Lain</h4>
+      <div class="code-box">import paho.mqtt.client as mqtt
+import json
+
+BROKER = "192.168.1.50"  # Ganti dengan IP komputer server ZoneMinder Anda
+PORT = 1883
+
+def on_message(client, userdata, msg):
+    try:
+        data = json.loads(msg.payload.decode())
+        print(f"[{data.get('timestamp')}] {data.get('status')}: {data.get('message')}")
+    except Exception:
+        print(f"[{msg.topic}] {msg.payload.decode()}")
+
+client = mqtt.Client()
+client.on_message = on_message
+client.connect(BROKER, PORT, 60)
+client.subscribe("cctv/events")
+print("[*] Mendengarkan notifikasi ZoneMinder CCTV... Tekan Ctrl+C untuk berhenti.")
+client.loop_forever()</div>
+    </div>
+  </div>
+
+  <!-- 3. LIVE MQTT LOG TABLE & SEARCH -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h3 style="margin-bottom:0;">📋 3. Live Log Aktivitas CCTV dari Broker MQTT</h3>
+      <div id="statusCounter" style="font-size: 12px; color: var(--muted); font-weight:normal;">Memuat data...</div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" id="searchInput" class="form-control" style="width: 250px;" placeholder="🔍 Cari nama kamera atau kata kunci..." oninput="filterLogs()">
+      
+      <select id="filterStatus" class="form-control" onchange="filterLogs()">
+        <option value="ALL">Semua Status</option>
+        <option value="ONLINE">Hanya ONLINE</option>
+        <option value="OFFLINE">Hanya OFFLINE</option>
+        <option value="SUMMARY">Hanya Summary</option>
+      </select>
+
+      <button id="toggleBtn" class="btn btn-outline" onclick="toggleAutoRefresh()">⏸ Pause Refresh</button>
+      <button class="btn btn-primary" onclick="fetchLogsFromFile()">🔄 Refresh Sekarang</button>
+    </div>
+
+    <div id="log-container">Memuat log dari server...</div>
+  </div>
+</div>
+
+<footer>
+  ZoneMinder CCTV Management Hub &mdash; Light Enterprise Interface
+</footer>
+
+<script>
+  const API_URL = "/api/mqtt-logs";
+  let isAutoRefresh = true;
+  let refreshInterval = null;
+  let allLogs = [];
+  let checkerConfig = { enabled: true, interval: 60 };
+
+  // =========================================================================
+  // 1. CCTV CHECKER CONTROLLER API
+  // =========================================================================
+  async function loadCheckerConfig() {
+    try {
+      const res = await fetch('/api/checker/config');
+      if (res.ok) {
+        checkerConfig = await res.json();
+        renderCheckerStatus();
       }
+    } catch (e) {
+      console.error('Error fetching checker config:', e);
+    }
+  }
+
+  function renderCheckerStatus() {
+    const badge = document.getElementById('checkerStatusBadge');
+    const btnToggle = document.getElementById('btnToggleChecker');
+    const intervalInput = document.getElementById('checkerIntervalInput');
+    const lastRunText = document.getElementById('checkerLastRunText');
+
+    if (intervalInput && checkerConfig.interval) {
+      intervalInput.value = checkerConfig.interval;
     }
 
-    function renderLogs() {
-      const container = document.getElementById("log-container");
-      const search = document.getElementById("searchInput").value.toLowerCase().trim();
-      const counter = document.getElementById("statusCounter");
+    if (lastRunText) {
+      lastRunText.innerText = checkerConfig.last_check 
+        ? `Terakhir diperiksa: ${checkerConfig.last_check}`
+        : "Terakhir diperiksa: Belum ada eksekusi";
+    }
 
-      if (!Array.isArray(allLogs) || allLogs.length === 0) {
-        container.innerHTML = "<em>Belum ada log aktivitas kamera yang terekam.</em>";
-        counter.innerText = "0 Entri Log";
-        return;
+    if (checkerConfig.enabled) {
+      if (badge) {
+        badge.className = "badge badge-running";
+        badge.innerText = "🟢 Berjalan (Active)";
       }
+      if (btnToggle) {
+        btnToggle.className = "btn btn-warning";
+        btnToggle.innerText = "⏸ Jeda (Pause) Checker";
+      }
+    } else {
+      if (badge) {
+        badge.className = "badge badge-paused";
+        badge.innerText = "⏸ Dinonaktifkan (Paused)";
+      }
+      if (btnToggle) {
+        btnToggle.className = "btn btn-success";
+        btnToggle.innerText = "▶ Aktifkan Checker";
+      }
+    }
+  }
 
-      let filtered = allLogs;
+  async function toggleCheckerActive() {
+    const newStatus = !checkerConfig.enabled;
+    try {
+      const res = await fetch('/api/checker/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newStatus })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        checkerConfig = data.config || checkerConfig;
+        checkerConfig.enabled = newStatus;
+        renderCheckerStatus();
+      }
+    } catch (e) {
+      alert('Gagal mengubah status checker: ' + e.message);
+    }
+  }
+
+  async function updateCheckerInterval() {
+    const input = document.getElementById('checkerIntervalInput');
+    const val = parseInt(input.value);
+    if (isNaN(val) || val < 5) {
+      return alert('Interval minimal adalah 5 detik!');
+    }
+
+    try {
+      const res = await fetch('/api/checker/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval: val })
+      });
+      if (res.ok) {
+        alert(`Interval pengecekan berhasil diubah menjadi ${val} detik!`);
+        await loadCheckerConfig();
+      }
+    } catch (e) {
+      alert('Gagal menyimpan interval: ' + e.message);
+    }
+  }
+
+  async function triggerRunNow() {
+    const btn = document.getElementById('btnRunNow');
+    const origText = btn ? btn.innerText : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = "Memulai Pengecekan...";
+    }
+
+    try {
+      const res = await fetch('/api/checker/run-now', { method: 'POST' });
+      if (res.ok) {
+        alert('Pengecekan kamera segera dimulai! Tunggu beberapa saat lalu periksa log.');
+        setTimeout(async () => {
+          await loadCheckerConfig();
+          await fetchLogsFromFile();
+        }, 2500);
+      }
+    } catch (e) {
+      alert('Gagal mengirim trigger: ' + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = origText;
+      }
+    }
+  }
+
+  // =========================================================================
+  // 2. LOG VIEWER & SEARCH/FILTER
+  // =========================================================================
+  async function fetchLogsFromFile() {
+    try {
+      const response = await fetch(API_URL);
+      allLogs = await response.json();
+      renderLogs();
+    } catch (error) {
+      document.getElementById("log-container").innerHTML = `<span style="color:#ef4444;">Gagal mengambil log dari ${API_URL}: ${error.message}</span>`;
+    }
+  }
+
+  function renderLogs() {
+    const container = document.getElementById("log-container");
+    const search = document.getElementById("searchInput").value.toLowerCase().trim();
+    const filterStatus = document.getElementById("filterStatus").value;
+    const counter = document.getElementById("statusCounter");
+
+    if (!Array.isArray(allLogs) || allLogs.length === 0) {
+      container.innerHTML = "<div style='color:var(--muted); text-align:center; padding:30px;'>Belum ada log aktivitas kamera yang terekam.</div>";
+      counter.innerText = "0 Entri Log";
+      return;
+    }
+
+    let filtered = allLogs.filter(item => {
+      const t = (item.topic || '').toLowerCase();
+      const p = typeof item.payload === 'object' ? JSON.stringify(item.payload).toLowerCase() : String(item.payload || '').toLowerCase();
+
+      if (filterStatus === "ONLINE" && !p.includes('"online"') && !p.includes('online')) return false;
+      if (filterStatus === "OFFLINE" && !p.includes('"offline"') && !p.includes('offline')) return false;
+      if (filterStatus === "SUMMARY" && !t.includes('summary')) return false;
+
       if (search) {
-        filtered = allLogs.filter(item => {
-          const t = (item.topic || '').toLowerCase();
-          const p = typeof item.payload === 'object' ? JSON.stringify(item.payload).toLowerCase() : String(item.payload || '').toLowerCase();
-          return t.includes(search) || p.includes(search);
-        });
+        return t.includes(search) || p.includes(search);
       }
+      return true;
+    });
 
-      counter.innerText = `Menampilkan ${filtered.length} dari ${allLogs.length} Entri Log`;
+    counter.innerText = `Menampilkan ${filtered.length} dari ${allLogs.length} Entri Log`;
 
-      let html = "";
-      filtered.forEach(item => {
-        let payloadContent = "";
-        let statusBadge = "";
+    let html = "";
+    filtered.forEach(item => {
+      let payloadContent = "";
+      let statusBadge = "";
 
-        if (typeof item.payload === 'object' && item.payload !== null) {
-          const p = item.payload;
-          if (p.status === "ONLINE") {
-            statusBadge = '<span class="badge badge-online">ONLINE</span>';
-          } else if (p.status === "OFFLINE") {
-            statusBadge = '<span class="badge badge-offline">OFFLINE</span>';
-          }
-          payloadContent = `${statusBadge} <strong>${escapeHtml(p.name || '')}</strong>: ${escapeHtml(p.message || JSON.stringify(p))}`;
-        } else {
-          const raw = String(item.payload || '');
-          if (raw.includes("ONLINE")) statusBadge = '<span class="badge badge-online">ONLINE</span>';
-          if (raw.includes("OFFLINE")) statusBadge = '<span class="badge badge-offline">OFFLINE</span>';
-          payloadContent = `${statusBadge} ${escapeHtml(raw)}`;
+      if (typeof item.payload === 'object' && item.payload !== null) {
+        const p = item.payload;
+        if (p.status === "ONLINE") {
+          statusBadge = '<span class="badge badge-ok">ONLINE</span>';
+        } else if (p.status === "OFFLINE") {
+          statusBadge = '<span class="badge badge-err">OFFLINE</span>';
         }
 
-        html += `
-          <div class="log-entry">
-            <span class="time">[${escapeHtml(item.timestamp)}]</span>
-            <span class="topic">${escapeHtml(item.topic)}</span>
-            <span class="payload">${payloadContent}</span>
-          </div>
-        `;
-      });
-
-      container.innerHTML = html;
-    }
-
-    function filterLogs() {
-      renderLogs();
-    }
-
-    function toggleAutoRefresh() {
-      isAutoRefresh = !isAutoRefresh;
-      const btn = document.getElementById("toggleBtn");
-      if (isAutoRefresh) {
-        btn.innerText = "⏸ Pause Auto-Refresh";
-        startAutoRefresh();
+        if (p.total_monitors !== undefined) {
+          payloadContent = `📊 <b>Ringkasan:</b> Total ${p.total_monitors} Kamera | <span style="color:#16a34a; font-weight:600;">Online: ${p.online}</span> | <span style="color:#dc2626; font-weight:600;">Offline: ${p.offline}</span>`;
+        } else {
+          payloadContent = `${statusBadge} <strong>${escapeHtml(p.name || '')}</strong>: ${escapeHtml(p.message || JSON.stringify(p))}`;
+        }
       } else {
-        btn.innerText = "▶ Lanjutkan Auto-Refresh";
-        clearInterval(refreshInterval);
+        const raw = String(item.payload || '');
+        if (raw.includes("ONLINE")) statusBadge = '<span class="badge badge-ok">ONLINE</span>';
+        if (raw.includes("OFFLINE")) statusBadge = '<span class="badge badge-err">OFFLINE</span>';
+        payloadContent = `${statusBadge} ${escapeHtml(raw)}`;
       }
-    }
 
-    function startAutoRefresh() {
+      html += `
+        <div class="log-entry">
+          <span class="time">[${escapeHtml(item.timestamp)}]</span>
+          <span class="topic">${escapeHtml(item.topic)}</span>
+          <span class="payload">${payloadContent}</span>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  function filterLogs() {
+    renderLogs();
+  }
+
+  function toggleAutoRefresh() {
+    isAutoRefresh = !isAutoRefresh;
+    const btn = document.getElementById("toggleBtn");
+    if (isAutoRefresh) {
+      btn.innerText = "⏸ Pause Refresh";
+      startAutoRefresh();
+    } else {
+      btn.innerText = "▶ Lanjutkan Auto-Refresh";
       clearInterval(refreshInterval);
-      refreshInterval = setInterval(fetchLogsFromFile, 3000);
     }
+  }
 
-    function escapeHtml(text) {
-      return String(text || '')
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+  function startAutoRefresh() {
+    clearInterval(refreshInterval);
+    refreshInterval = setInterval(fetchLogsFromFile, 3000);
+  }
+
+  function toggleTutorial() {
+    const section = document.getElementById("tutorialSection");
+    const icon = document.getElementById("tutorialToggleIcon");
+    if (section.style.display === "none") {
+      section.style.display = "block";
+      icon.innerText = "▲ Tutup Panduan";
+    } else {
+      section.style.display = "none";
+      icon.innerText = "▼ Buka Panduan";
+    }
+  }
+
+  function escapeHtml(text) {
+    return String(text || '')
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  // =========================================================================
+  // INITIALIZATION
+  // =========================================================================
+  document.addEventListener('DOMContentLoaded', () => {
+    const hostEl = document.getElementById('displayHostIp');
+    if (hostEl) {
+      hostEl.innerText = window.location.hostname || "192.168.x.x";
     }
 
     fetchLogsFromFile();
     startAutoRefresh();
-  </script>
+    loadCheckerConfig();
+
+    setInterval(loadCheckerConfig, 10000);
+  });
+</script>
 </body>
 </html>

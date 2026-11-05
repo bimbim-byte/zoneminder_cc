@@ -115,8 +115,10 @@ services:
       - RTSP_TIMEOUT=3.0
       - RETENTION_DAYS=10
       - MQTT_LOG_FILE=/app/data/mqtt_logs.json
+      - CHECKER_CONFIG_FILE=/app/data/checker_config.json
 
     volumes:
+      - ./cctv_checker:/app
       - ./data:/app/data
 
     networks:

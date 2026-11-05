@@ -17,6 +17,7 @@ ZM_USER = os.environ.get("ZM_USER", "admin")
 ZM_PASS = os.environ.get("ZM_PASS", "admin")
 
 MQTT_LOG_FILE = os.environ.get("MQTT_LOG_FILE", "/app/data/mqtt_logs.json")
+CHECKER_CONFIG_FILE = os.environ.get("CHECKER_CONFIG_FILE", "/app/data/checker_config.json")
 
 # Cache token auth ZM di memori
 ZM_TOKEN = None
@@ -273,6 +274,76 @@ def get_mqtt_logs():
         except Exception as e:
             return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
     return jsonify([])
+
+
+# ==============================================================================
+# 6. API KONTROL CCTV CHECKER (TOGGLE AKTIF/MATI & DELAY INTERVAL)
+# ==============================================================================
+def get_checker_config():
+    default_cfg = {
+        "enabled": True,
+        "interval": 60,
+        "rtsp_timeout": 3.0,
+        "run_now": False,
+        "status": "Running",
+        "last_check": None
+    }
+    if os.path.exists(CHECKER_CONFIG_FILE):
+        try:
+            with open(CHECKER_CONFIG_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                default_cfg.update(saved)
+        except Exception:
+            pass
+    return default_cfg
+
+
+def save_checker_config(cfg):
+    try:
+        os.makedirs(os.path.dirname(CHECKER_CONFIG_FILE), exist_ok=True)
+        with open(CHECKER_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"[ERROR SAVE CHECKER CONFIG] {e}")
+        return False
+
+
+@app.route("/api/checker/config", methods=["GET", "POST"])
+def manage_checker_config():
+    """Endpoint untuk membaca dan memperbarui konfigurasi CCTV Checker."""
+    cfg = get_checker_config()
+
+    if request.method == "POST":
+        data = request.json or {}
+        if "enabled" in data:
+            cfg["enabled"] = bool(data["enabled"])
+            cfg["status"] = "Running" if cfg["enabled"] else "Paused"
+        if "interval" in data:
+            try:
+                new_interval = max(5, int(data["interval"]))
+                cfg["interval"] = new_interval
+            except (ValueError, TypeError):
+                pass
+        if "rtsp_timeout" in data:
+            try:
+                cfg["rtsp_timeout"] = max(1.0, float(data["rtsp_timeout"]))
+            except (ValueError, TypeError):
+                pass
+
+        save_checker_config(cfg)
+        return jsonify({"status": "success", "message": "Konfigurasi checker berhasil disimpan!", "config": cfg})
+
+    return jsonify(cfg)
+
+
+@app.route("/api/checker/run-now", methods=["POST"])
+def checker_run_now():
+    """Memicu CCTV Checker untuk segera melakukan pengecekan tanpa menunggu interval."""
+    cfg = get_checker_config()
+    cfg["run_now"] = True
+    save_checker_config(cfg)
+    return jsonify({"status": "success", "message": "Trigger pengecekan segera dikirim ke checker!"})
 
 
 # ==============================================================================
