@@ -28,6 +28,7 @@ services:
     image: pppasantos/zoneminder:latest
     container_name: zoneminder
     restart: always
+    # Naikkan ke 8g bila load tinggi, jangan melebihi 25% RAM host.
     shm_size: "4g"
 
     ports:
@@ -38,14 +39,71 @@ services:
       - PHP_TIMEZONE=Asia/Jakarta
 
     volumes:
+      - ./zm-conf/cctv-entrypoint.sh:/usr/local/bin/cctv-entrypoint.sh:ro
+      - ./zm-conf/custom.conf:/etc/cctv-tuning.conf:ro
+      - ./zm-conf/99-php-cctv.ini:/etc/zm-custom/99-php-cctv.ini:ro
+      - ./zm-conf/apache-limit.conf:/etc/apache2/conf-enabled/apache-limit.conf:ro
+      - ./zm-conf/go2rtc.yaml:/etc/go2rtc/go2rtc.yaml:ro
       - zoneminder_events:/var/lib/zoneminder/events
       - zoneminder_images:/var/lib/zoneminder/images
       - zoneminder_mysql:/var/lib/mysql
-      - ./zm-conf/apache-limit.conf:/etc/apache2/conf-enabled/apache-limit.conf:ro
+
+    entrypoint: ["/bin/sh", "/usr/local/bin/cctv-entrypoint.sh"]
+    command: ["/usr/local/bin/docker-entrypoint.sh", "docker-entrypoint.sh"]
+
+    # Batasi agar 100 kamera tidak menghabiskan RAM host
+    mem_limit: 6g
+    # Beri waktu bersih-bersih agar DB tidak corrupt
+    stop_grace_period: 60s
 
     networks:
       - cctv_net
 
+  # --------------------------------------------------------
+  # 2b. go2rtc (WebRTC/HLS untuk montage & live view)
+  # --------------------------------------------------------
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    restart: always
+    ports:
+      - "1984:1984" # API + WebRTC signaling
+      - "8554:8554" # RTSP re-stream
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    volumes:
+      - go2rtc_config:/config
+    networks:
+      - cctv_net
+    depends_on:
+      - zoneminder
+
+  # --------------------------------------------------------
+  # 2c. go2rtc-sync (daftar stream ZM -> config go2rtc)
+  # --------------------------------------------------------
+  go2rtc-sync:
+    image: python:3.11-slim
+    container_name: go2rtc_sync
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ZM_HOST=http://zoneminder:80
+      - ZM_USER=admin
+      - ZM_PASS=admin
+      - GO2RTC_CONFIG=/config/go2rtc.yaml
+      - SYNC_INTERVAL=60
+    volumes:
+      - ./zm-conf/go2rtc.yaml:/app/go2rtc.base.yaml:ro
+      - ./scripts/go2rtc_sync.py:/app/go2rtc_sync.py:ro
+      - go2rtc_config:/config
+    networks:
+      - cctv_net
+    depends_on:
+      - go2rtc
+    command:
+      - /bin/sh
+      - -c
+      - "pip install --quiet requests pyyaml && exec python /app/go2rtc_sync.py"
   # --------------------------------------------------------
   # 3. Camera Management Dashboard (UI Interface)
   # --------------------------------------------------------
@@ -141,3 +199,4 @@ volumes:
   zoneminder_mysql:
   caddy_data:
   caddy_config:
+  go2rtc_config:

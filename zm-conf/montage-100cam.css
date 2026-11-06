@@ -1,0 +1,40 @@
+// Montage grid untuk 100+ kamera.
+// Dimuat setelah base.css milik ZoneMinder (lihat README / custom CSS ZM).
+// Bertujuan: kurangi pembacaan gambar per detik & hiasi grid agar navigasi
+// di 100 kamera tetap cepat. Tidak mengubah HTML ZM.
+
+// Grid montage lebih rapat: 10 kolom di layar lebar (100 kamera = 10 baris).
+table#montageTable td {
+  vertical-align: top;
+}
+
+table#montageTable td img {
+  width: 100%;
+  height: auto;
+  max-height: 180px;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+// Thumbnail montage tidak perlu bayangan/animasi.
+table#montageTable td .thumbnail,
+table#montageTable td a {
+  box-shadow: none !important;
+  transition: none !important;
+}
+
+// Nama kamera tetap terbaca pada thumbnail kecil.
+table#montageTable td .monitorName,
+table#montageTable td .caption {
+  font-size: 10px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Sembunyikan elemen berat saat mode montage (ditandai body.montage).
+body.montage .nav-thumbs,
+body.montage #consoleBanner {
+  display: none;
+}

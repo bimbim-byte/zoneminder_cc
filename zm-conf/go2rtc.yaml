@@ -1,0 +1,25 @@
+# go2rtc: bridge stream -> WebRTC/HLS untuk 100 kamera.
+# Daftar stream ditulis otomatis dari DB ZoneMinder oleh service go2rtc-sync.
+api:
+  listen: ":1984"
+
+webrtc:
+  listen: ":8555"
+  candidates:
+    # Ganti dengan IP LAN server CCTV (wajib agar WebRTC dari LAN terhubung)
+    - 192.168.1.20:8555
+
+rtsp:
+  listen: ":8554"
+
+hls:
+  mpegts: true        # 1 proses ffmpeg per kamera (default go2rtc)
+
+log:
+  level: info
+  format: text
+
+streams:
+  # Placeholder dari zm-conf/go2rtc.yaml; go2rtc-sync menulis ulang daftar
+  # ini (dan menimpa seluruh key `streams`) sesuai monitor ZoneMinder.
+  _status: rtsp://zoneminder:80/zm/cgi-bin/nph-zms?mode=single&monitor=0

@@ -1,15 +1,64 @@
+# Tuning Caddy untuk montage 100 kamera: matikan redirect otomatis ke HTTPS
+# di port 80, teruskan stream tanpa buffering, dan proxy go2rtc (WebRTC API).
+# IP rute WebRTC diatur di zm-conf/go2rtc.yaml (bagian candidates).
+
 {
-    debug
+    admin off
+    auto_https disable_redirects
+}
+
+http://:80 {
+    handle /go2rtc/* {
+        uri strip_prefix /go2rtc
+        reverse_proxy go2rtc:1984 {
+            flush_interval -1
+        }
+    }
+    handle /zm* {
+        reverse_proxy zoneminder:80 {
+            flush_interval -1
+            transport http {
+                read_timeout 300s
+                write_timeout 300s
+                dial_timeout 10s
+            }
+        }
+    }
+    handle /cgi-bin* {
+        reverse_proxy zoneminder:80 {
+            flush_interval -1
+        }
+    }
+    handle /mqtt {
+        reverse_proxy mosquitto:9001
+    }
+    handle {
+        reverse_proxy ui-interface:8080
+    }
 }
 
 :443 {
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
-
+    handle /go2rtc/* {
+        uri strip_prefix /go2rtc
+        reverse_proxy go2rtc:1984 {
+            flush_interval -1
+        }
+    }
     handle /zm* {
-        reverse_proxy zoneminder:80
+        reverse_proxy zoneminder:80 {
+            flush_interval -1
+            transport http {
+                read_timeout 300s
+                write_timeout 300s
+                dial_timeout 10s
+            }
+        }
     }
     handle /cgi-bin* {
-        reverse_proxy zoneminder:80
+        reverse_proxy zoneminder:80 {
+            flush_interval -1
+        }
     }
     handle /mqtt {
         reverse_proxy mosquitto:9001
