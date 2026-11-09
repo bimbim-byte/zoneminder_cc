@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wall Dashboard - Pilih Kamera</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #2563eb; --primary-dark: #1d4ed8;
+    --bg: #0f172a; --card: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #22d3ee;
+  }
+  body {
+    min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text); background: radial-gradient(circle at top left, rgba(37,99,235,.18), transparent 45%), var(--bg);
+  }
+  header { padding: 26px 20px; text-align: center; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  header p { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .container { max-width: 1080px; margin: 0 auto; padding: 28px 20px 100px; }
+  .section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 26px 0 12px; }
+  .big-option {
+    display: flex; align-items: center; gap: 16px; padding: 20px; cursor: pointer;
+    background: var(--card); border: 2px solid var(--border); border-radius: 12px; transition: .18s;
+  }
+  .big-option:hover { border-color: var(--primary); transform: translateY(-2px); }
+  .big-option.selected { border-color: var(--accent); background: rgba(34,211,238,.09); }
+  .big-option input { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+  .big-option .ico { font-size: 30px; }
+  .big-option .txt strong { display: block; font-size: 15px; margin-bottom: 3px; }
+  .big-option .txt span { font-size: 12.5px; color: var(--muted); }
+  .group-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; max-height: 46vh; overflow-y: auto; padding-right: 4px; }
+  .group-item {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer;
+    background: var(--card); border: 2px solid var(--border); border-radius: 10px; transition: .15s;
+  }
+  .group-item:hover { border-color: var(--primary); }
+  .group-item.selected { border-color: var(--accent); background: rgba(34,211,238,.09); }
+  .group-item input { width: 17px; height: 17px; accent-color: var(--accent); flex-shrink: 0; }
+  .group-item .gname { font-size: 13.5px; font-weight: 600; word-break: break-word; }
+  .group-item .gcount { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .empty { padding: 26px; text-align: center; color: var(--muted); font-size: 13px; background: var(--card); border: 1px dashed var(--border); border-radius: 10px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .chip { padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--muted); background: var(--card); border: 1px solid var(--border); border-radius: 20px; }
+  .chip:hover { color: var(--text); border-color: var(--primary); }
+  .actionbar {
+    position: fixed; bottom: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 14px 24px; background: rgba(15,23,42,.94); border-top: 1px solid var(--border);
+    backdrop-filter: blur(10px); flex-wrap: wrap;
+  }
+  .counter { font-size: 13.5px; color: var(--muted); }
+  .counter b { color: var(--accent); font-size: 15px; }
+  .btn {
+    padding: 11px 26px; font-size: 14px; font-weight: 700; color: #fff; cursor: pointer;
+    background: var(--primary); border: none; border-radius: 8px; transition: .18s;
+  }
+  .btn:hover:not(:disabled) { background: var(--primary-dark); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn.ghost:hover { color: var(--text); border-color: var(--primary); background: transparent; }
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🖥️ Wall Dashboard</h1>
+  <p>Pilih sumber kamera untuk ditampilkan pada grid live</p>
+</header>
+
+<div class="container">
+  <div id="loading" class="loading">Memuat daftar kamera &amp; group dari ZoneMinder...</div>
+
+  <div id="content" style="display:none">
+    <div class="section-title">Opsi Tampilan</div>
+    <label class="big-option" id="optAll">
+      <input type="radio" name="mode" value="all" checked>
+      <span class="ico">📹</span>
+      <span class="txt">
+        <strong>Seluruh Kamera</strong>
+        <span id="allCount">Menampilkan semua kamera yang terdaftar di ZoneMinder</span>
+      </span>
+    </label>
+
+    <label class="big-option" id="optGroups" style="margin-top:12px">
+      <input type="radio" name="mode" value="groups">
+      <span class="ico">🗂️</span>
+      <span class="txt">
+        <strong>Berdasarkan Group</strong>
+        <span>Pilih satu atau beberapa group (multiple group)</span>
+      </span>
+    </label>
+
+    <div id="groupSection" style="display:none">
+      <div class="section-title">Pilih Group <span id="srcBadge" style="text-transform:none; font-weight:400"></span></div>
+      <div class="toolbar">
+        <span class="chip" id="chipAll">Pilih Semua</span>
+        <span class="chip" id="chipNone">Kosongkan</span>
+      </div>
+      <div class="group-list" id="groupList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="actionbar">
+  <div class="counter" id="counter">—</div>
+  <div style="display:flex; gap:10px">
+    <button class="btn ghost" onclick="location.href='/'">← Kembali</button>
+    <button class="btn" id="btnOpen" disabled>Buka Wall Dashboard →</button>
+  </div>
+</div>
+
+<script>
+let ALL_CAMERAS = [];
+let GROUPS = [];
+let GROUP_TABLE = {};
+
+const $ = (id) => document.getElementById(id);
+
+function selectedMode() {
+  return document.querySelector('input[name="mode"]:checked').value;
+}
+
+function selectedGroups() {
+  return Array.from(document.querySelectorAll('.group-item input:checked')).map(i => i.value);
+}
+
+function cameraIdsForGroups(gids) {
+  const set = new Set();
+  gids.forEach(g => (GROUP_TABLE[g] || []).forEach(id => set.add(id)));
+  return Array.from(set);
+}
+
+function updateUI() {
+  const mode = selectedMode();
+  const isGroups = mode === 'groups';
+
+  $('optAll').classList.toggle('selected', !isGroups);
+  $('optGroups').classList.toggle('selected', isGroups);
+  $('groupSection').style.display = isGroups ? 'block' : 'none';
+
+  let count;
+  if (!isGroups) {
+    count = ALL_CAMERAS.length;
+    $('counter').innerHTML = `Mode: <b>Seluruh Kamera</b> — <b>${count}</b> kamera`;
+  } else {
+    const gids = selectedGroups();
+    count = cameraIdsForGroups(gids).length;
+    $('counter').innerHTML = `Mode: <b>Group</b> — <b>${gids.length}</b> group dipilih, <b>${count}</b> kamera`;
+  }
+  $('btnOpen').disabled = count === 0;
+  $('btnOpen').textContent = count === 0
+    ? 'Tidak ada kamera'
+    : `Buka Wall Dashboard (${count} kamera) →`;
+}
+
+async function load() {
+  try {
+    const [camRes, grpRes] = await Promise.all([
+      fetch('/api/cameras/wall?mode=all'),
+      fetch('/api/cameras/groups')
+    ]);
+    const camData = await camRes.json();
+    const grpData = await grpRes.json();
+
+    ALL_CAMERAS = camData.cameras || [];
+    GROUPS = grpData.groups || [];
+    $('allCount').textContent = `${ALL_CAMERAS.length} kamera terdaftar di ZoneMinder`;
+
+    const list = $('groupList');
+    list.innerHTML = '';
+
+    if (!GROUPS.length) {
+      list.innerHTML = '<div class="empty">Tidak ada group ditemukan.<br>Gunakan opsi <b>Seluruh Kamera</b>, atau daftarkan group di ZoneMinder.</div>';
+    } else {
+      $('srcBadge').textContent = grpData.source === 'local' ? '(group lokal dashboard)' : '(dari ZoneMinder)';
+      GROUPS.forEach(g => {
+        const monitors = g.monitors || [];
+        GROUP_TABLE[String(g.id)] = monitors.map(String);
+        const el = document.createElement('label');
+        el.className = 'group-item';
+        el.innerHTML = `
+          <input type="checkbox" value="${g.id}">
+          <span>
+            <div class="gname">${escapeHtml(g.name)}</div>
+            <div class="gcount">${g.camera_count} kamera</div>
+          </span>`;
+        el.querySelector('input').addEventListener('change', () => {
+          el.classList.toggle('selected', el.querySelector('input').checked);
+          updateUI();
+        });
+        list.appendChild(el);
+      });
+    }
+
+    $('loading').style.display = 'none';
+    $('content').style.display = 'block';
+    updateUI();
+  } catch (e) {
+    $('loading').innerHTML = `Gagal memuat data: ${escapeHtml(e.message)}<br><br>Cek koneksi ke ZoneMinder.`;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', updateUI));
+
+$('chipAll').addEventListener('click', () => {
+  document.querySelectorAll('.group-item').forEach(el => {
+    el.querySelector('input').checked = true;
+    el.classList.add('selected');
+  });
+  updateUI();
+});
+
+$('chipNone').addEventListener('click', () => {
+  document.querySelectorAll('.group-item').forEach(el => {
+    el.querySelector('input').checked = false;
+    el.classList.remove('selected');
+  });
+  updateUI();
+});
+
+$('btnOpen').addEventListener('click', () => {
+  const mode = selectedMode();
+  if (mode === 'all') {
+    location.href = '/wall/view?mode=all';
+  } else {
+    const gids = selectedGroups();
+    if (!gids.length) return;
+    location.href = `/wall/view?mode=groups&groups=${encodeURIComponent(gids.join(','))}`;
+  }
+});
+
+load();
+</script>
+</body>
+</html>
