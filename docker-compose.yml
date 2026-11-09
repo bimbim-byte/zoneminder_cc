@@ -25,10 +25,24 @@ services:
   # 2. ZoneMinder (NVR Core)
   # --------------------------------------------------------
   zoneminder:
-    image: pppasantos/zoneminder:latest
+    # Image turunan yang menyalin tuning MySQL & Apache ke dalam image.
+    # Lihat zm-conf/Dockerfile untuk alasan tidak memakai bind mount.
+    build:
+      context: ./zm-conf
+      dockerfile: Dockerfile
+    image: zoneminder_tuned:latest
     container_name: zoneminder
     restart: always
-    shm_size: "4g"
+
+    # Shared memory untuk buffer frame tiap kamera (~9 MB per monitor @720p).
+    # 8 GB memberi ruang lega untuk 100+ kamera dan lonjakan saat motion terdeteksi.
+    shm_size: "8g"
+
+    # ZoneMinder membuka banyak file descriptor (monitor + event + shared memory).
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
     ports:
       - "8082:80" # Akses langsung port ZoneMinder
@@ -41,7 +55,6 @@ services:
       - zoneminder_events:/var/lib/zoneminder/events
       - zoneminder_images:/var/lib/zoneminder/images
       - zoneminder_mysql:/var/lib/mysql
-      - ./zm-conf/apache-limit.conf:/etc/apache2/conf-enabled/apache-limit.conf:ro
 
     networks:
       - cctv_net
@@ -111,7 +124,7 @@ services:
       - ZM_HOST=http://zoneminder:80
       - ZM_USER=admin
       - ZM_PASS=admin
-      - CHECK_INTERVAL=60
+      - CHECK_INTERVAL=600
       - RTSP_TIMEOUT=3.0
       - RETENTION_DAYS=10
       - MQTT_LOG_FILE=/app/data/mqtt_logs.json

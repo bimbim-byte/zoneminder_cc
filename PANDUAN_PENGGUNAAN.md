@@ -158,7 +158,7 @@ Setelah portal terbuka di `https://<IP_ANDA>/`, Anda akan melihat 6 menu utama:
 | No | Nama Menu | Fungsi |
 | :---: | :--- | :--- |
 | **1** | **ZoneMinder Web Console** (`/zm/`) | Membuka antarmuka resmi bawaan ZoneMinder NVR untuk melihat rekaman, live view, dan setting kamera. *(Login default: user `admin`, password `admin`)*. |
-| **2** | **Kelola Monitor ZoneMinder** (`/zoneminder.html`) | Mengatur kamera yang sudah ada, mengedit nama/resolusi/fungsi, menyalakan/mematikan kamera (*Quick OFF*), dan mengatur CCTV Health Checker. |
+| **2** | **Kelola Monitor ZoneMinder** (`/zoneminder.html`) | Mengatur kamera yang sudah ada, mengedit nama/resolusi/fungsi, menyalakan/mematikan kamera (*Quick OFF*), **kontrol massal seluruh kamera** (aktifkan semua / matikan semua / pulihkan fungsi asli), dan mengatur CCTV Health Checker. |
 | **3** | **Tambah Kamera Tunggal** (`/add_camera.html`) | Menambahkan 1 kamera baru secara cepat dengan memasukkan alamat RTSP stream kamera. |
 | **4** | **Burst Add Massal** (`/burst.html`) | Mendaftarkan puluhan kamera sekaligus cukup dengan *copy-paste* daftar RTSP atau *upload* file Excel (.xlsx). |
 | **5** | **Live MQTT Monitor Log** (`/log_display.html`) | Memantau log status kamera hidup/mati secara *real-time*, mengatur jeda waktu pemeriksaan (*delay interval*), dan panduan memasang notifikasi ke HP. |
@@ -196,6 +196,34 @@ https://<IP_ANDA>/wall/view?mode=all              # seluruh kamera
 https://<IP_ANDA>/wall/view?mode=groups&groups=3,4 # group 3 dan 4
 https://<IP_ANDA>/wall/view?mode=ids&ids=8,10,21   # kamera tertentu
 ```
+
+### Detail Menu 2 (bagian): Kontrol Massal Seluruh Kamera
+
+Di halaman `zoneminder.html`, tepat di atas tabel kamera ada baris **⚡ Kontrol Seluruh Kamera**:
+
+| Tombol | Yang terjadi |
+| :--- | :--- |
+| **▶ Aktifkan Semua** | Semua kamera memakai mode fungsi dari dropdown di sebelahnya (Monitor / Modect / Record / Mocord / Nodect) |
+| **↺ Pulihkan Fungsi Asli** | Tiap kamera kembali ke mode terakhir yang tercatat (`data/camera_functions.json`) |
+| **⏹ Matikan Semua** | Semua kamera menjadi `None` — perekaman dan deteksi gerak berhenti |
+
+**Langkah mematikan semua kamera sementara (misal saat maintenance jaringan):**
+1. Klik **⏹ Matikan Semua**, lalu setujui konfirmasi.
+2. Tunggu hingga muncul `Selesai: N berhasil, 0 gagal`.
+3. Setelah maintenance selesai, klik **↺ Pulihkan Fungsi Asli** — kamera yang tadinya
+   `Modect` akan kembali `Modect`, bukan seragam menjadi `Monitor`.
+
+> Mengaktifkan/mematikan kamera **tidak menghapus** rekaman atau event yang sudah ada.
+> Rekaman lama tetap utuh dan bisa diputar dari ZoneMinder Web Console.
+
+### Detail Menu 2 (bagian): CCTV Health Checker
+
+- **Status awal checker: NONAKTIF.** Setelah sistem dinyalakan, tidak ada
+  pengecekan RTSP otomatis sampai Anda menekan **▶ Aktifkan Checker**.
+- **Interval default: 600 detik (10 menit).** Ubah di kolom *Delay Interval
+  Pengecekan* lalu klik **💾 Set Detik**.
+- Tombol **⚡ Cek Semua Sekarang** tetap bisa dipakai kapan pun tanpa
+  mengaktifkan mode otomatis.
 
 ---
 

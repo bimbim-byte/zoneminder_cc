@@ -1,0 +1,57 @@
+; ============================================================================
+; ZoneMinder - Tuning MySQL/MariaDB
+; Di-mount ke /etc/mysql/mysql.conf.d/zz-zm-tuning.cnf
+; Prefix "zz-" agar dibaca PALING AKHIR dan menimpa nilai default.
+;
+; PENTING: MySQL/MariaDB MENOLAK file config yang world-writable.
+; Pastikan permission di host 644 SEBELUM start container:
+;     chmod 644 zm-conf/mysql-tuning.cnf
+; Lihat juga: scripts/fix-permissions.sh
+; ============================================================================
+
+[mysqld]
+
+; --- Buffer pool ----------------------------------------------------------
+; Default bawaan hanya 128 MB, terlalu kecil untuk event ZoneMinder.
+; Dinaikkan ke 2 GB agar query event/frame tidak menyentuh disk terus-menerus.
+; Patokan aman: ~25% RAM yang dialokasikan untuk container ZoneMinder.
+innodb_buffer_pool_size = 2G
+
+; Buffer pool dibagi jadi beberapa instance (server 32 core).
+innodb_buffer_pool_instances = 4
+
+; --- Log & flush ----------------------------------------------------------
+; 2 = flush sekali per detik (bukan tiap commit). Jauh lebih cepat saat
+; banyak event masuk, tetap aman untuk data CCTV.
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+
+; --- Kapasitas koneksi ----------------------------------------------------
+; Default 151 terlalu kecil: checker + wall dashboard + API ZM membuka
+; koneksi masing-masing.
+max_connections = 500
+
+; --- Table cache ----------------------------------------------------------
+table_open_cache = 4000
+table_definition_cache = 2000
+
+; --- Per-query buffer -----------------------------------------------------
+; Dialokasikan per koneksi aktif, jadi jangan berlebihan.
+read_buffer_size = 1M
+read_rnd_buffer_size = 2M
+sort_buffer_size = 2M
+join_buffer_size = 2M
+tmp_table_size = 64M
+max_heap_table_size = 64M
+
+; --- InnoDB log -----------------------------------------------------------
+innodb_log_file_size = 256M
+innodb_log_buffer_size = 32M
+
+; --- Lain-lain ------------------------------------------------------------
+; Semua koneksi via IP internal, jadi DNS lookup tidak perlu.
+skip-name-resolve = 1
+
+default_time_zone = '+07:00'
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
