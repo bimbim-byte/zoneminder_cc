@@ -2,7 +2,7 @@ import json
 import os
 import re
 import requests
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
 from flask_cors import CORS
 
 app = Flask(__name__, static_folder=".")
@@ -347,9 +347,310 @@ def checker_run_now():
 
 
 # ==============================================================================
+# 7. WALL DASHBOARD (GRID KAMERA + GROUP)
+# ==============================================================================
+MONITOR_CACHE = {"data": None, "ts": 0}
+MONITOR_CACHE_TTL = 10  # detik
+
+# Session persisten: ZM v1.36 via HTTP memakai cookie sesi, bukan access_token.
+ZM_SESSION = requests.Session()
+ZM_SESSION.verify = False
+ZM_SESSION_AUTHED = False
+
+
+def zm_login_session():
+    """
+    Login ke ZoneMinder dan simpan cookie di session.
+    Diperlukan karena ZM hanya mengembalikan access_token saat HTTPS;
+    pada HTTP autentikasi berjalan lewat cookie session (ZMSESSID).
+    """
+    global ZM_SESSION_AUTHED
+    if ZM_SESSION_AUTHED and ZM_SESSION.cookies.get_dict():
+        return True
+
+    try:
+        res = ZM_SESSION.post(
+            f"{ZM_HOST}/zm/api/host/login.json",
+            data={"user": ZM_USER, "pass": ZM_PASS},
+            timeout=10,
+        )
+        if res.status_code == 200:
+            ZM_SESSION_AUTHED = True
+            return True
+        print(f"[WARN ZM LOGIN] HTTP {res.status_code}")
+    except Exception as e:
+        print(f"[ERROR ZM LOGIN] {e}")
+    return False
+
+
+def zm_api_get(path, params=None, retry=True):
+    """
+    GET ke ZoneMinder API memakai session cookie, dengan fallback access_token.
+    Re-login sekali otomatis bila sesi kedaluwarsa.
+    """
+    q = dict(params or {})
+    token = get_zm_token()
+    if token:
+        q["token"] = token
+
+    zm_login_session()
+
+    try:
+        res = ZM_SESSION.get(f"{ZM_BASE_URL}/{path}", params=q, timeout=10)
+
+        if res.status_code in (401, 403) and retry:
+            ZM_SESSION.cookies.clear()
+            global ZM_SESSION_AUTHED
+            ZM_SESSION_AUTHED = False
+            return zm_api_get(path, params, retry=False)
+
+        if res.status_code == 200:
+            return res.json()
+        print(f"[WARN ZM GET {path}] HTTP {res.status_code}")
+    except Exception as e:
+        print(f"[ERROR ZM GET {path}] {e}")
+    return None
+
+
+def normalize_monitor(raw):
+    """Ambil field penting dari objek Monitor ZM."""
+    m = raw.get("Monitor", raw) if isinstance(raw, dict) else {}
+
+    # ZM mengirim GroupIds hanya jika monitor memang punya group.
+    # Bila kosong, coba relasi Groups (perlu ?recursive=1).
+    group_ids = m.get("GroupIds")
+    if not group_ids:
+        raw_groups = m.get("Groups") or m.get("Group")
+        if isinstance(raw_groups, list):
+            group_ids = ",".join(
+                str(g.get("Id", "") if isinstance(g, dict) else g) for g in raw_groups
+            )
+        elif isinstance(raw_groups, dict):
+            group_ids = str(raw_groups.get("Id", ""))
+        else:
+            group_ids = raw_groups or ""
+
+    return {
+        "id": str(m.get("Id", "")),
+        "name": m.get("Name", "Unknown"),
+        "function": m.get("Function", "None"),
+        "enabled": str(m.get("Enabled", "0")) == "1",
+        "width": m.get("Width", ""),
+        "height": m.get("Height", ""),
+        "capture_fps": m.get("CaptureFPS", ""),
+        "group_ids": [g.strip() for g in str(group_ids).split(",") if g.strip()],
+    }
+
+
+def get_all_monitors_cached():
+    """Daftar monitor dari ZM, di-cache sebentar agar tidak membanjiri ZM."""
+    import time
+    now = time.time()
+    if MONITOR_CACHE["data"] and (now - MONITOR_CACHE["ts"]) < MONITOR_CACHE_TTL:
+        return MONITOR_CACHE["data"]
+
+    data = zm_api_get("monitors.json")
+    if data is None:
+        return MONITOR_CACHE["data"] or []
+
+    monitors = [normalize_monitor(m) for m in data.get("monitors", [])]
+    MONITOR_CACHE["data"] = monitors
+    MONITOR_CACHE["ts"] = now
+    return monitors
+
+
+def get_groups_from_zm():
+    """
+    Daftar Group asli ZoneMinder (ZM >= 1.34).
+    ZM mengirim tiap group dengan relasi 'Monitor' di dalamnya, jadi daftar
+    anggota group sudah tersedia tanpa request tambahan.
+    Mengembalikan None bila endpoint tidak didukung.
+    """
+    data = zm_api_get("groups.json")
+    if not isinstance(data, dict):
+        return None
+    raw = data.get("groups")
+    if not isinstance(raw, list):
+        return None
+
+    groups = []
+    for g in raw:
+        if not isinstance(g, dict):
+            continue
+        d = g.get("Group", g)
+        gid = str(d.get("Id", "")).strip()
+        if not gid:
+            continue
+        members = g.get("Monitor") or []
+        if isinstance(members, dict):
+            members = [members]
+        groups.append({
+            "id": gid,
+            "name": d.get("Name", f"Group {gid}"),
+            "monitors": [str(m.get("Id", "")) for m in members if isinstance(m, dict) and m.get("Id")],
+        })
+    return groups
+
+
+@app.route("/api/cameras/groups", methods=["GET"])
+def api_camera_groups():
+    """
+    Daftar Group + jumlah kamera per group.
+    Prioritas: API ZoneMinder. Fallback: data/camera_groups.json (group lokal).
+    """
+    monitors = get_all_monitors_cached()
+    groups = get_groups_from_zm()
+    source = "zone_minder"
+
+    if not groups:
+        source = "local"
+        local_file = os.environ.get("CAMERA_GROUPS_FILE", "/app/data/camera_groups.json")
+        groups = []
+        if os.path.exists(local_file):
+            try:
+                with open(local_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                for g in raw:
+                    gid = str(g.get("id", "")).strip()
+                    if not gid:
+                        continue
+                    groups.append({
+                        "id": gid,
+                        "name": g.get("name", f"Group {gid}"),
+                        "monitors": [str(x) for x in g.get("monitors", [])],
+                    })
+            except Exception as e:
+                print(f"[ERROR LOCAL GROUPS] {e}")
+
+    for g in groups:
+        # Group ZM: anggota sudah dari relasi Monitor. Fallback: cocokkan GroupIds.
+        if not g.get("monitors"):
+            g["monitors"] = [m["id"] for m in monitors if g["id"] in m["group_ids"]]
+        g["camera_count"] = len(g["monitors"])
+
+    return jsonify({
+        "source": source,
+        "total_cameras": len(monitors),
+        "groups": groups,
+    })
+
+
+@app.route("/api/cameras/wall", methods=["GET"])
+def api_camera_wall():
+    """
+    Daftar kamera untuk wall dashboard.
+    Query:
+      mode=all            -> seluruh kamera
+      groups=1,3          -> kamera pada group tersebut (union)
+      ids=5,7             -> kamera spesifik
+    """
+    mode = request.args.get("mode", "all")
+    monitors = get_all_monitors_cached()
+    by_id = {m["id"]: m for m in monitors}
+
+    if mode == "groups":
+        wanted_ids = set()
+        ginfo = api_camera_groups().get_json()
+        table = {g["id"]: g.get("monitors", []) for g in ginfo.get("groups", [])}
+        for gid in [x.strip() for x in request.args.get("groups", "").split(",") if x.strip()]:
+            wanted_ids.update(table.get(gid, []))
+        selected = [by_id[i] for i in wanted_ids if i in by_id]
+
+    elif mode == "ids":
+        wanted = [x.strip() for x in request.args.get("ids", "").split(",") if x.strip()]
+        selected = [by_id[i] for i in wanted if i in by_id]
+
+    else:
+        selected = monitors
+
+    selected.sort(key=lambda m: (m["name"].lower(), int(m["id"]) if m["id"].isdigit() else 0))
+
+    return jsonify({
+        "mode": mode,
+        "count": len(selected),
+        "cameras": selected,
+    })
+
+
+@app.route("/api/cameras/stream/<monitor_id>", methods=["GET"])
+def api_camera_stream(monitor_id):
+    """
+    Proxy stream MJPEG dari ZoneMinder.
+    ZM sudah multiplex stream: N klien menonton stream yang sama tidak menambah decode.
+    Parameter: scale (mis. 320), maxfps
+    """
+    if not re.fullmatch(r"\d+", str(monitor_id)):
+        return jsonify({"error": "ID kamera tidak valid"}), 400
+
+    params = {"mode": "jpeg", "monitor": monitor_id}
+    params["scale"] = request.args.get("scale", "320")
+    # Batasi laju frame: wall dashboard tidak perlu 30fps per kamera.
+    # Ini pengurangan bandwidth paling besar untuk grid berisi banyak kamera.
+    params["maxfps"] = request.args.get("maxfps", "5")
+    token = get_zm_token()
+    if token:
+        params["token"] = token
+
+    zm_login_session()
+
+    try:
+        upstream = ZM_SESSION.get(
+            f"{ZM_HOST}/zm/cgi-bin/nph-zms",
+            params=params,
+            stream=True,
+            timeout=(10, None),
+        )
+    except Exception as e:
+        return jsonify({"error": f"Stream gagal: {e}"}), 502
+
+    if upstream.status_code != 200:
+        upstream.close()
+        return jsonify({"error": f"ZoneMinder menolak stream ({upstream.status_code})"}), upstream.status_code
+
+    content_type = upstream.headers.get("Content-Type", "multipart/x-mixed-replace; boundary=--myboundary")
+
+    @stream_with_context
+    def generate():
+        try:
+            for chunk in upstream.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        except Exception:
+            pass
+        finally:
+            upstream.close()
+
+    resp = Response(generate(), content_type=content_type)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
+
+
+@app.route("/wall")
+def wall_picker():
+    return send_from_directory(".", "wall.html")
+
+
+@app.route("/wall/view")
+def wall_view():
+    return send_from_directory(".", "wall_view.html")
+
+
+# ==============================================================================
 # MAIN ENTRYPOINT
 # ==============================================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     print(f"[*] Menjalankan Dashboard CCTV pada port {port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+
+    # Flask dev server tidak sanggup menangani banyak koneksi MJPEG persisten
+    # sekaligus (koneksi terputus: ERR_EMPTY_RESPONSE). Waitress memakai thread
+    # pool sehingga puluhan stream bisa berjalan bersamaan.
+    try:
+        from waitress import serve
+        threads = int(os.environ.get("WSGI_THREADS", "64"))
+        print(f"[*] WSGI server: waitress ({threads} threads)")
+        serve(app, host="0.0.0.0", port=port, threads=threads, channel_timeout=300)
+    except ImportError:
+        print("[WARN] waitress tidak terpasang, memakai Flask dev server (tidak disarankan).")
+        app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

@@ -71,6 +71,13 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
   - Tombol **Jeda (Pause) / Aktifkan (Resume)** tanpa perlu mematikan kontainer Docker.
   - Pengaturan **Delay Interval Pengecekan** (dalam detik, misal 10s, 30s, 60s).
   - Tombol **⚡ Cek Semua Kamera Sekarang (Run Now)** untuk memicu pemeriksaan instan.
+- **🖥️ Wall Dashboard (Grid Live Kamera)**:
+  - Halaman khusus menonton banyak kamera sekaligus tanpa membebani ZoneMinder (tanpa memicu perekaman/analisis tambahan).
+  - Pemilihan sumber kamera: **Seluruh Kamera** atau **sebagian Group** (mendukung **multi-group** dengan penggabungan otomatis tanpa duplikat).
+  - Grid dapat dikustomisasi: jumlah **kolom**, **rasio** tile (16:9 / 4:3 / 1:1 / 21:9), **resolusi**, dan **FPS** per kamera.
+  - **Lazy load viewport**: kamera hanya dimuat saat terlihat di layar, sehingga hemat bandwidth dan CPU.
+  - **Batas stream bersamaan** (dapat diatur) dengan indikator `live` / `antre` untuk menjaga kestabilan server.
+  - Mode layar penuh per kamera, jeda massal, dan URL langsung yang bisa dijadikan bookmark atau kiosk display.
 - **📡 Pusat Log & Notifikasi MQTT Real-Time**:
   - Menampilkan log aktivitas kamera (Timestamp, Topik, Status ONLINE/OFFLINE, Payload).
   - Filter pencarian instan berdasarkan nama kamera, topik, atau status.
@@ -90,6 +97,8 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
 | **Burst Add Massal (Upgraded)** | `https://<IP_SERVER>/burst.html` | Pendaftaran massal via Quick Paste RTSP & Excel |
 | **Tambah Kamera Tunggal** | `https://<IP_SERVER>/add_camera.html` | Form tambah 1 kamera RTSP secara instan |
 | **Live MQTT Health Log** | `https://<IP_SERVER>/log_display.html` | Live log stream, statistik kamera, dan tutorial MQTT |
+| **Wall Dashboard (Pilih Kamera)** | `https://<IP_SERVER>/wall` | Pilih seluruh kamera atau sebagian group (multi-group) |
+| **Wall Dashboard (Grid Live)** | `https://<IP_SERVER>/wall/view?mode=all` | Grid live stream kamera, atur kolom/rasio/resolusi/FPS |
 | **ZoneMinder Direct Port** | `http://<IP_SERVER>:8082/zm/` | Port langsung (fallback tanpa HTTPS) |
 | **Dashboard Direct Port** | `http://<IP_SERVER>:8080/` | Port langsung dashboard (fallback tanpa HTTPS) |
 
@@ -162,6 +171,48 @@ Pada halaman `zoneminder.html` maupun `log_display.html` tersedia widget kendali
 - **Tombol ⏸ Jeda / ▶ Aktifkan:** Menjeda atau melanjutkan loop pengecekan kesehatan kamera tanpa mematikan kontainer.
 - **Delay Interval Pengecekan:** Ubah angka detik (minimal 5 detik) lalu klik **Simpan Delay**.
 - **Tombol ⚡ Cek Semua Kamera Sekarang:** Memeriksa status konektivitas seluruh kamera RTSP saat itu juga tanpa menunggu interval waktu.
+
+### 5. Wall Dashboard (Grid Live Kamera)
+Halaman ini dibuat khusus untuk **menonton banyak kamera sekaligus** tanpa membebani ZoneMinder. Berbeda dari montage bawaan ZoneMinder, halaman ini hanya mengambil stream (tanpa memicu perekaman atau analisis tambahan).
+
+**Alur penggunaan:**
+1. Buka **Wall Dashboard** (`https://<IP_SERVER>/wall`).
+2. Pilih salah satu mode:
+   - **Seluruh Kamera** — menampilkan semua kamera yang terdaftar di ZoneMinder.
+   - **Berdasarkan Group** — centang **satu atau beberapa group** (multi-group). Kamera gabungan dari group terpilih akan ditampilkan tanpa duplikat.
+3. Klik **Buka Wall Dashboard**. Anda akan diarahkan ke halaman grid live.
+
+**Kontrol pada halaman grid:**
+| Kontrol | Fungsi |
+| :--- | :--- |
+| **Kolom** | Jumlah kolom grid (Auto, 1–10) |
+| **Rasio** | Perbandingan sisi tile kamera (16:9, 4:3, 1:1, 21:9) |
+| **Resolusi** | Ukuran gambar dari ZM (240–640 px, atau Asli) |
+| **FPS** | Batas frame per detik per kamera (2, 5, 10, 15, Maks) |
+| **Stream** | Jumlah stream yang berjalan bersamaan (4–16) |
+| **🏷️** | Tampilkan/sembunyikan nama kamera |
+| **⏸️** | Jeda semua stream (menghemat resource) |
+| **↻ Reload** | Muat ulang semua stream |
+
+**Indikator status** di kanan atas menampilkan `X kamera · live N · antre M` — berapa stream yang sedang berjalan dan berapa yang menunggu.
+
+**Penting — pemahaman performa:**
+- Stream hanya dimuat untuk kamera yang **terlihat di layar** (*lazy load*). Kamera di luar viewport otomatis dilepas.
+- Jumlah stream bersamaan dibatasi (default **6**) karena browser hanya mengizinkan ~6 koneksi HTTP/1.1 per host. Stream berlebih masuk antrean.
+- ZM melakukan **multiplex stream**: banyak penonton pada kamera yang sama hanya memakai **satu** proses ZM. Jadi 8 orang menonton kamera yang sama ≈ beban 1 kamera.
+- Untuk grid berisi banyak kamera (50–100), disarankan **Resolusi 240–320 px** dan **FPS 2–5** agar bandwidth tetap wajar.
+
+**Format URL langsung** (bisa dijadikan bookmark / kiosk display):
+```
+# Seluruh kamera
+https://<IP_SERVER>/wall/view?mode=all
+
+# Satu atau beberapa group
+https://<IP_SERVER>/wall/view?mode=groups&groups=3,4
+
+# Kamera spesifik
+https://<IP_SERVER>/wall/view?mode=ids&ids=8,10,21
+```
 
 ---
 
@@ -264,7 +315,9 @@ zoneminder_cc/
 │   ├── add_camera.html        # Form pendaftaran kamera tunggal
 │   ├── burst.html             # Pendaftaran massal via Quick Paste RTSP & Excel
 │   ├── log_display.html       # Live stream MQTT log & panduan notifikasi
-│   └── requirements.txt       # Dependencies Python Flask
+│   ├── wall.html              # Wall Dashboard: pemilihan kamera / multi-group
+│   ├── wall_view.html         # Wall Dashboard: grid live kamera (grid, rasio, FPS)
+│   ├── requirements.txt       # Dependencies Python (Flask, Waitress)
 └── scripts/
     ├── renew_ssl.ps1          # Script auto-renew SSL untuk Windows
     └── renew_ssl.sh           # Script auto-renew SSL untuk Linux/WSL

@@ -153,7 +153,7 @@ Saat pertama kali membuka `https://`, browser akan memunculkan peringatan keaman
 
 ## 🎯 Panduan Menu & Fitur yang Tersedia
 
-Setelah portal terbuka di `https://<IP_ANDA>/`, Anda akan melihat 5 menu utama:
+Setelah portal terbuka di `https://<IP_ANDA>/`, Anda akan melihat 6 menu utama:
 
 | No | Nama Menu | Fungsi |
 | :---: | :--- | :--- |
@@ -162,6 +162,40 @@ Setelah portal terbuka di `https://<IP_ANDA>/`, Anda akan melihat 5 menu utama:
 | **3** | **Tambah Kamera Tunggal** (`/add_camera.html`) | Menambahkan 1 kamera baru secara cepat dengan memasukkan alamat RTSP stream kamera. |
 | **4** | **Burst Add Massal** (`/burst.html`) | Mendaftarkan puluhan kamera sekaligus cukup dengan *copy-paste* daftar RTSP atau *upload* file Excel (.xlsx). |
 | **5** | **Live MQTT Monitor Log** (`/log_display.html`) | Memantau log status kamera hidup/mati secara *real-time*, mengatur jeda waktu pemeriksaan (*delay interval*), dan panduan memasang notifikasi ke HP. |
+| **6** | **Wall Dashboard** (`/wall`) | Menampilkan banyak kamera secara grid live. Pilih **seluruh kamera** atau **sebagian group** (bisa lebih dari satu group), lalu atur jumlah kolom, rasio, resolusi, dan FPS. Hanya kamera yang terlihat di layar yang dimuat, sehingga tidak membebani ZoneMinder. |
+
+### Detail Menu 6: Wall Dashboard
+
+**Langkah penggunaan:**
+1. Dari portal, klik **Wall Dashboard (Grid Kamera)**, atau buka langsung `https://<IP_ANDA>/wall`.
+2. Pilih salah satu opsi:
+   - **Seluruh Kamera** — semua kamera yang terdaftar di ZoneMinder.
+   - **Berdasarkan Group** — centang satu atau beberapa group sekaligus. Jumlah kamera yang akan tampil langsung terlihat di bagian bawah.
+3. Klik **Buka Wall Dashboard**. Halaman grid live akan terbuka.
+
+**Pengaturan di halaman grid:**
+
+| Kontrol | Pilihan | Keterangan |
+| :--- | :--- | :--- |
+| **Kolom** | Auto, 1–10 | Jumlah kolom grid |
+| **Rasio** | 16:9, 4:3, 1:1, 21:9 | Perbandingan sisi tiap kamera |
+| **Resolusi** | 240, 320, 480, 640 px, Asli | Ukuran gambar; makin kecil makin ringan |
+| **FPS** | 2, 5, 10, 15, Maks | Batas frame per detik; makin kecil makin hemat bandwidth |
+| **Stream** | 4, 6, 9, 12, 16 | Jumlah stream yang berjalan bersamaan |
+
+Indikator di kanan atas (`X kamera · live N · antre M`) menunjukkan berapa stream aktif dan berapa yang menunggu.
+
+**Tips untuk 50–100 kamera:**
+- Gunakan **Resolusi 240–320 px** dan **FPS 2–5**.
+- Biarkan **Stream** di angka **6** (batas aman browser).
+- Sortir dengan mengecilkan **Kolom** agar lebih banyak kamera terlihat tanpa membuka terlalu banyak stream.
+
+**Akses langsung lewat URL** (bisa dijadikan *bookmark* atau layar kiosk):
+```
+https://<IP_ANDA>/wall/view?mode=all              # seluruh kamera
+https://<IP_ANDA>/wall/view?mode=groups&groups=3,4 # group 3 dan 4
+https://<IP_ANDA>/wall/view?mode=ids&ids=8,10,21   # kamera tertentu
+```
 
 ---
 
@@ -203,6 +237,9 @@ Jika Anda mengubah file Python atau konfigurasi:
 ```cmd
 docker compose up -d --build
 ```
+> Jika Anda mengubah daftar paket di `html_dashboard/requirements.txt` (misal menambah
+> `waitress`), rebuild **wajib** dijalankan agar paket ikut terpasang.
+> Perubahan file HTML/JS saja cukup di-refresh di browser tanpa rebuild.
 
 ### 4. Melihat Log Pemeriksaan Kamera (CCTV Checker)
 Untuk memantau apakah checker sedang aktif memeriksa kamera RTSP:
