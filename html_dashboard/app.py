@@ -82,11 +82,21 @@ def proxy_zm(subpath):
             timeout=15
         )
 
+        # Header hop-by-hop (RFC 7230) HARUS dibuang saat mem-proxy.
+        # Apache ZoneMinder mengirim "Keep-Alive" sejak KeepAlive diaktifkan;
+        # bila diteruskan mentah, Waitress/WSGI menolaknya dengan
+        # AssertionError dan request berakhir HTTP 500 (PEP 3333).
         excluded_headers = [
             "content-encoding",
             "content-length",
             "transfer-encoding",
             "connection",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "upgrade",
         ]
         resp_headers = [
             (name, value)
@@ -281,11 +291,11 @@ def get_mqtt_logs():
 # ==============================================================================
 def get_checker_config():
     default_cfg = {
-        "enabled": True,
-        "interval": 60,
+        "enabled": False,
+        "interval": 600,
         "rtsp_timeout": 3.0,
         "run_now": False,
-        "status": "Running",
+        "status": "Paused",
         "last_check": None
     }
     if os.path.exists(CHECKER_CONFIG_FILE):
@@ -630,10 +640,149 @@ def api_camera_stream(monitor_id):
 def wall_picker():
     return send_from_directory(".", "wall.html")
 
-
 @app.route("/wall/view")
 def wall_view():
     return send_from_directory(".", "wall_view.html")
+
+# ==============================================================================
+# 8. BULK CONTROL SELURUH KAMERA
+# ==============================================================================
+# ZM memakai "Function" sebagai mode operasi monitor. "None" = kamera mati.
+ZM_OFF_FUNCTION = "None"
+ZM_ACTIVE_FUNCTIONS = ("Monitor", "Modect", "Record", "Mocord", "Nodect")
+
+# Catatan fungsi terakhir tiap kamera, supaya tombol "Aktifkan Semua" bisa
+# mengembalikan mode asli (mis. Modect) dan bukan selalu jatuh ke Monitor.
+CAMERA_FUNCTIONS_FILE = os.environ.get("CAMERA_FUNCTIONS_FILE", "/app/data/camera_functions.json")
+
+
+def load_saved_functions():
+    if os.path.exists(CAMERA_FUNCTIONS_FILE):
+        try:
+            with open(CAMERA_FUNCTIONS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return {str(k): str(v) for k, v in data.items()}
+        except Exception as e:
+            print(f"[ERROR LOAD CAMERA FUNCTIONS] {e}")
+    return {}
+
+
+def save_saved_functions(mapping):
+    try:
+        os.makedirs(os.path.dirname(CAMERA_FUNCTIONS_FILE), exist_ok=True)
+        with open(CAMERA_FUNCTIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(mapping, f, indent=2)
+    except Exception as e:
+        print(f"[ERROR SAVE CAMERA FUNCTIONS] {e}")
+
+
+def zm_post(path, data, retry=True):
+    """POST form ke ZoneMinder API memakai session cookie yang sama."""
+    zm_login_session()
+    try:
+        res = ZM_SESSION.post(f"{ZM_BASE_URL}/{path}", data=data, timeout=15)
+        if res.status_code in (401, 403) and retry:
+            global ZM_SESSION_AUTHED
+            ZM_SESSION.cookies.clear()
+            ZM_SESSION_AUTHED = False
+            return zm_post(path, data, retry=False)
+        return res.status_code
+    except Exception as e:
+        print(f"[ERROR ZM POST {path}] {e}")
+        return 0
+
+
+@app.route("/api/cameras/bulk-function", methods=["POST"])
+def bulk_set_function():
+    """
+    Mengubah Function seluruh kamera sekaligus (enable/disable massal).
+
+    Body JSON:
+      action  : "on" | "off" | "custom"
+      function: dipakai saat action="custom", mis. "Monitor" / "Mocord"
+      ids     : opsional, daftar ID kamera. Kosong = semua kamera.
+
+    Saat action="on", kamera yang sebelumnya "None" dikembalikan ke Fungsi
+    terakhir yang tersimpan di data/camera_functions.json. Bila belum ada
+    catatan, dipakai "Monitor" (aman: tanpa motion detection).
+    """
+    body = request.json or {}
+    action = str(body.get("action", "")).strip().lower()
+    target_ids = [str(x) for x in body.get("ids", []) if str(x).strip()]
+
+    monitors = get_all_monitors_cached()
+    if target_ids:
+        wanted = set(target_ids)
+        monitors = [m for m in monitors if m["id"] in wanted]
+
+    if not monitors:
+        return jsonify({"status": "error", "message": "Tidak ada kamera yang diproses."}), 400
+
+    saved = load_saved_functions()
+
+    if action == "on":
+        # Hidupkan kembali sesuai fungsi terakhir yang tercatat
+        jobs = []
+        for m in monitors:
+            fn = saved.get(m["id"], "Monitor")
+            if fn not in ZM_ACTIVE_FUNCTIONS:
+                fn = "Monitor"
+            jobs.append((m["id"], fn, m["function"]))
+    elif action == "off":
+        jobs = []
+        for m in monitors:
+            # Ingat fungsi yang sedang aktif sebelum dimatikan, supaya
+            # "Pulihkan Fungsi Asli" tetap bisa mengembalikannya.
+            if m["function"] in ZM_ACTIVE_FUNCTIONS:
+                saved[m["id"]] = m["function"]
+            jobs.append((m["id"], ZM_OFF_FUNCTION, m["function"]))
+    elif action == "custom":
+        fn = str(body.get("function", "")).strip()
+        if fn not in ZM_ACTIVE_FUNCTIONS and fn != ZM_OFF_FUNCTION:
+            return jsonify({
+                "status": "error",
+                "message": f"Function '{fn}' tidak valid. Pilihan: {', '.join(ZM_ACTIVE_FUNCTIONS + (ZM_OFF_FUNCTION,))}"
+            }), 400
+        jobs = [(m["id"], fn, m["function"]) for m in monitors]
+    else:
+        return jsonify({"status": "error", "message": "action harus 'on', 'off', atau 'custom'."}), 400
+
+    results = []
+    ok_count = 0
+    fail_count = 0
+
+    for mon_id, new_fn, old_fn in jobs:
+        wants_enabled = new_fn != ZM_OFF_FUNCTION
+        code = zm_post(f"monitors/{mon_id}.json", {
+            "Monitor[Function]": new_fn,
+            "Monitor[Enabled]": "1" if wants_enabled else "0",
+        })
+
+        if code in (200, 201):
+            ok_count += 1
+            results.append({"id": mon_id, "status": "ok", "function": new_fn})
+            # Catat fungsi AKTIF terakhir. Saat kamera dimatikan ("None"),
+            # catatan LAMA sengaja tidak dihapus agar tombol
+            # "Pulihkan Fungsi Asli" bisa mengembalikan mode sebelumnya.
+            if wants_enabled:
+                saved[mon_id] = new_fn
+        else:
+            fail_count += 1
+            results.append({"id": mon_id, "status": "failed", "http": code})
+
+    save_saved_functions(saved)
+    # Paksa refresh cache agar panggilan berikutnya membaca kondisi terbaru
+    MONITOR_CACHE["ts"] = 0
+
+    return jsonify({
+        "status": "completed",
+        "action": action,
+        "total": len(jobs),
+        "success_count": ok_count,
+        "fail_count": fail_count,
+        "details": results,
+    })
 
 
 # ==============================================================================

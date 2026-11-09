@@ -66,6 +66,7 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
   - Autentikasi otomatis API ZoneMinder v1.36.
   - Registrasi kamera tunggal dan pengeditan konfigurasi (Nama, RTSP Path, Resolusi, Fungsi) dengan proteksi primary key ID.
   - Shortcut fungsi cepat (*Quick Set Function* & *Quick OFF*).
+  - **Kontrol massal seluruh kamera**: aktifkan semua dengan mode fungsi tertentu, matikan semua, atau pulihkan tiap kamera ke fungsi asli yang tersimpan.
   - Pengecekan CPU Load server ZoneMinder secara langsung.
 - **⚙️ Kendali Dinamis CCTV Health Checker**:
   - Tombol **Jeda (Pause) / Aktifkan (Resume)** tanpa perlu mematikan kontainer Docker.
@@ -166,11 +167,30 @@ https://<IP_SERVER>/
 3. Untuk mengubah fungsi kamera secara cepat, gunakan dropdown shortcut lalu klik **Set**, atau klik **OFF** untuk mematikan monitor.
 4. Untuk mengedit konfigurasi lengkap, klik tombol **✏️ Edit** pada baris kamera. Data kamera akan otomatis mengisi form di atas. Lakukan perubahan lalu klik **💾 Perbarui Kamera**.
 
+#### Kontrol Massal Seluruh Kamera
+Di atas tabel kamera terdapat baris **⚡ Kontrol Seluruh Kamera**:
+
+| Tombol | Fungsi |
+| :--- | :--- |
+| **▶ Aktifkan Semua** | Mengaktifkan seluruh kamera memakai mode fungsi pada dropdown di sebelahnya (Monitor / Modect / Record / Mocord / Nodect) |
+| **↺ Pulihkan Fungsi Asli** | Mengembalikan setiap kamera ke mode terakhir yang tercatat. Berguna setelah *Matikan Semua* — kamera kembali ke mode asalnya, bukan seragam ke satu mode |
+| **⏹ Matikan Semua** | Mengubah seluruh kamera ke `Function=None` dan `Enabled=0` (perekaman & deteksi berhenti) |
+
+Catatan:
+- Setiap tombol meminta konfirmasi sebelum dijalankan, dan menampilkan ringkasan `X berhasil, Y gagal` setelah selesai.
+- Mode terakhir tiap kamera dicatat di `data/camera_functions.json`, sehingga *Pulihkan Fungsi Asli* tetap bekerja meski container sempat di-restart.
+- Mengaktifkan/mematikan kamera **tidak menghapus** rekaman atau event yang sudah ada.
+
 ### 4. Mengontrol CCTV Health Checker
 Pada halaman `zoneminder.html` maupun `log_display.html` tersedia widget kendali checker:
 - **Tombol ⏸ Jeda / ▶ Aktifkan:** Menjeda atau melanjutkan loop pengecekan kesehatan kamera tanpa mematikan kontainer.
-- **Delay Interval Pengecekan:** Ubah angka detik (minimal 5 detik) lalu klik **Simpan Delay**.
+- **Delay Interval Pengecekan:** Ubah angka detik (minimal 5 detik) lalu klik **Simpan Delay**. Nilai default adalah **600 detik (10 menit)**.
 - **Tombol ⚡ Cek Semua Kamera Sekarang:** Memeriksa status konektivitas seluruh kamera RTSP saat itu juga tanpa menunggu interval waktu.
+
+> **Status awal checker adalah NONAKTIF (Paused).** Setelah container dinyalakan
+> pertama kali, checker tidak melakukan pengecekan otomatis sampai Anda menekan
+> **▶ Aktifkan Checker**. Ini mencegah pemeriksaan RTSP berjalan diam-diam dan
+> membebani jaringan tanpa sepengetahuan operator.
 
 ### 5. Wall Dashboard (Grid Live Kamera)
 Halaman ini dibuat khusus untuk **menonton banyak kamera sekaligus** tanpa membebani ZoneMinder. Berbeda dari montage bawaan ZoneMinder, halaman ini hanya mengambil stream (tanpa memicu perekaman atau analisis tambahan).
@@ -306,21 +326,91 @@ zoneminder_cc/
 │   ├── Dockerfile             # Dockerfile service CCTV Health Checker
 │   └── main.py                # Core Python penguji RTSP & MQTT publisher
 ├── data/
-│   └── .gitkeep               # Direktori runtime (log json diabaikan git)
+│   └── .gitkeep               # Direktori runtime (log json & config diabaikan git)
 ├── html_dashboard/
 │   ├── Dockerfile             # Dockerfile web interface dashboard
 │   ├── app.py                 # Backend Flask proxy API ZoneMinder & kontrol checker
 │   ├── index.html             # Portal navigasi utama ZoneMinder
-│   ├── zoneminder.html        # CRUD Camera Manager, status & checker controls
+│   ├── zoneminder.html        # CRUD Camera Manager, kontrol massal & checker controls
 │   ├── add_camera.html        # Form pendaftaran kamera tunggal
 │   ├── burst.html             # Pendaftaran massal via Quick Paste RTSP & Excel
 │   ├── log_display.html       # Live stream MQTT log & panduan notifikasi
 │   ├── wall.html              # Wall Dashboard: pemilihan kamera / multi-group
 │   ├── wall_view.html         # Wall Dashboard: grid live kamera (grid, rasio, FPS)
 │   ├── requirements.txt       # Dependencies Python (Flask, Waitress)
+├── zm-conf/
+│   ├── Dockerfile             # Image turunan ZM + tuning produksi
+│   ├── mysql-tuning.cnf       # Tuning MySQL (buffer pool, koneksi, flush)
+│   ├── apache-limit.conf      # Tuning Apache MPM (ServerLimit, worker, keepalive)
+│   └── zoneminder.conf        # Konfigurasi Apache ZoneMinder
 └── scripts/
     ├── renew_ssl.ps1          # Script auto-renew SSL untuk Windows
     └── renew_ssl.sh           # Script auto-renew SSL untuk Linux/WSL
+```
+
+---
+
+## ⚙️ Tuning Produksi (Server 32 Core / 32 GB RAM)
+
+Konfigurasi sudah disetel untuk server kelas Proxmox VM 32 core / 32 GB. Semua nilai
+dipilih konservatif: cukup lega untuk 100 kamera, tidak boros RAM.
+
+### Ringkasan nilai tuning
+
+| Komponen | Parameter | Nilai | Alasan |
+| :--- | :--- | :--- | :--- |
+| **ZoneMinder** | `shm_size` | **8 GB** | Buffer frame ~9 MB/kamera; 8 GB aman untuk 100+ kamera |
+| ZoneMinder | `ulimits.nofile` | 65536 | ZM membuka banyak file descriptor (event + shared memory) |
+| **MySQL** | `innodb_buffer_pool_size` | **2 GB** | Default hanya 128 MB → query event menyentuh disk |
+| MySQL | `innodb_buffer_pool_instances` | 4 | Hindari rebutan latch di CPU banyak |
+| MySQL | `innodb_flush_log_at_trx_commit` | 2 | Flush per detik, bukan per commit → jauh lebih cepat |
+| MySQL | `max_connections` | 500 | Default 151 terlalu kecil untuk checker + wall + API |
+| MySQL | `tmp_table_size` | 64 MB | Query event ZM butuh tabel sementara lebih besar |
+| **Apache** | `ServerLimit` | 512 | **Wajib** — bila tidak diset, Apache memotong `MaxRequestWorkers` |
+| Apache | `MaxRequestWorkers` | 512 | Satu stream = satu worker; cukup untuk 100 kamera + web |
+| Apache | `KeepAlive` | On | Cegah buka-tutup koneksi pada streaming MJPEG |
+| **CCTV Checker** | Interval default | **600 detik** | Cek tiap 10 menit; cukup untuk pemantauan |
+| CCTV Checker | Status awal | **Nonaktif (OFF)** | Mencegah pengecekan otomatis tanpa sepengetahuan operator |
+
+### Catatan penting: kenapa ZoneMinder memakai image turunan
+
+ZoneMinder **menolak file config yang world-writable**:
+
+```
+[Warning] World-writable config file '...zz-zm-tuning.cnf' is ignored.
+```
+
+Saat file config di-*bind mount* dari filesystem Windows (9p/drvfs), permission
+dipaksa menjadi `777` dan `chmod` gagal karena mount bersifat read-only. Akibatnya
+seluruh tuning MySQL diabaikan tanpa error yang jelas.
+
+Solusinya: [`zm-conf/Dockerfile`](zm-conf/Dockerfile) menyalin file config ke dalam
+layer image dengan permission `644`. Ini bekerja konsisten di host mana pun
+(Proxmox/ext4 maupun Windows), dan container tetap portabel.
+
+Setelah mengubah file di `zm-conf/`, wajib rebuild:
+
+```bash
+docker compose build zoneminder
+docker compose up -d zoneminder
+```
+
+### Cara verifikasi tuning sudah terpakai
+
+```bash
+# MySQL — harus menampilkan 2048 MB, instances 4, maxconn 500
+docker exec zoneminder mysql -uroot -e \
+  "SELECT @@innodb_buffer_pool_size/1024/1024 AS bufferpool_MB, \
+   @@innodb_buffer_pool_instances AS inst, @@max_connections AS maxconn;"
+
+# Tidak boleh ada warning "world-writable"
+docker exec zoneminder tail -30 /var/log/mysql/error.log | grep -i world-writable
+
+# Apache — tidak boleh muncul warning "exceeds ServerLimit"
+docker exec zoneminder apache2ctl configtest
+
+# Shared memory — harus 8.0G
+docker exec zoneminder df -h /dev/shm
 ```
 
 ---

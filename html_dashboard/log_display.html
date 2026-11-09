@@ -373,7 +373,7 @@
           <div style="grid-column: 1 / -1;">
             <label for="checkerIntervalInput" style="font-size:11px; font-weight:600; display:block; margin-bottom:4px; color:var(--muted);">Delay Interval Pengecekan (Detik)</label>
             <div style="display:flex; gap:6px;">
-              <input type="number" id="checkerIntervalInput" class="form-control" min="5" max="3600" value="60" style="width:80px; height:32px;">
+              <input type="number" id="checkerIntervalInput" class="form-control" min="5" max="3600" value="600" style="width:80px; height:32px;">
               <button class="btn btn-primary" style="flex:1; height:32px; font-size:12px;" onclick="updateCheckerInterval()">💾 Simpan Interval</button>
             </div>
           </div>
@@ -582,7 +582,7 @@ client.loop_forever()</div>
     let isAutoRefresh = true;
     let refreshInterval = null;
     let allLogs = [];
-    let checkerConfig = { enabled: true, interval: 60 };
+    let checkerConfig = { enabled: false, interval: 600 };
 
     // =========================================================================
     // 1. TABS MANAGEMENT

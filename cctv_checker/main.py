@@ -31,8 +31,8 @@ ZM_HOST = os.environ.get("ZM_HOST", "http://zoneminder:80")
 ZM_USER = os.environ.get("ZM_USER", "admin")
 ZM_PASS = os.environ.get("ZM_PASS", "admin")
 
-# Interval Pengecekan Kamera default (detik)
-CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", 60))
+# Interval Pengecekan Kamera default (detik). 600 = 10 menit.
+CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", 600))
 RTSP_TIMEOUT = float(os.environ.get("RTSP_TIMEOUT", 3.0))
 RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", 10))
 
@@ -57,13 +57,17 @@ def ensure_data_dir():
 
 
 def load_checker_config():
-    """Membaca file konfigurasi controller cctv_checker."""
+    """
+    Membaca file konfigurasi controller cctv_checker.
+    Default saat pertama kali dijalankan (file belum ada): checkernya MATI,
+    agar tidak ada pengecekan otomatis tanpa sepengetahuan operator.
+    """
     default_cfg = {
-        "enabled": True,
+        "enabled": False,
         "interval": CHECK_INTERVAL,
         "rtsp_timeout": RTSP_TIMEOUT,
         "run_now": False,
-        "status": "Running",
+        "status": "Paused",
         "last_check": None
     }
     if os.path.exists(CHECKER_CONFIG_FILE):
@@ -404,7 +408,7 @@ def run_camera_health_check():
 
     initial_cfg = load_checker_config()
     update_checker_config({
-        "status": "Running" if initial_cfg.get("enabled", True) else "Paused"
+        "status": "Running" if initial_cfg.get("enabled", False) else "Paused"
     })
 
     print("[CHECKER] Service Health Checker siap menerima instruksi kontrol...", flush=True)
@@ -414,7 +418,7 @@ def run_camera_health_check():
     while True:
         try:
             cfg = load_checker_config()
-            is_enabled = cfg.get("enabled", True)
+            is_enabled = cfg.get("enabled", False)
             interval = max(5, int(cfg.get("interval", CHECK_INTERVAL)))
             timeout_val = float(cfg.get("rtsp_timeout", RTSP_TIMEOUT))
             should_run_now = bool(cfg.get("run_now", False))
