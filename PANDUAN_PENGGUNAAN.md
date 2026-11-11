@@ -55,7 +55,33 @@ cd E:\CodeFile\kemnaker\zoneminder_cc
 
 ---
 
-### Langkah 2: Buat Sertifikat SSL (Cukup Dijalankan Sekali di Awal)
+### Langkah 2: Siapkan File Konfigurasi `.env`
+
+Semua kredensial ZoneMinder disimpan di satu file `.env`. Salin dari template:
+
+- **Windows (PowerShell / CMD):**
+  ```cmd
+  copy .env.example .env
+  ```
+
+- **Linux / WSL Ubuntu:**
+  ```bash
+  cp .env.example .env
+  ```
+
+Buka file `.env` dengan Notepad / nano, lalu pastikan dua baris ini sesuai akun ZoneMinder Anda:
+```env
+ZM_USER=admin
+ZM_PASS=P@ssw0rd
+```
+
+> **Penting:** Jika Anda mengganti password di ZoneMinder, cukup ubah `ZM_PASS`
+> di file ini lalu jalankan `docker compose up -d`. Tidak perlu mengedit kode Python
+> atau HTML sama sekali.
+
+---
+
+### Langkah 3: Buat Sertifikat SSL (Cukup Dijalankan Sekali di Awal)
 Jalankan skrip pembuat sertifikat otomatis yang telah disediakan. Skrip ini akan otomatis mendeteksi IP komputer Anda:
 
 - **Jika Menggunakan Windows (PowerShell):**
@@ -81,7 +107,7 @@ Jalankan skrip pembuat sertifikat otomatis yang telah disediakan. Skrip ini akan
 
 ---
 
-### Langkah 3: Jalankan Sistem dengan Docker Compose
+### Langkah 4: Jalankan Sistem dengan Docker Compose
 Ketik perintah berikut untuk mendownload image dan menyalakan semua kontainer di latar belakang (*background*):
 
 ```cmd
@@ -102,7 +128,7 @@ docker compose up -d
 
 ---
 
-### Langkah 4: Pastikan Semua Layanan Berjalan Normal
+### Langkah 5: Pastikan Semua Layanan Berjalan Normal
 Ketik perintah berikut untuk melihat status kontainer:
 ```cmd
 docker compose ps
@@ -157,7 +183,7 @@ Setelah portal terbuka di `https://<IP_ANDA>/`, Anda akan melihat 6 menu utama:
 
 | No | Nama Menu | Fungsi |
 | :---: | :--- | :--- |
-| **1** | **ZoneMinder Web Console** (`/zm/`) | Membuka antarmuka resmi bawaan ZoneMinder NVR untuk melihat rekaman, live view, dan setting kamera. *(Login default: user `admin`, password `admin`)*. |
+| **1** | **ZoneMinder Web Console** (`/zm/`) | Membuka antarmuka resmi bawaan ZoneMinder NVR untuk melihat rekaman, live view, dan setting kamera. *(Kredensial diatur di file `.env`, default: user `admin`, password `P@ssw0rd`)*. |
 | **2** | **Kelola Monitor ZoneMinder** (`/zoneminder.html`) | Mengatur kamera yang sudah ada, mengedit nama/resolusi/fungsi, menyalakan/mematikan kamera (*Quick OFF*), **kontrol massal seluruh kamera** (aktifkan semua / matikan semua / pulihkan fungsi asli), dan mengatur CCTV Health Checker. |
 | **3** | **Tambah Kamera Tunggal** (`/add_camera.html`) | Menambahkan 1 kamera baru secara cepat dengan memasukkan alamat RTSP stream kamera. |
 | **4** | **Burst Add Massal** (`/burst.html`) | Mendaftarkan puluhan kamera sekaligus cukup dengan *copy-paste* daftar RTSP atau *upload* file Excel (.xlsx). |
@@ -284,7 +310,7 @@ docker logs -f caddy_proxy
 ---
 
 ## 🔑 Informasi Akun & Port Default
-- **ZoneMinder Login**: Username `admin`, Password `admin`
+- **ZoneMinder Login**: Username `admin`, Password `P@ssw0rd` *(atur di file `.env`)*
 - **Port HTTPS Web Portal**: `443`
 - **Port Mosquitto MQTT Native**: `1883` (untuk aplikasi HP / script Python)
 - **Port Mosquitto MQTT WebSocket**: `9001` (untuk browser)

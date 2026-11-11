@@ -16,6 +16,9 @@ ZM_BASE_URL = os.environ.get("ZM_BASE_URL", f"{ZM_HOST}/zm/api")
 ZM_USER = os.environ.get("ZM_USER", "admin")
 ZM_PASS = os.environ.get("ZM_PASS", "admin")
 
+if ZM_PASS == "admin":
+    print("[WARN] ZM_PASS masih 'admin' (default). Set ZM_PASS di file .env!")
+
 MQTT_LOG_FILE = os.environ.get("MQTT_LOG_FILE", "/app/data/mqtt_logs.json")
 CHECKER_CONFIG_FILE = os.environ.get("CHECKER_CONFIG_FILE", "/app/data/checker_config.json")
 
@@ -60,6 +63,19 @@ def serve_static(filename):
         return send_from_directory(".", filename)
     return jsonify({"error": "File tidak ditemukan"}), 404
 
+
+@app.route("/api/config", methods=["GET"])
+def api_runtime_config():
+    """
+    Konfigurasi runtime untuk halaman web (username/password ZoneMinder).
+
+    Dibaca dari environment ZM_USER / ZM_PASS yang berasal dari file .env,
+    sehingga password tidak perlu ditulis ulang di HTML setiap kali berubah.
+    """
+    return jsonify({
+        "zm_user": ZM_USER,
+        "zm_pass": ZM_PASS,
+    })
 
 # ==============================================================================
 # 2. API PROXY KE ZONEMINDER

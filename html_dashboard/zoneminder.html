@@ -499,11 +499,24 @@
 
   <script>
     const SERVER_HOST = window.location.origin;
+    // Kredensial TIDAK lagi ditulis di HTML. Diambil dari /api/config,
+    // yang membacanya dari environment ZM_USER / ZM_PASS (file .env).
     const ZM_CONFIG = {
         host: SERVER_HOST,
-        username: 'admin',
-        password: 'admin'
+        username: '',
+        password: ''
     };
+
+    async function loadRuntimeConfig() {
+        try {
+            const res = await fetch('/api/config');
+            const cfg = await res.json();
+            if (cfg.zm_user) ZM_CONFIG.username = cfg.zm_user;
+            if (cfg.zm_pass) ZM_CONFIG.password = cfg.zm_pass;
+        } catch (err) {
+            console.error('Gagal memuat konfigurasi runtime:', err);
+        }
+    }
 
     let currentToken = sessionStorage.getItem('zm_token') || '';
     let existingIds = [];
@@ -1087,6 +1100,7 @@
     // INITIALIZATION
     // =========================================================================
     document.addEventListener('DOMContentLoaded', async () => {
+        await loadRuntimeConfig();
         await authenticate();
         await loadCameras();
         await loadCheckerConfig();

@@ -23,6 +23,8 @@ checker_config.json
 .env
 .env.*
 *.env
+# Template aman untuk dibagikan — dikecualikan dari aturan di atas.
+!.env.example
 
 # ==============================================================================
 # 4. Python Cache & Virtual Environments
@@ -46,9 +48,13 @@ ehthumbs.db
 [Dd]esktop.ini
 .idea/
 .vscode/
-.continue/
 *.sublime-workspace
 *.sublime-project
+
+# ==============================================================================
+# 5b. Konfigurasi Asisten AI Lokal (mengandung API key — JANGAN di-commit)
+# ==============================================================================
+.continue/
 
 # ==============================================================================
 # 6. File Backup & Temporary Files

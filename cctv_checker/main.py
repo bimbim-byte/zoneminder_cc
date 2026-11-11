@@ -31,10 +31,19 @@ ZM_HOST = os.environ.get("ZM_HOST", "http://zoneminder:80")
 ZM_USER = os.environ.get("ZM_USER", "admin")
 ZM_PASS = os.environ.get("ZM_PASS", "admin")
 
+# Peringatan keras bila kredensial masih memakai default.
+# Nilai sebenarnya seharusnya datang dari file .env (lihat .env.example).
+if ZM_PASS == "admin":
+    print("[WARN] ZM_PASS masih 'admin' (default). Set ZM_PASS di file .env!", flush=True)
+
 # Interval Pengecekan Kamera default (detik). 600 = 10 menit.
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", 600))
 RTSP_TIMEOUT = float(os.environ.get("RTSP_TIMEOUT", 3.0))
 RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", 10))
+
+# Status awal checker saat file konfigurasi belum ada.
+# Default false: tidak ada pengecekan RTSP diam-diam sebelum operator sadar.
+CHECKER_ENABLED = os.environ.get("CHECKER_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
 
 # State monitor lokal untuk mengingat fungsi asli kamera (misal: Monitor / Modect)
 state_backup = {}
@@ -59,15 +68,18 @@ def ensure_data_dir():
 def load_checker_config():
     """
     Membaca file konfigurasi controller cctv_checker.
-    Default saat pertama kali dijalankan (file belum ada): checkernya MATI,
-    agar tidak ada pengecekan otomatis tanpa sepengetahuan operator.
+
+    Saat file belum ada, nilai awal diambil dari environment
+    (CHECK_INTERVAL, RTSP_TIMEOUT, CHECKER_ENABLED) yang berasal dari .env.
+    Bila file sudah ada, isinya yang menang supaya perubahan dari dashboard
+    tidak tertimpa saat container di-restart.
     """
     default_cfg = {
-        "enabled": False,
+        "enabled": CHECKER_ENABLED,
         "interval": CHECK_INTERVAL,
         "rtsp_timeout": RTSP_TIMEOUT,
         "run_now": False,
-        "status": "Paused",
+        "status": "Running" if CHECKER_ENABLED else "Paused",
         "last_check": None
     }
     if os.path.exists(CHECKER_CONFIG_FILE):

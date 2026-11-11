@@ -112,13 +112,57 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
 - **Docker Compose** v2.
 - **OpenSSL** (sudah tersedia bawaan di Linux/WSL/Git for Windows).
 
+> **Menjalankan dari Windows?** Jika Anda memakai WSL2, jalankan seluruh perintah
+> di bawah **dari dalam WSL Ubuntu**, bukan PowerShell. Jalankan
+> `wsl --distribution Ubuntu`, lalu `cd /mnt/e/CodeFile/kemnaker/zoneminder_cc`.
+> Docker Desktop juga harus dalam keadaan menyala.
+
+### 0. Checklist Instalasi (Ringkas)
+
+Urutan ini wajib diikuti; melewati satu langkah akan menghentikan proses berikutnya.
+
+| # | Langkah | Perintah | Wajib? |
+| :--: | :--- | :--- | :--- |
+| 1 | Kloning repo | `git clone <url> && cd zoneminder_cc` | ✔ |
+| 2 | Buat file `.env` | `cp .env.example .env` | **✔ WAJIB** |
+| 3 | Isi `ZM_USER` / `ZM_PASS` | edit `.env` | **✔ WAJIB** |
+| 4 | Buat sertifikat SSL | `./scripts/renew_ssl.sh` | **✔ WAJIB** |
+| 5 | Nyalakan stack | `docker compose up -d` | ✔ |
+| 6 | Periksa kontainer | `docker compose ps` | disarankan |
+| 7 | Jalankan pre-flight | `bash scripts/preflight.sh` | disarankan |
+
+> **Langkah 2 dan 4 tidak bisa dilewati.** Docker Compose akan langsung gagal
+> dengan pesan `required variable ZM_USER is missing a value` bila `.env` belum
+> ada, dan Caddy akan gagal memuat karena `cert.pem` belum dibuat.
+
+**Cek dulu sebelum menyalakan** — jalankan skrip pre-flight. Skrip ini memeriksa
+Docker, `.env`, sertifikat, port, dan berkas penting, lalu memberi tahu apa yang
+kurang:
+
+```bash
+bash scripts/preflight.sh
+```
+
+Contoh keluaran bila sudah siap:
+```text
+ HASIL: SIAP. Lanjutkan dengan:  docker compose up -d
+```
+
 ### 1. Kloning Repository
 ```bash
 git clone https://github.com/<username>/zoneminder_cc.git
 cd zoneminder_cc
 ```
 
-### 2. Generate Sertifikat SSL Lokal (Wajib Sebelum Start Pertama)
+### 2. Siapkan File Konfigurasi `.env`
+```bash
+cp .env.example .env
+```
+Sesuaikan `ZM_USER` dan `ZM_PASS` dengan akun ZoneMinder Anda. Nilai default
+adalah `admin` / `P@ssw0rd`. File ini menjadi satu-satunya tempat menyimpan
+kredensial — dashboard dan checker membacanya dari sini.
+
+### 3. Generate Sertifikat SSL Lokal (Wajib Sebelum Start Pertama)
 Jalankan skrip berikut agar sertifikat SSL dibuat sesuai IP host Anda:
 - **Pada Windows (PowerShell):**
   ```powershell
@@ -130,13 +174,13 @@ Jalankan skrip berikut agar sertifikat SSL dibuat sesuai IP host Anda:
   ./scripts/renew_ssl.sh
   ```
 
-### 3. Jalankan Seluruh Kontainer
+### 4. Jalankan Seluruh Kontainer
 ```bash
 docker compose up -d
 ```
 Tunggu sekitar 1–2 menit saat pertama kali dijalankan agar inisialisasi database ZoneMinder selesai.
 
-### 4. Buka Antarmuka di Browser
+### 5. Buka Antarmuka di Browser
 Buka browser dan akses:
 ```text
 https://<IP_SERVER>/
@@ -317,6 +361,8 @@ zoneminder_cc/
 ├── docker-compose.yml         # Konfigurasi orkestrasi 5 layanan Docker
 ├── mosquitto.conf             # Konfigurasi broker MQTT Mosquitto
 ├── README.md                  # Dokumentasi teknis & panduan lengkap
+├── .env.example               # Template konfigurasi (kredensial, interval, port)
+├── .env                       # Konfigurasi aktual — DIABAIKAN GIT
 ├── caddy/
 │   ├── Caddyfile              # Konfigurasi reverse proxy universal (:443 HTTPS)
 │   └── certs/                 # Direktori sertifikat TLS (diabaikan git demi keamanan)
@@ -344,6 +390,7 @@ zoneminder_cc/
 │   ├── apache-limit.conf      # Tuning Apache MPM (ServerLimit, worker, keepalive)
 │   └── zoneminder.conf        # Konfigurasi Apache ZoneMinder
 └── scripts/
+    ├── preflight.sh           # Cek kesiapan instalasi sebelum `docker compose up`
     ├── renew_ssl.ps1          # Script auto-renew SSL untuk Windows
     └── renew_ssl.sh           # Script auto-renew SSL untuk Linux/WSL
 ```
@@ -371,6 +418,7 @@ dipilih konservatif: cukup lega untuk 100 kamera, tidak boros RAM.
 | Apache | `KeepAlive` | On | Cegah buka-tutup koneksi pada streaming MJPEG |
 | **CCTV Checker** | Interval default | **600 detik** | Cek tiap 10 menit; cukup untuk pemantauan |
 | CCTV Checker | Status awal | **Nonaktif (OFF)** | Mencegah pengecekan otomatis tanpa sepengetahuan operator |
+| **Konfigurasi** | Sumber kredensial | **`.env`** | Satu tempat untuk `ZM_USER`/`ZM_PASS`; ubah password tanpa edit kode |
 
 ### Catatan penting: kenapa ZoneMinder memakai image turunan
 
@@ -415,10 +463,41 @@ docker exec zoneminder df -h /dev/shm
 
 ---
 
-## 💡 Informasi Akun Default & Troubleshooting
+## 💡 Kredensial, Akun Default & Troubleshooting
 
-- **ZoneMinder Admin Username**: `admin`
-- **ZoneMinder Admin Password**: `admin`
+### Konfigurasi kredensial lewat file `.env`
+
+Seluruh kredensial ZoneMinder dibaca dari satu file `.env` di root proyek —
+tidak ada lagi password yang ditulis langsung di kode Python maupun HTML.
+
+**Langkah pertama setelah kloning:**
+```bash
+cp .env.example .env
+```
+
+Lalu sesuaikan isinya:
+
+| Variabel | Default | Keterangan |
+| :--- | :--- | :--- |
+| `ZM_USER` | `admin` | Username ZoneMinder untuk API & login |
+| `ZM_PASS` | `P@ssw0rd` | Password ZoneMinder untuk API & login |
+| `CHECK_INTERVAL` | `600` | Interval pengecekan RTSP (detik) |
+| `RTSP_TIMEOUT` | `3.0` | Timeout koneksi TCP ke kamera (detik) |
+| `RETENTION_DAYS` | `10` | Umur simpan log MQTT (hari) |
+| `CHECKER_ENABLED` | `false` | Status awal checker saat pertama dinyalakan |
+| `WSGI_THREADS` | `64` | Thread waitress untuk stream MJPEG |
+
+**Setelah mengubah password di ZoneMinder:**
+1. Ubah `ZM_PASS` di file `.env`.
+2. Jalankan `docker compose up -d` — kedua service (dashboard & checker)
+   otomatis memakai password baru. Tidak perlu mengedit kode.
+
+> File `.env` **tidak** ikut ter-commit (lihat `.gitignore` bagian 3).
+> Gunakan `.env.example` sebagai template yang aman dibagikan.
+
+### Akun
+
+- **ZoneMinder Admin**: `admin` / `P@ssw0rd` *(ubah segera setelah instalasi)*
 - **Mosquitto MQTT Auth**: `Anonymous (Tanpa password)`
 
 ### Troubleshooting:
