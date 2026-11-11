@@ -1,0 +1,23 @@
+# ==============================================================================
+# Normalisasi akhir baris (line endings)
+#
+# Skrip shell WAJIB memakai LF. Tanpa aturan ini, Git di Windows mengubahnya
+# menjadi CRLF saat checkout, dan skrip gagal dijalankan di WSL/Linux dengan
+# error seperti: "$'\r': command not found".
+# ==============================================================================
+
+# Default: biarkan Git menormalkan ke LF di repository.
+* text=auto
+
+# Skrip shell: selalu LF, di repository maupun di working tree.
+*.sh            text eol=lf
+*.bash          text eol=lf
+preflight.sh    text eol=lf
+
+# Skrip PowerShell: CRLF (dibutuhkan Windows PowerShell 5.1).
+*.ps1           text eol=crlf
+
+# Berkas yang tidak boleh diubah sama sekali.
+*.pyc           binary
+*.pem           binary
+*.key           binary
