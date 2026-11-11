@@ -131,7 +131,9 @@ for F in docker-compose.yml caddy/Caddyfile mosquitto.conf; do
     fi
 done
 
-if grep -q '^\.env$' .gitignore 2>/dev/null; then
+# grep dengan -x (baris cocok persis) dan toleransi CR agar tetap benar
+# walau .gitignore tersimpan dengan akhir baris Windows.
+if grep -qxE '[[:space:]]*\.env[[:space:]]*' .gitignore 2>/dev/null; then
     pass ".env terlindungi oleh .gitignore (tidak akan ter-commit)"
 else
     warn ".env TIDAK ada di .gitignore — risiko kredensial ikut ter-commit!"
