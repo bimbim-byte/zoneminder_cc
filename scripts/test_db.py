@@ -1,12 +1,23 @@
+import os
+import sys
+
 import pymysql
 
-# Konfigurasi Database ZoneMinder
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _env_loader import load_env  # noqa: E402
+
+load_env()
+
+# Konfigurasi Database ZoneMinder.
+# Kredensial diambil dari file .env di root repo (lihat .env.example).
+# ZM_DB_* dipakai bila ada; kalau tidak, jatuh ke ZM_USER/ZM_PASS.
 ZM_DB_CONFIG = {
-    "host": "10.121.35.108",
-    "user": "zmuser",
-    "password": "zmpassword",
-    "database": "zm",
-    "autocommit": True
+    "host": os.environ.get("ZM_DB_HOST", "localhost"),
+    "user": os.environ.get("ZM_DB_USER", os.environ.get("ZM_USER", "zmuser")),
+    "password": os.environ.get("ZM_DB_PASS", os.environ.get("ZM_PASS", "")),
+    "database": os.environ.get("ZM_DB_NAME", "zm"),
+    "port": int(os.environ.get("ZM_DB_PORT", 3306)),
+    "autocommit": True,
 }
 
 def test_database():

@@ -15,11 +15,20 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ==========================================
 # KONFIGURASI ZONEMINDER & INTERVAL
 # ==========================================
-ZM_HOST = "https://10.121.35.108/zm"  # Menggunakan HTTPS sesuai IP Anda
-ZM_USER = "admin"
-ZM_PASS = "admin"
+# Kredensial dibaca dari file .env di root repo (lihat .env.example).
+# Environment asli menang atas .env, jadi override lewat shell juga bisa.
+from _env_loader import load_env  # noqa: E402  (butuh path skrip di sys.path)
+
+load_env()
+
+ZM_HOST = os.environ.get("ZM_HOST", "https://10.121.35.108/zm")
+ZM_USER = os.environ.get("ZM_USER", "admin")
+ZM_PASS = os.environ.get("ZM_PASS", "admin")
 CHECK_INTERVAL_SECONDS = 300         # 300 detik = 5 menit
 RTSP_TIMEOUT_SECONDS = 5             # Timeout pengecekan RTSP per kamera
+
+if ZM_PASS == "admin":
+    print("[WARN] ZM_PASS masih 'admin' (default). Set ZM_PASS di file .env!")
 
 # File lokal untuk menyimpan state/fungsi asli kamera
 BACKUP_FILE = "zm_monitor_state.json"
