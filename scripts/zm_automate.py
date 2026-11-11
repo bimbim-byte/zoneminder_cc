@@ -21,7 +21,7 @@ from _env_loader import load_env  # noqa: E402  (butuh path skrip di sys.path)
 
 load_env()
 
-ZM_HOST = os.environ.get("ZM_HOST", "https://10.121.35.108/zm")
+ZM_HOST = os.environ.get("ZM_HOST", "https://localhost/zm")
 ZM_USER = os.environ.get("ZM_USER", "admin")
 ZM_PASS = os.environ.get("ZM_PASS", "admin")
 CHECK_INTERVAL_SECONDS = 300         # 300 detik = 5 menit
