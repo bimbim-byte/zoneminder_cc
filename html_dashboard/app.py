@@ -1,52 +1,293 @@
 import json
+import logging
 import os
 import re
+import threading
 import requests
-from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
-from flask_cors import CORS
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    stream_with_context,
+    url_for,
+)
 
-app = Flask(__name__, static_folder=".")
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+import auth as dash_auth
+import token_crypto
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+)
+log = logging.getLogger("dashboard")
+
+app = Flask(__name__, static_folder=".", template_folder=".")
 
 # ==============================================================================
 # KONFIGURASI ENVIRONMENT
 # ==============================================================================
 ZM_HOST = os.environ.get("ZM_HOST", "http://zoneminder:80")
 ZM_BASE_URL = os.environ.get("ZM_BASE_URL", f"{ZM_HOST}/zm/api")
-ZM_USER = os.environ.get("ZM_USER", "admin")
-ZM_PASS = os.environ.get("ZM_PASS", "admin")
-
-if ZM_PASS == "admin":
-    print("[WARN] ZM_PASS masih 'admin' (default). Set ZM_PASS di file .env!")
 
 MQTT_LOG_FILE = os.environ.get("MQTT_LOG_FILE", "/app/data/mqtt_logs.json")
 CHECKER_CONFIG_FILE = os.environ.get("CHECKER_CONFIG_FILE", "/app/data/checker_config.json")
 
-# Cache token auth ZM di memori
+DASH_SECRET_KEY = os.environ.get("DASH_SECRET_KEY", "")
+if not DASH_SECRET_KEY:
+    # Tanpa kunci tetap, setiap restart akan membuat kunci acak baru:
+    # semua sesi login dan brankas kredensial menjadi tidak dapat dibuka.
+    log.warning(
+        "DASH_SECRET_KEY kosong. Memakai kunci acak sementara — sesi login dan "
+        "brankas kredensial TIDAK akan bertahan setelah restart. Isi di .env."
+    )
+    DASH_SECRET_KEY = os.urandom(32).hex()
+
+DASH_USERS_FILE = os.environ.get("DASH_USERS_FILE", "/app/data/dashboard_users.json")
+ZM_CREDENTIALS_FILE = os.environ.get("ZM_CREDENTIALS_FILE", "/app/data/zm_credentials.enc")
+
+# Cookie sesi: HttpOnly mencegah pembacaan oleh JavaScript, SameSite=Lax
+# mencegah pengiriman lintas situs (CSRF), Secure hanya saat HTTPS dipakai.
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "true").lower()
+    in ("1", "true", "yes", "on"),
+    PERMANENT_SESSION_LIFETIME=dash_auth.SESSION_TTL_SECONDS,
+    MAX_CONTENT_LENGTH=32 * 1024 * 1024,
+)
+
+dashboard_auth = dash_auth.DashboardAuth(DASH_USERS_FILE)
+zm_credentials = dash_auth.ZMCredentials(ZM_CREDENTIALS_FILE, DASH_SECRET_KEY)
+
+if not token_crypto.crypto_available():
+    log.warning(
+        "Library 'cryptography' tidak tersedia — kredensial ZM akan jatuh ke "
+        "environment dan TIDAK tersimpan terenkripsi."
+    )
+
+# Cache token auth ZM di memori. Direset saat kredensial berubah.
 ZM_TOKEN = None
 
 
 # ==============================================================================
 # HELPER AUTH ZONEMINDER
 # ==============================================================================
+def zm_login_params():
+    """Kredensial ZM efektif (brankas -> environment)."""
+    return {"user": zm_credentials.user, "pass": zm_credentials.password}
+
+
+def invalidate_zm_session():
+    """Buang token & cookie ZM yang lama setelah kredensial berganti."""
+    global ZM_TOKEN, ZM_SESSION_AUTHED
+    ZM_TOKEN = None
+    ZM_SESSION_AUTHED = False
+    try:
+        ZM_SESSION.cookies.clear()
+    except Exception:
+        pass
+
+
 def get_zm_token():
-    """Mengambil Access Token dari ZoneMinder API."""
+    """Mengambil Access Token dari ZoneMinder API.
+
+    PENTING (perilaku ZoneMinder v1.36 yang mudah menjebak):
+    /zm/api/host/login.json mengembalikan access_token, tetapi TIDAK memasang
+    cookie sesi apa pun pada responsnya. Artinya token itu satu-satunya bukti
+    autentikasi untuk panggilan API berikutnya. Bila token tidak ikut dikirim
+    (mis. karena nilainya None), ZM membalas HTTP 401 "Not Authenticated".
+
+    Karena itu fungsi ini selalu mengembalikan token yang benar-benar baru
+    diambil, bukan sekadar nilai cache global.
+    """
     global ZM_TOKEN
+    creds = zm_login_params()
     login_url = f"{ZM_HOST}/zm/api/host/login.json"
     try:
-        res = requests.post(
-            login_url,
-            data={"user": ZM_USER, "pass": ZM_PASS},
-            timeout=8,
-            verify=False
-        )
+        res = requests.post(login_url, data=creds, timeout=8, verify=False)
         if res.status_code == 200:
-            data = res.json()
-            ZM_TOKEN = data.get("access_token")
+            ZM_TOKEN = res.json().get("access_token") or None
             return ZM_TOKEN
+        log.warning("Login ZoneMinder ditolak: HTTP %s", res.status_code)
+        ZM_TOKEN = None
     except Exception as e:
-        print(f"[ERROR AUTH ZM] {e}")
+        log.error("Auth ZoneMinder gagal: %s", e)
+        ZM_TOKEN = None
     return ZM_TOKEN
+
+
+_login_lock = threading.Lock()
+
+
+def zm_authenticated_session():
+    """Session requests yang PASTI terautentikasi ke ZoneMinder.
+
+    Dua jalur autentikasi disiapkan sekaligus karena keduanya bergantung pada
+    konfigurasi server:
+
+      1. Cookie ZMSESSID — hasil login lewat /zm/index.php. Dipakai untuk
+         endpoint non-API (mis. stream nph-zms).
+      2. Access token — dikirim sebagai query string pada endpoint /api/*.
+         Ini jalur utama: lihat catatan di get_zm_token().
+
+    Mengembalikan (session, token). Token bisa None bila ZM menolak kredensial;
+    pemanggil harus memperlakukan itu sebagai kegagalan autentikasi, bukan
+    sebagai kondisi normal.
+    """
+    global ZM_SESSION_AUTHED
+    with _login_lock:
+        token = get_zm_token()
+        if token:
+            return ZM_SESSION, token
+
+        # Tanpa token (mis. kredensial terisi tetapi autentikasi ZM dimatikan),
+        # login cookie tetap dicoba agar instalasi lama tetap berjalan.
+        if not ZM_SESSION.cookies.get_dict():
+            try:
+                ZM_SESSION.post(
+                    f"{ZM_HOST}/zm/index.php",
+                    data={
+                        "username": zm_credentials.user,
+                        "password": zm_credentials.password,
+                        "action": "login",
+                    },
+                    timeout=10,
+                )
+            except Exception as e:
+                log.error("Login cookie ZoneMinder gagal: %s", e)
+        ZM_SESSION_AUTHED = bool(ZM_SESSION.cookies.get_dict())
+        return ZM_SESSION, None
+
+
+def zm_connection_test(user=None, password=None):
+    """Uji kredensial ZM tanpa menyimpannya. Dipakai oleh tombol Test Connection."""
+    creds = {
+        "user": user if user is not None else zm_credentials.user,
+        "pass": password if password is not None else zm_credentials.password,
+    }
+    result = {"reachable": False, "authenticated": False, "zm_version": None, "message": ""}
+    try:
+        res = requests.post(
+            f"{ZM_HOST}/zm/api/host/login.json", data=creds, timeout=10, verify=False
+        )
+    except Exception as exc:
+        result["message"] = f"ZoneMinder tidak dapat dihubungi: {exc}"
+        return result
+
+    result["reachable"] = True
+    if res.status_code != 200:
+        result["message"] = f"ZoneMinder menolak permintaan login (HTTP {res.status_code})."
+        return result
+
+    try:
+        data = res.json()
+    except Exception:
+        result["message"] = "Respons ZoneMinder bukan JSON."
+        return result
+
+    result["zm_version"] = data.get("version")
+    token = data.get("access_token")
+
+    # ZM hanya mengembalikan access_token bila autentikasi diaktifkan. Saat
+    # ZM_OPT_USE_AUTH=0, API memang terbuka dan token bernilai null — ini
+    # bukan kegagalan, karena dashboard memakai cookie sesi ZM.
+    if token:
+        result["authenticated"] = True
+        result["message"] = f"Kredensial valid. ZoneMinder v{result['zm_version'] or '?'}."
+        return result
+
+    try:
+        probe = requests.get(
+            f"{ZM_BASE_URL}/monitors.json", params={"limit": 1}, timeout=10, verify=False
+        )
+    except Exception as exc:
+        result["message"] = f"Login OK tetapi API tidak dapat dijangkau: {exc}"
+        return result
+
+    if probe.status_code == 200:
+        result["authenticated"] = True
+        result["message"] = (
+            f"Terhubung. ZoneMinder v{result['zm_version'] or '?'} berjalan dengan "
+            "autentikasi internal NONAKTIF (ZM_OPT_USE_AUTH=0), sehingga login "
+            "mengembalikan token kosong dan dashboard memakai cookie sesi ZM."
+        )
+    elif probe.status_code in (401, 403):
+        result["message"] = (
+            f"Login ditolak (HTTP {probe.status_code}). Periksa username/password ZM."
+        )
+    else:
+        result["message"] = f"API ZoneMinder mengembalikan HTTP {probe.status_code}."
+    return result
+
+
+# ==============================================================================
+# AUTENTIKASI DASHBOARD (login, logout, ganti password)
+# ==============================================================================
+dash_auth.install_auth(app, dashboard_auth, zm_credentials)
+
+# Buat akun dashboard awal (admin / admin) bila belum ada. Tanpa langkah ini
+# tidak ada satu pun user yang bisa login pada instalasi baru.
+if dashboard_auth.bootstrap():
+    log.warning(
+        "Login pertama: gunakan admin / admin, lalu SEGERA ganti password "
+        "di halaman Pengaturan (https://<host>:%s/settings).",
+        os.environ.get("DASHBOARD_HTTPS_PORT", "9443"),
+    )
+
+if not zm_credentials.status().get("has_password"):
+    log.warning(
+        "Kredensial ZoneMinder belum tersimpan di brankas terenkripsi. "
+        "Dashboard memakai nilai dari .env sampai Anda menyimpannya di halaman Pengaturan."
+    )
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    next_url = request.args.get("next") or ""
+    error = ""
+
+    if request.method == "POST":
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+        locked, remaining = dash_auth.is_locked_out(ip)
+        if locked:
+            error = f"Terlalu banyak percobaan login. Coba lagi dalam {remaining} detik."
+            return render_template(
+                "login.html", error=error, next_url=next_url, host_label=request.host
+            ), 429
+
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+
+        ok, message = dashboard_auth.authenticate(username, password)
+        if ok:
+            dash_auth.clear_attempts(ip)
+            session.clear()
+            session["user"] = username
+            session["issued_at"] = dash_auth.time.time()
+            session.permanent = True
+
+            entry = dashboard_auth.user(username) or {}
+            if entry.get("must_change_password"):
+                return redirect(url_for("settings") + "?force=1")
+            return redirect(next_url if next_url.startswith("/") else url_for("index"))
+
+        dash_auth.record_attempt(ip)
+        error = message
+
+    return render_template(
+        "login.html", error=error, next_url=next_url, host_label=request.host
+    )
+
+
+@app.route("/logout", methods=["GET", "POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 # ==============================================================================
@@ -57,43 +298,179 @@ def index():
     return send_from_directory(".", "index.html")
 
 
+@app.route("/healthz")
+def healthz():
+    """Probe sederhana untuk Docker healthcheck (tanpa data sensitif)."""
+    return jsonify({"ok": True, "encryption": token_crypto.crypto_available()})
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return ("", 204)
+
+
 @app.route("/<path:filename>")
 def serve_static(filename):
-    if os.path.exists(os.path.join(".", filename)):
+    # Tidak ada lagi endpoint /api/config: kredensial ZM tidak pernah dikirim
+    # ke browser. Halaman memanggil /api/* yang diproksi backend.
+    if os.path.exists(os.path.join(".", filename)) and not filename.endswith((".py", ".enc", ".json")):
         return send_from_directory(".", filename)
     return jsonify({"error": "File tidak ditemukan"}), 404
 
 
-@app.route("/api/config", methods=["GET"])
-def api_runtime_config():
-    """
-    Konfigurasi runtime untuk halaman web (username/password ZoneMinder).
+# ==============================================================================
+# 1b. PENGATURAN: KREDENSIAL ZONEMINDER + AKUN DASHBOARD
+# ==============================================================================
+@app.route("/settings")
+def settings():
+    return send_from_directory(".", "settings.html")
 
-    Dibaca dari environment ZM_USER / ZM_PASS yang berasal dari file .env,
-    sehingga password tidak perlu ditulis ulang di HTML setiap kali berubah.
-    """
+
+@app.route("/api/settings/status", methods=["GET"])
+def settings_status():
+    """Ringkasan status tanpa membocorkan password."""
+    user = session.get("user")
+    entry = dashboard_auth.user(user) or {}
+    status = zm_credentials.status()
     return jsonify({
-        "zm_user": ZM_USER,
-        "zm_pass": ZM_PASS,
+        "dashboard_user": user,
+        "dashboard_display_name": dashboard_auth.display_name(user),
+        "dashboard_hint": entry.get("hint", ""),
+        "must_change_password": bool(entry.get("must_change_password")),
+        "last_login": entry.get("last_login"),
+        "zm": status,
+    })
+
+
+@app.route("/api/settings/credentials", methods=["POST"])
+def settings_credentials():
+    """Menyimpan kredensial ZM baru ke brankas terenkripsi."""
+    body = request.json or {}
+    user = (body.get("zm_user") or "").strip()
+    password = body.get("zm_pass") or ""
+
+    if not user:
+        return jsonify({"status": "error", "message": "Username ZoneMinder wajib diisi."}), 400
+    if not password:
+        return jsonify({"status": "error", "message": "Password ZoneMinder wajib diisi."}), 400
+
+    try:
+        zm_credentials.save(user, password, updated_by=session.get("user", ""))
+    except token_crypto.CredentialError as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 500
+    except Exception as exc:
+        log.exception("Gagal menyimpan kredensial ZM")
+        return jsonify({"status": "error", "message": f"Gagal menyimpan: {exc}"}), 500
+
+    invalidate_zm_session()
+
+    # Verifikasi langsung: lebih baik memberi tahu operator sekarang daripada
+    # membiarkan dashboard tampak normal lalu gagal di halaman lain.
+    test = zm_connection_test(user, password)
+    return jsonify({
+        "status": "success",
+        "message": "Kredensial ZoneMinder tersimpan terenkripsi.",
+        "test": test,
+    })
+
+
+@app.route("/api/settings/test", methods=["POST"])
+def settings_test():
+    """Uji kredensial (tersimpan atau kandidat dari form) tanpa menyimpan."""
+    body = request.json or {}
+    user = body.get("zm_user")
+    password = body.get("zm_pass")
+
+    # Bila form tidak diisi, uji nilai yang tersimpan.
+    if not user or password in (None, ""):
+        test = zm_connection_test()
+    else:
+        test = zm_connection_test(user.strip(), password)
+
+    return jsonify({"status": "success" if test.get("authenticated") else "error", "test": test})
+
+
+@app.route("/api/settings/password", methods=["POST"])
+def change_password():
+    """Mengganti password dashboard (wajib saat masih memakai default)."""
+    body = request.json or {}
+    current = body.get("current_password") or ""
+    new = body.get("new_password") or ""
+    confirm = body.get("confirm_password") or ""
+    hint = body.get("hint")
+
+    if new != confirm:
+        return jsonify({"status": "error", "message": "Konfirmasi password tidak sama."}), 400
+
+    ok, message = dashboard_auth.change_password(
+        session.get("user", ""), current, new, hint=hint
+    )
+    if not ok:
+        return jsonify({"status": "error", "message": message}), 400
+
+    return jsonify({
+        "status": "success",
+        "message": "Password dashboard berhasil diubah. Gunakan password baru saat login berikutnya.",
     })
 
 # ==============================================================================
 # 2. API PROXY KE ZONEMINDER
 # ==============================================================================
+@app.route("/api/zm/health.json", methods=["GET"])
+@app.route("/zm/api/health.json", methods=["GET"])
+def zm_health():
+    """Status koneksi ZoneMinder untuk badge di halaman dashboard.
+
+    Hanya mengembalikan status, versi, dan pesan — tidak pernah mengirim
+    username/password ke browser.
+    """
+    test = zm_connection_test()
+    if not test.get("authenticated"):
+        log.warning("Health ZoneMinder gagal: %s", test.get("message"))
+    return jsonify({
+        "connected": bool(test.get("authenticated")),
+        "reachable": bool(test.get("reachable")),
+        "version": test.get("zm_version"),
+        "message": test.get("message", ""),
+    }), (200 if test.get("authenticated") else 502)
+
+
 @app.route("/api/zm/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE"])
 @app.route("/zm/api/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE"])
 def proxy_zm(subpath):
+    """Proxy umum ke API ZoneMinder.
+
+    PENTING: permintaan dari browser TIDAK membawa kredensial ZM apa pun —
+    itu disengaja, agar password ZM tidak pernah sampai ke sisi klien. Karena
+    itu token autentikasi HARUS ditempelkan di sini. Tanpa langkah ini,
+    ZoneMinder selalu membalas HTTP 401 "Not Authenticated" meskipun
+    kredensial di brankas sudah benar, dan seluruh tabel kamera gagal dimuat.
+    """
     url = f"{ZM_BASE_URL}/{subpath}"
-    headers = {k: v for k, v in request.headers if k.lower() != "host"}
+    session, token = zm_authenticated_session()
+    if not token and not session.cookies.get_dict():
+        return jsonify({
+            "error": "Kredensial ZoneMinder tidak valid. Periksa di halaman Pengaturan.",
+            "success": False,
+        }), 502
+
+    headers = {
+        k: v for k, v in request.headers.items()
+        if k.lower() not in ("host", "cookie", "content-length")
+    }
+
+    # Token ditaruh di query string (jalur yang bekerja pada ZM 1.36).
+    params = request.args.to_dict(flat=False)
+    if token:
+        params["token"] = [token]
 
     try:
-        resp = requests.request(
+        resp = session.request(
             method=request.method,
             url=url,
             headers=headers,
             data=request.get_data(),
-            params=request.args,
-            cookies=request.cookies,
+            params=params,
             allow_redirects=False,
             timeout=15
         )
@@ -120,7 +497,32 @@ def proxy_zm(subpath):
             if name.lower() not in excluded_headers
         ]
 
-        response = Response(resp.content, resp.status_code, resp_headers)
+        content = resp.content
+
+        # Daftar monitor memuat field Path yang berisi rtsp://user:password@host.
+        # Nilai itu TIDAK boleh sampai ke browser: halaman Kelola Kamera cukup
+        # menampilkan host-nya. Payload JSON disaring di sini, bukan di sisi
+        # klien, supaya kebocoran tidak bergantung pada perilaku JavaScript.
+        if (
+            resp.status_code == 200
+            and "application/json" in resp.headers.get("Content-Type", "")
+            and re.search(rb"monitors", subpath.encode() or b"")
+        ):
+            try:
+                payload = json.loads(content.decode("utf-8"))
+                if isinstance(payload, dict) and isinstance(payload.get("monitors"), list):
+                    for item in payload["monitors"]:
+                        target = item.get("Monitor") if isinstance(item, dict) else None
+                        if isinstance(target, dict) and target.get("Path"):
+                            target["Path"] = _redact_rtsp(target["Path"])
+                    content = json.dumps(payload).encode("utf-8")
+                    resp_headers = [(k, v) for k, v in resp_headers
+                                    if k.lower() != "content-type"]
+                    resp_headers.append(("Content-Type", "application/json"))
+            except Exception as exc:
+                log.warning("Gagal menyaring kredensial monitor: %s", exc)
+
+        response = Response(content, resp.status_code, resp_headers)
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "*"
@@ -282,24 +684,60 @@ def burst_add_monitors():
 # ==============================================================================
 # 5. API MQTT LOGS
 # ==============================================================================
+def _redact_rtsp(text):
+    """Buang kredensial dari URL RTSP apa pun di dalam sebuah string.
+
+    Log lama (sebelum checker diperbaiki) memuat rtsp://user:pass@host di
+    dalam payload. Nilai itu TIDAK boleh keluar ke browser, jadi disaring
+    saat dibaca — bukan hanya saat ditulis.
+    """
+    if not isinstance(text, str) or "@" not in text or "rtsp://" not in text.lower():
+        return text
+    try:
+        scheme, _, rest = text.partition("//")
+        hostpart = rest.rsplit("@", 1)[-1]
+        return f"{scheme}//{hostpart}" if hostpart else "rtsp://<kredensial-dihilangkan>"
+    except Exception:
+        return "<kredensial-dihilangkan>"
+
+
+def _scrub_payload(value):
+    """Rekursif: bersihkan rtsp_url dan kredensial di semua bentuk payload."""
+    if isinstance(value, dict):
+        out = {}
+        for key, item in value.items():
+            if key == "rtsp_url":
+                out[key] = _redact_rtsp(item)
+            else:
+                out[key] = _scrub_payload(item)
+        return out
+    if isinstance(value, list):
+        return [_scrub_payload(item) for item in value]
+    if isinstance(value, str):
+        return _redact_rtsp(value)
+    return value
+
+
 @app.route("/api/mqtt-logs", methods=["GET"])
 def get_mqtt_logs():
-    """Membaca isi file log MQTT dan menyajikan dalam format JSON untuk log_display.html"""
-    if os.path.exists(MQTT_LOG_FILE):
-        try:
-            with open(MQTT_LOG_FILE, "r", encoding="utf-8") as f:
-                logs = json.load(f)
-            return jsonify(logs)
-        except Exception as e:
-            return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
-    elif os.path.exists("mqtt_logs.json"):
-        try:
-            with open("mqtt_logs.json", "r", encoding="utf-8") as f:
-                logs = json.load(f)
-            return jsonify(logs)
-        except Exception as e:
-            return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
-    return jsonify([])
+    """Membaca isi file log MQTT dan menyajikan dalam format JSON untuk log_display.html.
+
+    Setiap payload disaring sebelum dikirim: URL RTSP tidak pernah lagi
+    membawa user/password ke browser (lihat _redact_rtsp).
+    """
+    target = MQTT_LOG_FILE if os.path.exists(MQTT_LOG_FILE) else "mqtt_logs.json"
+    if not os.path.exists(target):
+        return jsonify([])
+    try:
+        with open(target, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+        if isinstance(logs, list):
+            logs = [_scrub_payload(entry) for entry in logs]
+        else:
+            logs = _scrub_payload(logs)
+        return jsonify(logs)
+    except Exception as e:
+        return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
 
 
 # ==============================================================================
@@ -378,63 +816,58 @@ def checker_run_now():
 MONITOR_CACHE = {"data": None, "ts": 0}
 MONITOR_CACHE_TTL = 10  # detik
 
-# Session persisten: ZM v1.36 via HTTP memakai cookie sesi, bukan access_token.
+# Session persisten ke ZoneMinder. Berisi cookie ZMSESSID bila login web
+# dipakai; jalur utama pada ZM v1.36 adalah access token pada query string
+# (lihat get_zm_token), karena endpoint /zm/api/host/login.json tidak
+# memasang cookie apa pun.
 ZM_SESSION = requests.Session()
 ZM_SESSION.verify = False
 ZM_SESSION_AUTHED = False
 
 
 def zm_login_session():
-    """
-    Login ke ZoneMinder dan simpan cookie di session.
-    Diperlukan karena ZM hanya mengembalikan access_token saat HTTPS;
-    pada HTTP autentikasi berjalan lewat cookie session (ZMSESSID).
-    """
-    global ZM_SESSION_AUTHED
-    if ZM_SESSION_AUTHED and ZM_SESSION.cookies.get_dict():
-        return True
+    """Pastikan ada jalur autentikasi yang siap dipakai.
 
-    try:
-        res = ZM_SESSION.post(
-            f"{ZM_HOST}/zm/api/host/login.json",
-            data={"user": ZM_USER, "pass": ZM_PASS},
-            timeout=10,
+    Mengembalikan access_token bila ZM memberikannya, atau None bila ZM
+    memakai autentikasi cookie murni.
+    """
+    session, token = zm_authenticated_session()
+    if token is None and not session.cookies.get_dict():
+        log.warning(
+            "ZoneMinder tidak memberikan token maupun cookie. Periksa kredensial "
+            "ZM di halaman Pengaturan."
         )
-        if res.status_code == 200:
-            ZM_SESSION_AUTHED = True
-            return True
-        print(f"[WARN ZM LOGIN] HTTP {res.status_code}")
-    except Exception as e:
-        print(f"[ERROR ZM LOGIN] {e}")
-    return False
+    return token
 
 
 def zm_api_get(path, params=None, retry=True):
+    """GET ke ZoneMinder API dengan access token (dan cookie bila ada).
+
+    Bug lama: token hasil login TIDAK pernah ditempelkan ke query string,
+    sehingga setiap GET berakhir HTTP 401 'Not Authenticated'. Token kini
+    diambil langsung dari hasil login pada request yang sama.
     """
-    GET ke ZoneMinder API memakai session cookie, dengan fallback access_token.
-    Re-login sekali otomatis bila sesi kedaluwarsa.
-    """
+    session, token = zm_authenticated_session()
+
     q = dict(params or {})
-    token = get_zm_token()
     if token:
         q["token"] = token
 
-    zm_login_session()
-
     try:
-        res = ZM_SESSION.get(f"{ZM_BASE_URL}/{path}", params=q, timeout=10)
+        res = session.get(f"{ZM_BASE_URL}/{path}", params=q, timeout=10)
 
         if res.status_code in (401, 403) and retry:
-            ZM_SESSION.cookies.clear()
+            # Token/sesi basi: bersihkan lalu ulangi SEKALI dengan token baru.
             global ZM_SESSION_AUTHED
+            ZM_SESSION.cookies.clear()
             ZM_SESSION_AUTHED = False
             return zm_api_get(path, params, retry=False)
 
         if res.status_code == 200:
             return res.json()
-        print(f"[WARN ZM GET {path}] HTTP {res.status_code}")
+        log.warning("ZM GET %s -> HTTP %s", path, res.status_code)
     except Exception as e:
-        print(f"[ERROR ZM GET {path}] {e}")
+        log.error("ZM GET %s gagal: %s", path, e)
     return None
 
 
@@ -464,6 +897,7 @@ def normalize_monitor(raw):
         "width": m.get("Width", ""),
         "height": m.get("Height", ""),
         "capture_fps": m.get("CaptureFPS", ""),
+        "path": _redact_rtsp(m.get("Path", "")),
         "group_ids": [g.strip() for g in str(group_ids).split(",") if g.strip()],
     }
 
@@ -561,43 +995,6 @@ def api_camera_groups():
     })
 
 
-@app.route("/api/cameras/wall", methods=["GET"])
-def api_camera_wall():
-    """
-    Daftar kamera untuk wall dashboard.
-    Query:
-      mode=all            -> seluruh kamera
-      groups=1,3          -> kamera pada group tersebut (union)
-      ids=5,7             -> kamera spesifik
-    """
-    mode = request.args.get("mode", "all")
-    monitors = get_all_monitors_cached()
-    by_id = {m["id"]: m for m in monitors}
-
-    if mode == "groups":
-        wanted_ids = set()
-        ginfo = api_camera_groups().get_json()
-        table = {g["id"]: g.get("monitors", []) for g in ginfo.get("groups", [])}
-        for gid in [x.strip() for x in request.args.get("groups", "").split(",") if x.strip()]:
-            wanted_ids.update(table.get(gid, []))
-        selected = [by_id[i] for i in wanted_ids if i in by_id]
-
-    elif mode == "ids":
-        wanted = [x.strip() for x in request.args.get("ids", "").split(",") if x.strip()]
-        selected = [by_id[i] for i in wanted if i in by_id]
-
-    else:
-        selected = monitors
-
-    selected.sort(key=lambda m: (m["name"].lower(), int(m["id"]) if m["id"].isdigit() else 0))
-
-    return jsonify({
-        "mode": mode,
-        "count": len(selected),
-        "cameras": selected,
-    })
-
-
 @app.route("/api/cameras/stream/<monitor_id>", methods=["GET"])
 def api_camera_stream(monitor_id):
     """
@@ -608,19 +1005,17 @@ def api_camera_stream(monitor_id):
     if not re.fullmatch(r"\d+", str(monitor_id)):
         return jsonify({"error": "ID kamera tidak valid"}), 400
 
+    session, token = zm_authenticated_session()
+
     params = {"mode": "jpeg", "monitor": monitor_id}
     params["scale"] = request.args.get("scale", "320")
-    # Batasi laju frame: wall dashboard tidak perlu 30fps per kamera.
-    # Ini pengurangan bandwidth paling besar untuk grid berisi banyak kamera.
+    # Batasi laju frame per kamera untuk menghemat bandwidth dan CPU ZM.
     params["maxfps"] = request.args.get("maxfps", "5")
-    token = get_zm_token()
     if token:
         params["token"] = token
 
-    zm_login_session()
-
     try:
-        upstream = ZM_SESSION.get(
+        upstream = session.get(
             f"{ZM_HOST}/zm/cgi-bin/nph-zms",
             params=params,
             stream=True,
@@ -652,13 +1047,11 @@ def api_camera_stream(monitor_id):
     return resp
 
 
-@app.route("/wall")
-def wall_picker():
-    return send_from_directory(".", "wall.html")
-
-@app.route("/wall/view")
-def wall_view():
-    return send_from_directory(".", "wall_view.html")
+# Wall Dashboard (wall.html / wall_view.html) DIHAPUS.
+# Halaman pemilihan kamera dan grid live-nya tidak lagi disajikan, dan
+# endpoint /api/cameras/wall ikut dihapus bersama halamannya.
+# API group & normalisasi monitor TETAP dipertahankan karena dipakai oleh
+# kontrol massal (bulk-function) dan pemetaan fungsi monitor.
 
 # ==============================================================================
 # 8. BULK CONTROL SELURUH KAMERA
@@ -694,10 +1087,12 @@ def save_saved_functions(mapping):
 
 
 def zm_post(path, data, retry=True):
-    """POST form ke ZoneMinder API memakai session cookie yang sama."""
-    zm_login_session()
+    """POST form ke ZoneMinder API dengan access token pada query string."""
+    session, token = zm_authenticated_session()
+
+    q = {"token": token} if token else {}
     try:
-        res = ZM_SESSION.post(f"{ZM_BASE_URL}/{path}", data=data, timeout=15)
+        res = session.post(f"{ZM_BASE_URL}/{path}", params=q, data=data, timeout=15)
         if res.status_code in (401, 403) and retry:
             global ZM_SESSION_AUTHED
             ZM_SESSION.cookies.clear()
@@ -705,7 +1100,7 @@ def zm_post(path, data, retry=True):
             return zm_post(path, data, retry=False)
         return res.status_code
     except Exception as e:
-        print(f"[ERROR ZM POST {path}] {e}")
+        log.error("ZM POST %s gagal: %s", path, e)
         return 0
 
 

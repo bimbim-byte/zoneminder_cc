@@ -17,6 +17,11 @@ data/*.log
 mqtt_logs.json
 checker_config.json
 
+# Brankas kredensial terenkripsi & akun dashboard (hash password).
+# Terenkripsi, tetapi tetap tidak boleh ikut ter-commit.
+data/*.enc
+data/dashboard_users.json
+
 # ==============================================================================
 # 3. Environment Variables & Secret Files
 # ==============================================================================

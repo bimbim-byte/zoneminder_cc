@@ -25,16 +25,34 @@ CHECKER_CONFIG_FILE = os.environ.get("CHECKER_CONFIG_FILE", "/app/data/checker_c
 MQTT_BROKER_HOST = os.environ.get("MQTT_BROKER_HOST", "mosquitto")
 MQTT_BROKER_PORT = int(os.environ.get("MQTT_BROKER_PORT", 1883))
 MQTT_TOPIC_SUB = os.environ.get("MQTT_TOPIC", "cctv/#")
+MQTT_USER = os.environ.get("MQTT_USER", "")
+MQTT_PASS = os.environ.get("MQTT_PASS", "")
+
+# Broker tidak lagi menerima klien anonim (lihat mosquitto.conf).
+# Tanpa kredensial, koneksi akan ditolak dengan rc=5 (not authorised).
+if not MQTT_USER or not MQTT_PASS:
+    print(
+        "[WARN] MQTT_USER/MQTT_PASS kosong. Broker menolak koneksi anonim — "
+        "isi keduanya di file .env.",
+        flush=True,
+    )
 
 # ZoneMinder
 ZM_HOST = os.environ.get("ZM_HOST", "http://zoneminder:80")
 ZM_USER = os.environ.get("ZM_USER", "admin")
 ZM_PASS = os.environ.get("ZM_PASS", "admin")
 
-# Peringatan keras bila kredensial masih memakai default.
-# Nilai sebenarnya seharusnya datang dari file .env (lihat .env.example).
-if ZM_PASS == "admin":
-    print("[WARN] ZM_PASS masih 'admin' (default). Set ZM_PASS di file .env!", flush=True)
+# Peringatan bila password ZM belum diisi sama sekali.
+# Catatan: password "admin" TIDAK diperingatkan di sini. ZoneMinder yang di
+# deploy dengan ZM_OPT_USE_AUTH=1 memang memakai akun admin dengan password
+# awal "admin", dan dashboard mengelola kredensial yang sama dari halaman
+# Pengaturan. Peringatan lama memicu alarm palsu pada instalasi yang benar.
+if not ZM_PASS:
+    print(
+        "[WARN] ZM_PASS kosong. Isi kredensial ZoneMinder di halaman Pengaturan "
+        "dashboard, atau set ZM_PASS di file .env.",
+        flush=True,
+    )
 
 # Interval Pengecekan Kamera default (detik). 600 = 10 menit.
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", 600))
@@ -166,6 +184,20 @@ if hasattr(mqtt, "CallbackAPIVersion"):
 else:
     mqtt_client = mqtt.Client()
 
+# Broker menolak klien anonim; kredensial wajib dikirim saat handshake.
+if MQTT_USER:
+    mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS or None)
+
+
+# Kode balasan MQTT yang perlu diterjemahkan agar operator tahu penyebabnya.
+MQTT_RC_REASONS = {
+    1: "versi protokol tidak didukung",
+    2: "client id ditolak",
+    3: "broker tidak tersedia",
+    4: "username/password salah format",
+    5: "TIDAK DIIZINKAN — periksa MQTT_USER/MQTT_PASS di .env",
+}
+
 
 def on_mqtt_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -173,7 +205,8 @@ def on_mqtt_connect(client, userdata, flags, rc):
         client.subscribe(MQTT_TOPIC_SUB)
         print(f"[MQTT] Subscribed ke topik: '{MQTT_TOPIC_SUB}'", flush=True)
     else:
-        print(f"[MQTT ERROR] Gagal terhubung ke Broker MQTT, return code: {rc}", flush=True)
+        reason = MQTT_RC_REASONS.get(rc, "penyebab tidak diketahui")
+        print(f"[MQTT ERROR] Gagal terhubung ke Broker MQTT (rc={rc}): {reason}", flush=True)
 
 
 def on_mqtt_message(client, userdata, msg):
@@ -292,6 +325,32 @@ def update_monitor_function(monitor_id, new_function):
 # ==============================================================================
 # 4. RTSP CONNECTIVITY CHECKER
 # ==============================================================================
+def redact_rtsp_url(rtsp_url):
+    """Buang kredensial dari URL RTSP sebelum dipublikasikan.
+
+    Payload MQTT (cctv/events, cctv/status/<nama>) bisa dibaca siapa pun yang
+    memegang kredensial broker, dan URL asli memuat user:password kamera.
+    Bagian kredensial WAJIB dibuang sebelum dikirim; yang tersisa hanya
+    host:port agar operator tetap tahu kamera mana yang bermasalah.
+    """
+    if not rtsp_url:
+        return ""
+    text = str(rtsp_url)
+    if "@" not in text:
+        return text
+    if "//" not in text:
+        return "rtsp://<kredensial-dihilangkan>"
+
+    # rsplit: password boleh mengandung '@' (mis. P@ssw0rd). Pemisah yang
+    # benar adalah '@' TERAKHIR, karena bagian setelahnya selalu host.
+    scheme, _, rest = text.partition("//")
+    hostpart = rest.rsplit("@", 1)[-1]
+    if not hostpart or ":" not in hostpart and "." not in hostpart:
+        # Tidak ada host yang bisa dikenali — jangan tebak, buang seluruhnya.
+        return "rtsp://<kredensial-dihilangkan>"
+    return f"{scheme}//{hostpart}"
+
+
 def check_rtsp_online(rtsp_url, timeout=None):
     """
     Memeriksa keaktifan kamera melalui TCP Socket Ping ke Host & Port RTSP (default 554).
@@ -369,12 +428,15 @@ def perform_single_health_check(timeout_val=3.0):
                         else f"Kamera '{name}' TERPUTUS (OFFLINE)"
                     )
 
+                    # rtsp_url dipublikasikan TANPA kredensial: payload ini
+                    # disiarkan ke cctv/events dan cctv/status/<nama>, yang
+                    # bisa dibaca setiap klien broker.
                     event_payload = {
                         "timestamp": now_str,
                         "monitor_id": mon_id,
                         "name": name,
                         "status": status_str,
-                        "rtsp_url": path,
+                        "rtsp_url": redact_rtsp_url(path),
                         "message": msg_text
                     }
 

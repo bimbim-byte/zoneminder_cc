@@ -62,6 +62,16 @@
     }
     .btn-back:hover { background: rgba(255,255,255,0.22); }
 
+    /* Baris status koneksi ZoneMinder di bawah header bersama. */
+    .conn-strip {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 8px 24px; background: #fff; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .conn-note { font-size: 11.5px; color: var(--muted); }
+    .conn-note a { color: var(--primary); text-decoration: none; }
+    .conn-note a:hover { text-decoration: underline; }
+
     .main-layout {
       display: flex;
       flex-direction: column;
@@ -322,14 +332,15 @@
 </head>
 <body>
 
-  <header>
-    <h1>🛡️ ZoneMinder - Camera Registration & Management</h1>
-    <div class="header-actions">
-      <div id="authStatusHeader" class="badge badge-ok">Memeriksa API...</div>
-      <a href="/zm/" target="_blank" class="btn-back">🖥️ ZoneMinder Web (/zm/)</a>
-      <a href="index.html" class="btn-back">⬅ Portal</a>
-    </div>
-  </header>
+  <!-- Header navigasi bersama: tautan ZoneMinder ditonjolkan + tombol logout.
+       Status koneksi ZoneMinder ditampilkan tepat di bawah header. -->
+  <header id="dashHeader"></header>
+  <div class="conn-strip">
+    <span id="authStatusHeader" class="badge badge-ok">Memeriksa API ZoneMinder...</span>
+    <span class="conn-note">
+      Kredensial ZM dikelola di <a href="/settings">Pengaturan</a> dan tersimpan terenkripsi.
+    </span>
+  </div>
 
   <div class="main-layout">
     <!-- Top Grid Panels -->
@@ -498,113 +509,133 @@
   </div>
 
   <script>
-    const SERVER_HOST = window.location.origin;
-    // Kredensial TIDAK lagi ditulis di HTML. Diambil dari /api/config,
-    // yang membacanya dari environment ZM_USER / ZM_PASS (file .env).
-    const ZM_CONFIG = {
-        host: SERVER_HOST,
-        username: '',
-        password: ''
-    };
+    // =========================================================================
+    // KONFIGURASI AKSES ZONEMINDER
+    // =========================================================================
+    // ZM WEB UI ada di ALAMAT UTAMA server (https://<host>/zm/). URL itu
+    // dibuka lewat tab terpisah, bukan untuk panggilan fetch dari halaman ini.
+    //
+    // PENTING: panggilan API TIDAK boleh memakai '/zm/api'. Di port dashboard,
+    // Caddy punya aturan `handle /zm*` yang meneruskan permintaan LANGSUNG ke
+    // ZoneMinder, sehingga permintaan seperti itu melewati backend Flask —
+    // tidak ada autentikasi, tidak ada penyuntikan kredensial, dan ZM
+    // mengembalikan daftar kosong. Semua panggilan API karena itu diarahkan
+    // ke '/api/zm' (proxy backend) yang menangani login + session cookie ZM.
+    const ZM_API = '/api/zm';
+    const ZM_WEB = window.location.protocol + '//' + window.location.hostname + '/zm/';
 
-    async function loadRuntimeConfig() {
-        try {
-            const res = await fetch('/api/config');
-            const cfg = await res.json();
-            if (cfg.zm_user) ZM_CONFIG.username = cfg.zm_user;
-            if (cfg.zm_pass) ZM_CONFIG.password = cfg.zm_pass;
-        } catch (err) {
-            console.error('Gagal memuat konfigurasi runtime:', err);
-        }
-    }
-
-    let currentToken = sessionStorage.getItem('zm_token') || '';
     let existingIds = [];
     let cameraDataStore = {};
     let allMonitorsCache = [];
     let checkerConfig = { enabled: false, interval: 600 };
 
     // =========================================================================
-    // 1. AUTENTIKASI ZONEMINDER
+    // 1. STATUS KONEKSI ZONEMINDER
     // =========================================================================
-    async function authenticate() {
-        const headerBadge = document.getElementById('authStatusHeader');
-        if (headerBadge) {
-            headerBadge.className = "badge badge-paused";
-            headerBadge.innerText = "Authenticating...";
+    // Endpoint /api/zm/health.json diproksi backend: dia yang login ke ZM
+    // memakai kredensial tersimpan, lalu melaporkan hasilnya tanpa pernah
+    // mengekspos username/password ke browser.
+    async function checkZmConnection() {
+        const badge = document.getElementById('authStatusHeader');
+        if (badge) {
+            badge.className = 'badge badge-paused';
+            badge.innerText = 'Memeriksa koneksi ZoneMinder...';
         }
 
         try {
-            const loginUrl = `${ZM_CONFIG.host}/zm/api/host/login.json`;
-            const params = new URLSearchParams();
-            params.append('user', ZM_CONFIG.username);
-            params.append('pass', ZM_CONFIG.password);
+            const res = await fetch(`${ZM_API}/health.json`, { credentials: 'include' });
 
-            const res = await fetch(loginUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                credentials: 'include',
-                body: params.toString()
-            });
-
-            const data = await res.json().catch(() => ({}));
-
-            if (res.ok && data.access_token) {
-                currentToken = data.access_token;
-                sessionStorage.setItem('zm_token', currentToken);
-                
-                if (headerBadge) {
-                    headerBadge.className = "badge badge-ok";
-                    headerBadge.innerText = `Connected (ZM v${data.version || '1.36'})`;
+            if (res.status === 401) {
+                if (badge) {
+                    badge.className = 'badge badge-err';
+                    badge.innerText = 'Sesi dashboard berakhir';
                 }
-                return currentToken;
-            } else if (res.ok && (data.version || res.status === 200)) {
-                currentToken = data.access_token || "session-active";
-                if (headerBadge) {
-                    headerBadge.className = "badge badge-ok";
-                    headerBadge.innerText = `Connected (ZM v${data.version || '1.36'})`;
-                }
-                return currentToken;
-            } else {
-                if (headerBadge) {
-                    headerBadge.className = "badge badge-err";
-                    headerBadge.innerText = "Auth Failed";
-                }
-                return null;
+                return false;
             }
+
+            // 403 = password default belum diganti. Tanpa penanganan khusus,
+            // res.json() tetap jalan tetapi payloadnya bukan data kesehatan ZM,
+            // sehingga badge menampilkan pesan yang menyesatkan.
+            if (res.status === 403) {
+                if (badge) {
+                    badge.className = 'badge badge-err';
+                    badge.innerText = 'Ganti password dashboard terlebih dahulu';
+                }
+                return false;
+            }
+
+            if (!res.ok) {
+                if (badge) {
+                    badge.className = 'badge badge-err';
+                    badge.innerText = 'Backend mengembalikan HTTP ' + res.status;
+                }
+                return false;
+            }
+
+            // Bila Caddy/backend membalas HTML (mis. halaman error), res.json()
+            // melempar. Diperlakukan sebagai kegagalan koneksi, bukan crash.
+            const data = await res.json().catch(() => null);
+            if (!data) {
+                if (badge) {
+                    badge.className = 'badge badge-err';
+                    badge.innerText = 'Respons backend tidak dikenali';
+                }
+                return false;
+            }
+
+            if (data.connected) {
+                if (badge) {
+                    badge.className = 'badge badge-ok';
+                    badge.innerText = 'Terhubung ke ZoneMinder v' + (data.version || '1.36');
+                }
+                return true;
+            }
+
+            if (badge) {
+                badge.className = 'badge badge-err';
+                badge.innerText = data.message || 'Gagal terhubung ke ZoneMinder';
+            }
+            return false;
         } catch (err) {
-            console.error('Auth Error:', err);
-            if (headerBadge) {
-                headerBadge.className = "badge badge-err";
-                headerBadge.innerText = "Connection Error";
+            console.error('Gagal memeriksa koneksi ZM:', err);
+            if (badge) {
+                badge.className = 'badge badge-err';
+                badge.innerText = 'Kesalahan jaringan';
             }
-            return null;
+            return false;
         }
     }
 
+    // Semua permintaan ke ZM lewat proxy backend (relatif terhadap origin).
+    // Backend menangani autentikasi & cookie sesi ZM.
     async function fetchWithAutoAuth(url, options = {}) {
-        if (!currentToken) await authenticate();
-        
         options.credentials = 'include';
-        let delimiter = url.includes('?') ? '&' : '?';
-        let authenticatedUrl = currentToken && currentToken !== 'session-active'
-            ? `${url}${delimiter}token=${currentToken}`
-            : url;
-
-        let response = await fetch(authenticatedUrl, options);
+        const response = await fetch(url, options);
 
         if (response.status === 401) {
-            const newToken = await authenticate();
-            if (newToken && newToken !== 'session-active') {
-                const base = url.split('?')[0];
-                const query = url.includes('?') ? url.substring(url.indexOf('?') + 1) : '';
-                const cleanQuery = query.replace(/(^|&)token=[^&]*/g, '').replace(/^&/, '');
-                const sep = cleanQuery ? '?' + cleanQuery + '&' : '?';
-                authenticatedUrl = `${base}${sep}token=${newToken}`;
-                response = await fetch(authenticatedUrl, options);
-            }
+            // Sesi dashboard kedaluwarsa -> kembali ke halaman login.
+            window.location.href = '/login';
+            throw new Error('Sesi dashboard berakhir. Silakan login ulang.');
         }
+
+        // 403 = password default belum diganti; backend memblokir seluruh API.
+        if (response.status === 403) {
+            window.location.href = '/settings?force=1';
+            throw new Error('Password default masih dipakai. Ganti password terlebih dahulu.');
+        }
+
         return response;
+    }
+
+    // Baca JSON dengan aman: bila backend/Caddy membalas HTML (halaman error),
+    // jangan biarkan res.json() melempar "Unexpected token <" yang membingungkan.
+    async function readJson(response, fallbackMessage) {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (err) {
+            throw new Error(fallbackMessage + ' (HTTP ' + response.status + ')');
+        }
     }
 
     // =========================================================================
@@ -616,9 +647,12 @@
         if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--primary);">Memuat data kamera...</td></tr>';
 
         try {
-            const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors.json`);
-            const data = await res.json();
-            
+            const res = await fetchWithAutoAuth(`${ZM_API}/monitors.json`);
+            if (!res.ok) {
+                throw new Error('Backend mengembalikan HTTP ' + res.status);
+            }
+            const data = await readJson(res, 'Respons backend tidak dikenali');
+
             existingIds = [];
             cameraDataStore = {};
             allMonitorsCache = [];
@@ -715,7 +749,7 @@
         params.append('Monitor[Function]', selectedFn);
         params.append('Monitor[Enabled]', selectedFn === 'None' ? '0' : '1');
 
-        const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors/${id}.json`, {
+        const res = await fetchWithAutoAuth(`${ZM_API}/monitors/${id}.json`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params.toString()
@@ -729,7 +763,7 @@
         params.append('Monitor[Function]', 'None');
         params.append('Monitor[Enabled]', '0');
 
-        const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors/${id}.json`, {
+        const res = await fetchWithAutoAuth(`${ZM_API}/monitors/${id}.json`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params.toString()
@@ -901,9 +935,13 @@
         params.append('Monitor[TargetColorspace]', '4');
         params.append('Monitor[ServerId]', '0');
 
-        let targetUrl = originalId 
-            ? `${ZM_CONFIG.host}/zm/api/monitors/${originalId}.json`
-            : `${ZM_CONFIG.host}/zm/api/monitors.json`;
+        // WAJIB diawali ZM_API: URL tanpa prefix akan dijawab aplikasi Flask
+        // sebagai permintaan berkas statis (404), bukan diteruskan ke
+        // ZoneMinder. Save/update kamera akan selalu gagal bila prefix ini
+        // hilang.
+        let targetUrl = originalId
+            ? `${ZM_API}/monitors/${originalId}.json`
+            : `${ZM_API}/monitors.json`;
 
         if (!originalId && inputId) {
             params.append('Monitor[Id]', inputId);
@@ -945,7 +983,7 @@
     async function deleteCamera(id) {
         if (!confirm(`Apakah Anda yakin ingin menghapus kamera ID ${id}?`)) return;
         try {
-            const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/monitors/${id}.json`, { method: 'DELETE' });
+            const res = await fetchWithAutoAuth(`${ZM_API}/monitors/${id}.json`, { method: 'DELETE' });
             if (res.ok) {
                 alert(`Kamera ID ${id} berhasil dihapus.`);
                 loadCameras();
@@ -960,8 +998,11 @@
     async function checkCpuLoad() {
         const textEl = document.getElementById('cpuLoadText');
         try {
-            const res = await fetchWithAutoAuth(`${ZM_CONFIG.host}/zm/api/host/getLoad.json`);
-            const data = await res.json();
+            const res = await fetchWithAutoAuth(`${ZM_API}/host/getLoad.json`);
+            if (!res.ok) {
+                throw new Error('HTTP ' + res.status);
+            }
+            const data = await readJson(res, 'Respons load tidak dikenali');
             if (textEl && data.load) {
                 textEl.value = `1m: ${data.load[0]} | 5m: ${data.load[1]}`;
             }
@@ -1099,9 +1140,14 @@
     // =========================================================================
     // INITIALIZATION
     // =========================================================================
+    // Catatan: halaman ini TIDAK memanggil loadRuntimeConfig() maupun
+    // authenticate(). Kedua fungsi itu tidak pernah ada di berkas ini; sisa
+    // dari versi lama yang memakai kredensial di sisi browser. Memanggilnya
+    // melempar ReferenceError dan MENGHENTIKAN seluruh blok init, sehingga
+    // daftar kamera tidak pernah dimuat (hanya menyisakan teks "Memuat data
+    // kamera dari ZoneMinder..." di tabel).
     document.addEventListener('DOMContentLoaded', async () => {
-        await loadRuntimeConfig();
-        await authenticate();
+        await checkZmConnection();
         await loadCameras();
         await loadCheckerConfig();
         checkCpuLoad();
@@ -1109,5 +1155,6 @@
         setInterval(loadCheckerConfig, 10000);
     });
 </script>
+<script src="app_shell.js"></script>
 </body>
 </html>

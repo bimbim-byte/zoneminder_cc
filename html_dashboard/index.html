@@ -127,27 +127,27 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>🛡️ ZoneMinder CCTV Portal</h1>
-    <p>Pusat Manajemen NVR ZoneMinder, Pendaftaran Kamera RTSP & Monitoring Status MQTT</p>
-  </header>
+  <!-- Header navigasi bersama: tautan ZoneMinder ditonjolkan + tombol logout -->
+  <header id="dashHeader"></header>
 
   <div class="container">
     <div class="portal-grid">
-      <!-- Card 1: Official ZoneMinder Web Console -->
-      <a href="/zm/" target="_blank" class="portal-card" style="border-top-color: #0284c7;">
+      <!-- Card 1: Official ZoneMinder Web Console.
+           ZM berada di ALAMAT UTAMA server, jadi tautan disusun dari hostname
+           yang sedang dipakai (tanpa path /zm/ dan tanpa hardcode IP). -->
+      <a href="/zm/" target="_blank" rel="noopener" class="portal-card" id="zmCard" style="border-top-color: #0284c7;">
         <div>
-          <div class="icon" style="background: #e0f2fe;">🖥️</div>
+          <div class="icon" style="background: #e0f2fe;">&#128421;&#65039;</div>
           <div class="title">ZoneMinder Web Console</div>
-          <div class="desc">Akses antarmuka resmi ZoneMinder NVR untuk konfigurasi server, storage, motion detection zones, dan live stream view.</div>
+          <div class="desc">Antarmuka resmi ZoneMinder NVR untuk konfigurasi server, storage, motion detection zones, dan live stream view. Berada di alamat utama server ini.</div>
         </div>
-        <div class="btn-enter" style="background: #0284c7;">Buka ZoneMinder (/zm/) &rarr;</div>
+        <div class="btn-enter" style="background: #0284c7;">Buka ZoneMinder &rarr;</div>
       </a>
 
       <!-- Card 2: ZoneMinder Camera Manager -->
       <a href="zoneminder.html" class="portal-card" style="border-top-color: #16a34a;">
         <div>
-          <div class="icon" style="background: #f0fdf4;">🛡️</div>
+          <div class="icon" style="background: #f0fdf4;">&#128737;&#65039;</div>
           <div class="title">Kelola Monitor ZoneMinder</div>
           <div class="desc">Lihat daftar kamera terdaftar, edit nama/resolusi/fungsi, quick-toggle status ON/OFF, serta kendali CCTV health checker.</div>
         </div>
@@ -157,7 +157,7 @@
       <!-- Card 3: Single Camera Add -->
       <a href="add_camera.html" class="portal-card" style="border-top-color: #2563eb;">
         <div>
-          <div class="icon" style="background: #eff6ff;">➕</div>
+          <div class="icon" style="background: #eff6ff;">&#10133;</div>
           <div class="title">Tambah Kamera Tunggal</div>
           <div class="desc">Daftarkan kamera CCTV baru secara instan langsung dengan memasukkan alamat stream RTSP ke ZoneMinder.</div>
         </div>
@@ -167,7 +167,7 @@
       <!-- Card 4: Upgraded Burst Add -->
       <a href="burst.html" class="portal-card" style="border-top-color: #7c3aed;">
         <div>
-          <div class="icon" style="background: #f5f3ff;">🚀</div>
+          <div class="icon" style="background: #f5f3ff;">&#128640;</div>
           <div class="title">Burst Add Massal (Upgraded)</div>
           <div class="desc">Daftarkan puluhan kamera CCTV sekaligus melalui Quick Paste daftar RTSP atau impor template berkas Excel (.xlsx).</div>
         </div>
@@ -177,27 +177,40 @@
       <!-- Card 5: MQTT Live Log & Notification Center -->
       <a href="log_display.html" class="portal-card" style="border-top-color: #d97706;">
         <div>
-          <div class="icon" style="background: #fffbeb;">📡</div>
+          <div class="icon" style="background: #fffbeb;">&#128225;</div>
           <div class="title">Live MQTT Monitor Log</div>
           <div class="desc">Pantau status online/offline CCTV secara real-time, atur delay interval checker, dan panduan notifikasi MQTT ke HP/device lain.</div>
         </div>
         <div class="btn-enter" style="background: #d97706;">Lihat Status MQTT &rarr;</div>
       </a>
 
-      <!-- Card 6: Wall Dashboard (Camera Grid) -->
-      <a href="/wall" class="portal-card" style="border-top-color: #0891b2;">
+      <!-- Card 6: Pengaturan Dashboard -->
+      <a href="/settings" class="portal-card" style="border-top-color: #0f172a;">
         <div>
-          <div class="icon" style="background: #ecfeff;">🖥️</div>
-          <div class="title">Wall Dashboard (Grid Kamera)</div>
-          <div class="desc">Tampilan grid live stream kamera. Pilih seluruh kamera atau sebagian group (multi-group), atur jumlah kolom, rasio, dan resolusi sesuai kebutuhan.</div>
+          <div class="icon" style="background: #f1f5f9;">&#9881;&#65039;</div>
+          <div class="title">Pengaturan &amp; Kredensial</div>
+          <div class="desc">Rotasi username/password ZoneMinder tanpa mengedit kode (tersimpan terenkripsi), uji koneksi, dan ganti password dashboard.</div>
         </div>
-        <div class="btn-enter" style="background: #0891b2;">Buka Wall Dashboard &rarr;</div>
+        <div class="btn-enter" style="background: #0f172a;">Buka Pengaturan &rarr;</div>
       </a>
     </div>
   </div>
 
   <footer>
-    ZoneMinder CCTV Management Hub &mdash; Powered by ZoneMinder, Mosquitto & Caddy HTTPS
+    CCTV Management Dashboard &mdash; halaman ini hanya tersedia di port dashboard,
+    terpisah dari ZoneMinder di alamat utama.
   </footer>
+
+  <script src="app_shell.js"></script>
+  <script>
+    // Tautan ZoneMinder mengikuti hostname yang sedang dipakai, sehingga tidak
+    // ada alamat/IP yang perlu diubah saat server berpindah jaringan.
+    (function () {
+      var card = document.getElementById('zmCard');
+      if (card) {
+        card.href = window.location.protocol + '//' + window.location.hostname + '/zm/';
+      }
+    })();
+  </script>
 </body>
 </html>

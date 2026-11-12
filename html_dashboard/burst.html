@@ -217,20 +217,29 @@
       font-size: 11px;
       font-weight: bold;
     }
-  </style>
+      /* Toolbar aksi halaman, di bawah header bersama. */
+    .page-toolbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 9px 24px; background: #fff;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .page-toolbar .toolbar-info {
+      font-size: 12.5px; color: var(--muted); font-weight: 600;
+    }
+    .page-toolbar .btn { height: 30px; font-size: 12px; padding: 0 12px; }
+
+</style>
 </head>
 <body>
 
-  <header>
-    <h1>🚀 ZoneMinder - Upgraded Burst Add CCTV</h1>
-    <div class="header-actions">
-      <div id="summaryCounter" style="font-size: 13px; opacity: .9;">Total: 0 Kamera</div>
-      <button id="btnSubmitAll" class="btn btn-success" disabled onclick="executeBurstAdd()">
-        ⚡ Daftarkan Semua ke ZoneMinder
-      </button>
-      <a href="index.html" class="btn-back">⬅ Portal</a>
-    </div>
-  </header>
+  <!-- Header navigasi bersama: tautan ZoneMinder ditonjolkan + tombol logout -->
+  <header id="dashHeader"></header>
+  <div class="page-toolbar">
+    <span class="toolbar-info" id="summaryCounter">Total: 0 Kamera</span>
+    <button id="btnSubmitAll" class="btn btn-success" disabled onclick="executeBurstAdd()">
+      &#9889; Daftarkan Semua ke ZoneMinder
+    </button>
+  </div>
 
   <div class="main-layout">
     <!-- Tabs -->
@@ -535,6 +544,7 @@
       }
     }
   </script>
+  <script src="app_shell.js"></script>
 </body>
 </html>
 

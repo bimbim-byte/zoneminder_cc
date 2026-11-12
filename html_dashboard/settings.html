@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pengaturan - CCTV Management Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+    body {
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .container { width: min(920px, calc(100% - 32px)); margin: 26px auto 60px; }
+
+    .banner {
+      padding: 14px 18px; border-radius: 10px; margin-bottom: 20px;
+      font-size: 13.5px; line-height: 1.6;
+      background: #fffbeb; border: 1px solid #fcd34d; border-left: 4px solid var(--warning);
+      color: #78350f; display: none;
+    }
+    .banner.show { display: block; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.03); overflow: hidden;
+    }
+    .card-header {
+      padding: 15px 20px; border-bottom: 1px solid var(--border);
+      background: #fdfdfe; font-weight: 700; font-size: 14.5px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .card-body { padding: 20px; }
+
+    .status-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px; margin-bottom: 18px;
+    }
+    .status-box {
+      background: #f8fafc; border: 1px solid var(--border);
+      border-radius: 9px; padding: 12px 14px;
+    }
+    .status-box .lbl {
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted); margin-bottom: 5px;
+    }
+    .status-box .val { font-size: 13.5px; font-weight: 600; word-break: break-all; }
+    .val.ok { color: var(--success); }
+    .val.warn { color: var(--warning); }
+    .val.err { color: var(--danger); }
+
+    .form-group { margin-bottom: 15px; }
+    .form-group label {
+      display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%; height: 40px; padding: 0 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13.5px; color: var(--text); background: #fff;
+      outline: none; transition: border-color .18s, box-shadow .18s;
+    }
+    .form-control:focus {
+      border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+    }
+    .form-hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+
+    .row { display: flex; gap: 14px; flex-wrap: wrap; }
+    .row > .col { flex: 1; min-width: 210px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      height: 38px; padding: 0 16px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: filter .18s;
+    }
+    .btn:hover { filter: brightness(1.06); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-outline { background: #fff; color: var(--text); border: 1px solid var(--border); }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+    .msg {
+      margin-top: 14px; padding: 11px 14px; border-radius: 8px;
+      font-size: 12.5px; line-height: 1.6; display: none;
+    }
+    .msg.show { display: block; }
+    .msg.ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .msg.err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .msg.info { background: #f8fafc; border: 1px solid var(--border); color: var(--text); }
+
+    .danger-zone {
+      border: 1px solid #fecaca; background: #fffbfb;
+      border-radius: 10px; padding: 14px 16px; margin-top: 6px;
+      font-size: 12.5px; line-height: 1.65; color: #7f1d1d;
+    }
+    code {
+      background: #f1f5f9; color: #0f172a;
+      padding: 1px 5px; border-radius: 4px; font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header navigasi bersama (lihat app_shell.js) -->
+  <header id="dashHeader"></header>
+
+  <div class="container">
+    <div class="banner" id="forceBanner">
+      <b>&#128273; Wajib ganti password.</b>
+      Anda masih memakai password default dashboard. Ganti password di bagian
+      <b>Akun Dashboard</b> di bawah sebelum memakai halaman lain.
+      Halaman lain akan mengarahkan Anda kembali ke sini sampai password diganti.
+    </div>
+
+    <!-- BAGIAN 1: STATUS -->
+    <div class="card">
+      <div class="card-header">
+        <span>&#128202; Status Sistem</span>
+        <button class="btn btn-outline" onclick="loadStatus()">&#8635; Refresh</button>
+      </div>
+      <div class="card-body">
+        <div class="status-grid">
+          <div class="status-box">
+            <div class="lbl">Akun Dashboard</div>
+            <div class="val" id="stDashUser">-</div>
+          </div>
+          <div class="status-box">
+            <div class="lbl">Penyimpanan Kredensial</div>
+            <div class="val" id="stSource">-</div>
+          </div>
+          <div class="status-box">
+            <div class="lbl">User ZoneMinder</div>
+            <div class="val" id="stZmUser">-</div>
+          </div>
+          <div class="status-box">
+            <div class="lbl">Password ZoneMinder</div>
+            <div class="val" id="stZmPass">-</div>
+          </div>
+        </div>
+        <div class="form-hint" id="stNote"></div>
+      </div>
+    </div>
+
+    <!-- BAGIAN 2: KREDENSIAL ZONEMINDER -->
+    <div class="card">
+      <div class="card-header">
+        <span>&#127760; Kredensial ZoneMinder</span>
+        <span id="encBadge" style="font-size:11px; font-weight:600; color:var(--muted);"></span>
+      </div>
+      <div class="card-body">
+        <p style="font-size:12.5px; color:var(--muted); line-height:1.65; margin-bottom:16px;">
+          Username dan password ZoneMinder disimpan <b>terenkripsi (AES-256-GCM)</b> di
+          <code>data/zm_credentials.enc</code> dengan kunci dari <code>DASH_SECRET_KEY</code>.
+          Setelah disimpan, dashboard memakai nilai ini &mdash; tidak perlu mengedit kode
+          atau <code>.env</code> lagi saat password ZM berganti.
+        </p>
+
+        <div class="row">
+          <div class="col form-group">
+            <label for="zmUser">Username ZoneMinder</label>
+            <input type="text" id="zmUser" class="form-control" placeholder="admin" autocomplete="off">
+          </div>
+          <div class="col form-group">
+            <label for="zmPass">Password ZoneMinder</label>
+            <input type="password" id="zmPass" class="form-control" placeholder="Masukkan password ZM" autocomplete="new-password">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-primary" id="btnTest" onclick="testConnection()">&#128225; Test Connection</button>
+          <button class="btn btn-success" id="btnSaveZm" onclick="saveCredentials()">&#128190; Simpan Kredensial</button>
+        </div>
+
+        <div class="msg" id="zmMsg"></div>
+
+        <div class="danger-zone" style="margin-top:16px;">
+          <b>Urutan yang benar saat mengganti password ZoneMinder:</b>
+          <ol style="margin:8px 0 0 18px;">
+            <li>Ganti password di <b>ZoneMinder</b> lebih dulu (UI: Options &rarr; Users, atau SQL).</li>
+            <li>Uji kredensial baru dengan tombol <b>Test Connection</b> di atas.</li>
+            <li>Klik <b>Simpan Kredensial</b>.</li>
+            <li>Untuk service checker, jalankan <code>docker compose up -d</code> agar
+                <code>ZM_USER</code>/<code>ZM_PASS</code> di <code>.env</code> ikut diperbarui.</li>
+          </ol>
+          Jika Anda menyimpan kredensial yang salah, dashboard akan gagal memuat daftar
+          kamera. Uji dulu dengan <b>Test Connection</b> untuk menghindari kondisi itu.
+        </div>
+      </div>
+    </div>
+
+    <!-- BAGIAN 3: AKUN DASHBOARD -->
+    <div class="card">
+      <div class="card-header">
+        <span>&#128274; Akun Dashboard</span>
+        <span id="pwdAgeBadge" style="font-size:11px; font-weight:600; color:var(--muted);"></span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="curPass">Password saat ini</label>
+          <input type="password" id="curPass" class="form-control" autocomplete="current-password">
+        </div>
+        <div class="row">
+          <div class="col form-group">
+            <label for="newPass">Password baru</label>
+            <input type="password" id="newPass" class="form-control" autocomplete="new-password">
+            <div class="form-hint">Minimal 8 karakter, tidak boleh hanya angka.</div>
+          </div>
+          <div class="col form-group">
+            <label for="confirmPass">Ulangi password baru</label>
+            <input type="password" id="confirmPass" class="form-control" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="hintInput">Petunjuk password (opsional)</label>
+          <input type="text" id="hintInput" class="form-control" maxlength="200"
+                 placeholder="Contoh: kombinasi nama proyek + nomor unit">
+          <div class="form-hint">
+            Petunjuk ini disimpan apa adanya dan ditampilkan kembali di halaman ini.
+            Jangan menuliskan passwordnya sendiri di sini.
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-primary" id="btnChangePw" onclick="changePassword()">&#128273; Ganti Password</button>
+        </div>
+
+        <div class="msg" id="pwMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app_shell.js"></script>
+  <script>
+    function showMsg(elId, text, kind) {
+      var el = document.getElementById(elId);
+      el.className = 'msg show ' + (kind || 'info');
+      el.innerHTML = text;
+    }
+
+    function fmtEpoch(ts) {
+      if (!ts) return null;
+      try { return new Date(ts * 1000).toLocaleString(); } catch (e) { return null; }
+    }
+
+    async function loadStatus() {
+      try {
+        var res = await fetch('/api/settings/status');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        var data = await res.json();
+
+        document.getElementById('stDashUser').innerText =
+          data.dashboard_display_name || data.dashboard_user || '-';
+
+        var zm = data.zm || {};
+        var srcEl = document.getElementById('stSource');
+        var srcMap = {
+          'encrypted': 'Terenkripsi (brankas)',
+          'env': 'File .env / environment'
+        };
+        srcEl.innerText = srcMap[zm.source] || zm.source || '-';
+        srcEl.className = 'val ' + (zm.source === 'encrypted' ? 'ok' : 'warn');
+
+        document.getElementById('stZmUser').innerText = zm.user || '-';
+
+        var passEl = document.getElementById('stZmPass');
+        if (zm.has_password) {
+          passEl.innerText = zm.password_preview || '(tersimpan)';
+          passEl.className = 'val ok';
+        } else {
+          passEl.innerText = 'Belum diatur';
+          passEl.className = 'val err';
+        }
+
+        var enc = document.getElementById('encBadge');
+        enc.innerText = zm.encryption ? 'Enkripsi aktif (AES-256-GCM)' : 'Enkripsi tidak tersedia';
+        enc.style.color = zm.encryption ? '#16a34a' : '#dc2626';
+
+        var notes = [];
+        if (zm.updated_at) {
+          notes.push('Terakhir diperbarui: ' + (fmtEpoch(zm.updated_at) || zm.updated_at)
+            + (zm.updated_by ? ' oleh ' + zm.updated_by : ''));
+        }
+        if (zm.error) notes.push('Peringatan: ' + zm.error);
+        if (zm.source !== 'encrypted') {
+          notes.push('Kredensial masih dibaca dari environment. Simpan di formulir bawah ' +
+            'agar tersimpan terenkripsi dan dapat dirotasi dari dashboard.');
+        }
+        document.getElementById('stNote').innerText = notes.join(' ');
+
+        if (!document.getElementById('zmUser').value) {
+          document.getElementById('zmUser').value = zm.user || '';
+        }
+
+        var force = new URLSearchParams(window.location.search).get('force') === '1'
+          || data.must_change_password;
+        if (force) document.getElementById('forceBanner').classList.add('show');
+
+        if (data.dashboard_hint) {
+          document.getElementById('hintInput').value = data.dashboard_hint;
+        }
+        var changed = data.password_changed_at
+          ? fmtEpoch(data.password_changed_at) : null;
+        document.getElementById('pwdAgeBadge').innerText =
+          changed ? 'Terakhir diubah: ' + changed : 'Masih memakai password default';
+      } catch (e) {
+        showMsg('zmMsg', 'Gagal memuat status: ' + e.message, 'err');
+      }
+    }
+
+    async function testConnection() {
+      var btn = document.getElementById('btnTest');
+      btn.disabled = true;
+      var original = btn.innerHTML;
+      btn.innerHTML = 'Menguji...';
+
+      try {
+        var res = await fetch('/api/settings/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            zm_user: document.getElementById('zmUser').value.trim(),
+            zm_pass: document.getElementById('zmPass').value
+          })
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+
+        var data = await res.json();
+        var t = data.test || {};
+        var ok = t.authenticated;
+        showMsg('zmMsg',
+          (ok ? '[OK] ' : '[GAGAL] ') + (t.message || 'Tidak ada keterangan.'),
+          ok ? 'ok' : 'err');
+      } catch (e) {
+        showMsg('zmMsg', 'Gagal menguji koneksi: ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    }
+
+    async function saveCredentials() {
+      var user = document.getElementById('zmUser').value.trim();
+      var pass = document.getElementById('zmPass').value;
+
+      if (!user || !pass) {
+        return showMsg('zmMsg', 'Username dan password ZoneMinder wajib diisi.', 'err');
+      }
+
+      var btn = document.getElementById('btnSaveZm');
+      btn.disabled = true;
+      var original = btn.innerHTML;
+      btn.innerHTML = 'Menyimpan...';
+
+      try {
+        var res = await fetch('/api/settings/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ zm_user: user, zm_pass: pass })
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+
+        var data = await res.json();
+        if (data.status === 'success') {
+          var t = data.test || {};
+          var html = '[OK] ' + data.message;
+          html += '<br><b>Hasil uji:</b> ' + (t.message || '-');
+          showMsg('zmMsg', html, t.authenticated ? 'ok' : 'info');
+          document.getElementById('zmPass').value = '';
+          await loadStatus();
+        } else {
+          showMsg('zmMsg', '[GAGAL] ' + (data.message || 'Gagal menyimpan.'), 'err');
+        }
+      } catch (e) {
+        showMsg('zmMsg', 'Gagal menyimpan: ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    }
+
+    async function changePassword() {
+      var cur = document.getElementById('curPass').value;
+      var nw = document.getElementById('newPass').value;
+      var cf = document.getElementById('confirmPass').value;
+
+      if (!cur || !nw || !cf) {
+        return showMsg('pwMsg', 'Semua kolom password wajib diisi.', 'err');
+      }
+      if (nw !== cf) {
+        return showMsg('pwMsg', 'Konfirmasi password tidak sama.', 'err');
+      }
+      if (nw.length < 8) {
+        return showMsg('pwMsg', 'Password baru minimal 8 karakter.', 'err');
+      }
+
+      var btn = document.getElementById('btnChangePw');
+      btn.disabled = true;
+      var original = btn.innerHTML;
+      btn.innerHTML = 'Memproses...';
+
+      try {
+        var res = await fetch('/api/settings/password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            current_password: cur,
+            new_password: nw,
+            confirm_password: cf,
+            hint: document.getElementById('hintInput').value
+          })
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+
+        var data = await res.json();
+        if (data.status === 'success') {
+          showMsg('pwMsg', '[OK] ' + data.message, 'ok');
+          document.getElementById('curPass').value = '';
+          document.getElementById('newPass').value = '';
+          document.getElementById('confirmPass').value = '';
+          document.getElementById('forceBanner').classList.remove('show');
+          await loadStatus();
+        } else {
+          showMsg('pwMsg', '[GAGAL] ' + (data.message || 'Gagal mengganti password.'), 'err');
+        }
+      } catch (e) {
+        showMsg('pwMsg', 'Gagal mengganti password: ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadStatus);
+  </script>
+</body>
+</html>

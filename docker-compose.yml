@@ -15,6 +15,7 @@ services:
       - "${CADDY_HTTP_PORT:-80}:80"
       - "${CADDY_HTTPS_PORT:-443}:443"
       - "${CADDY_HTTPS_PORT:-443}:443/udp" # HTTP/3 (QUIC) support
+      - "${DASHBOARD_HTTPS_PORT:-9443}:9443" # Dashboard manajemen (terpisah dari root)
     volumes:
       - ./caddy:/etc/caddy:ro
       - caddy_data:/data
@@ -48,8 +49,14 @@ services:
         soft: 65536
         hard: 65536
 
-    ports:
-      - "${ZONEMINDER_PORT:-8082}:80" # Akses langsung port ZoneMinder
+    # PENTING: port ZM TIDAK lagi dipublikasikan ke host.
+    # Sebelumnya "${ZONEMINDER_PORT:-8082}:80" mengikat 0.0.0.0:8082 dan
+    # memberi jalur bypass langsung ke ZoneMinder (melewati HTTPS + login).
+    # Semua akses ZM sekarang lewat Caddy: https://<server>/  (publik)
+    # dan https://<server>:9443/zm/ (dari dashboard).
+    # Untuk debugging internal: "docker exec zoneminder curl -s localhost/zm/".
+    expose:
+      - "80"
 
     environment:
       - TZ=Asia/Jakarta
@@ -73,15 +80,27 @@ services:
     container_name: camera-dashboard
     restart: always
 
-    ports:
-      - "${DASHBOARD_PORT:-8080}:8080" # Akses langsung port dashboard
+    # PENTING: port dashboard TIDAK dipublikasikan ke host.
+    # Sebelumnya "${DASHBOARD_PORT:-8080}:8080" mengikat 0.0.0.0:8080 dan
+    # menjadi jalur bypass yang melewati HTTPS + login (semua endpoint API,
+    # termasuk pembaca konfigurasi, bisa dipanggil langsung).
+    # Dashboard kini HANYA dapat dijangkau lewat Caddy pada port 9443.
+    # Gunakan "docker exec camera-dashboard ..." untuk debugging internal.
+    expose:
+      - "8080"
 
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8080
       - ZM_HOST=http://zoneminder:80
-      - ZM_USER=${ZM_USER:?ZM_USER belum diisi di file .env}
-      - ZM_PASS=${ZM_PASS:?ZM_PASS belum diisi di file .env}
+      # Kredensial ZM: dashboard mengelolanya sendiri lewat
+      # data/zm_credentials.enc (lihat Pengaturan). Dua variabel di bawah
+      # hanya dipakai sebagai nilai AWAL saat file itu belum ada.
+      - ZM_USER=${ZM_USER:-admin}
+      - ZM_PASS=${ZM_PASS:-}
+      - DASH_SECRET_KEY=${DASH_SECRET_KEY:?DASH_SECRET_KEY belum diisi di file .env}
+      - ZM_CREDENTIALS_FILE=/app/data/zm_credentials.enc
+      - DASH_USERS_FILE=/app/data/dashboard_users.json
       - MQTT_LOG_FILE=/app/data/mqtt_logs.json
       - WSGI_THREADS=${WSGI_THREADS:-64}
 
@@ -109,6 +128,9 @@ services:
 
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      # File password wajib ada: allow_anonymous=false di mosquitto.conf
+      # akan membuat broker GAGAL START bila file ini tidak ditemukan.
+      - ./mosquitto_config/passwd:/mosquitto/config/passwd:ro
 
     networks:
       - cctv_net
@@ -128,6 +150,10 @@ services:
       - MQTT_BROKER_HOST=mosquitto
       - MQTT_BROKER_PORT=1883
       - MQTT_TOPIC=cctv/#
+      # Broker menolak koneksi anonim. Nilai harus sama dengan user yang
+      # dibuat di ./mosquitto_config/passwd.
+      - MQTT_USER=${MQTT_USER:-cctv}
+      - MQTT_PASS=${MQTT_PASS:?MQTT_PASS belum diisi di file .env}
       - ZM_HOST=http://zoneminder:80
       - ZM_USER=${ZM_USER:?ZM_USER belum diisi di file .env}
       - ZM_PASS=${ZM_PASS:?ZM_PASS belum diisi di file .env}

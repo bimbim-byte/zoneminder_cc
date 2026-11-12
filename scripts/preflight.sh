@@ -68,6 +68,20 @@ if [ -f .env ]; then
     else
         pass "ZM_PASS terisi (panjang ${#ZM_PASS_VAL} karakter)"
     fi
+
+    # DASH_SECRET_KEY: dipakai untuk menandatangani sesi login DAN menurunkan
+    # kunci enkripsi brankas kredensial (data/zm_credentials.enc).
+    DASH_KEY_VAL="$(grep -E '^DASH_SECRET_KEY=' .env | tail -1 | cut -d= -f2- | tr -d '\r' | sed 's/[[:space:]]*$//' || true)"
+
+    if [ -z "${DASH_KEY_VAL:-}" ]; then
+        fail "DASH_SECRET_KEY kosong di .env (wajib: sesi login + enkripsi kredensial)"
+    elif [ "$DASH_KEY_VAL" = "ganti_dengan_kunci_acak_32_byte_base64" ]; then
+        fail "DASH_SECRET_KEY masih nilai contoh. Buat kunci: head -c 32 /dev/urandom | base64"
+    elif [ "${#DASH_KEY_VAL}" -lt 24 ]; then
+        warn "DASH_SECRET_KEY pendek (${#DASH_KEY_VAL} karakter). Disarankan 32 byte acak."
+    else
+        pass "DASH_SECRET_KEY terisi (panjang ${#DASH_KEY_VAL} karakter)"
+    fi
 else
     if [ -f .env.example ]; then
         fail "file .env BELUM ADA. Jalankan: cp .env.example .env"
@@ -100,12 +114,12 @@ fi
 
 # ---------------------------------------------------------------- 4. Port
 echo
-echo "[4/5] Ketersediaan port (80, 443, 8080, 8082)"
+echo "[4/5] Ketersediaan port (80, 443, 9443)"
 if command -v ss >/dev/null 2>&1; then
     # Port yang dipakai kontainer stack ini sendiri BUKAN masalah —
     # itu justru tanda stack sudah berjalan. Hanya proses LAIN yang dilaporkan.
     OWN_CONTAINERS="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -E '^(caddy_proxy|zoneminder|camera-dashboard)$' || true)"
-    for P in 80 443 8080 8082; do
+    for P in 80 443 9443; do
         if ss -tln 2>/dev/null | grep -qE "[:.]${P}[[:space:]]"; then
             if [ -n "$OWN_CONTAINERS" ]; then
                 warn "port $P sedang dipakai — kemungkinan oleh stack ini sendiri (sedang berjalan)."
@@ -123,7 +137,10 @@ fi
 # ---------------------------------------------------------------- 5. Berkas
 echo
 echo "[5/5] Berkas penting"
-for F in docker-compose.yml caddy/Caddyfile mosquitto.conf; do
+for F in docker-compose.yml caddy/Caddyfile mosquitto.conf \
+         html_dashboard/auth.py html_dashboard/token_crypto.py \
+         html_dashboard/login.html html_dashboard/settings.html \
+         html_dashboard/app_shell.js zm-conf/zm-root.conf; do
     if [ -f "$F" ]; then
         pass "$F ada"
     else

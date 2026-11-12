@@ -2,18 +2,59 @@
     debug
 }
 
+# ============================================================================
+# PORT :443 — PUBLIK
+#
+# Root domain = ZoneMinder. Semua path lain juga diteruskan ke ZoneMinder,
+# supaya aset statis yang diminta dari root (mis. /graphics/*.png dari
+# /zm/index.php yang dialias ke root) tetap dapat dimuat.
+#
+# Dashboard manajemen TIDAK lagi dilayani di sini. Dashboard dipindahkan ke
+# blok :9443 di bawah agar tidak dapat diakses lewat URL root yang publik.
+# ============================================================================
 :443 {
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 
+    # Root domain -> ZoneMinder (redirect eksplisit supaya URL di address bar
+    # selalu konsisten ber-prefix /zm/).
+    @root path /
+    redir @root /zm/ 302
+
+    # Topic MQTT WebSocket (dipakai klien browser).
+    handle /mqtt {
+        reverse_proxy mosquitto:9001
+    }
+
+    # Sisanya (termasuk /zm*, /cgi-bin*, /css*, /js*, /graphics*, /ajax*)
+    # seluruhnya milik ZoneMinder.
+    handle {
+        reverse_proxy zoneminder:80
+    }
+}
+
+# ============================================================================
+# PORT :9443 — TERBATAS (Dashboard manajemen)
+#
+# Semua halaman dashboard (portal, kelola kamera, burst add, log MQTT, dan
+# pengaturan kredensial) hanya ada di sini, dilindungi login Flask.
+#
+# Kenapa port terpisah, bukan path seperti /admin?
+#   Halaman dashboard memakai URL relatif tanpa prefix, sehingga menaruhnya
+#   di :443 akan memaksa path-prefix yang rawan salah saat memanggil /api/*.
+#   Port terpisah membuatnya terisolasi total dari permukaan publik :443.
+# ============================================================================
+:9443 {
+    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
+
+    # ZoneMinder tetap dijangkau dari dashboard melalui proxy (API + stream),
+    # dengan autentikasi dikelola sepenuhnya oleh backend Flask.
     handle /zm* {
         reverse_proxy zoneminder:80
     }
     handle /cgi-bin* {
         reverse_proxy zoneminder:80
     }
-    handle /mqtt {
-        reverse_proxy mosquitto:9001
-    }
+
     handle {
         reverse_proxy ui-interface:8080
     }

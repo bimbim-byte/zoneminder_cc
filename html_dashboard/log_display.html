@@ -320,24 +320,32 @@
       .main-layout { overflow: visible; }
       .table-wrapper { height: 400px; }
     }
-  </style>
+      /* Toolbar aksi halaman, di bawah header bersama. */
+    .page-toolbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 9px 24px; background: #fff;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .page-toolbar .toolbar-info {
+      font-size: 12.5px; color: var(--muted); font-weight: 600;
+    }
+    .page-toolbar .btn { height: 30px; font-size: 12px; padding: 0 12px; }
+
+</style>
 </head>
 <body>
 
-  <header>
-    <h1>📡 ZoneMinder - Live MQTT Health Log & Notification Hub</h1>
-    <div class="header-actions">
-      <div id="logCountHeader" style="font-size: 13px; opacity: .9;">0 Entri Log</div>
-      <button id="toggleRefreshBtn" class="btn btn-outline btn-small" onclick="toggleAutoRefresh()">
-        ⏸ Pause Auto-Refresh
-      </button>
-      <button class="btn btn-primary btn-small" onclick="fetchLogsFromFile()">
-        🔄 Refresh
-      </button>
-      <a href="/zm/" target="_blank" class="btn-back">🖥️ ZoneMinder Web (/zm/)</a>
-      <a href="index.html" class="btn-back">⬅ Portal</a>
-    </div>
-  </header>
+  <!-- Header navigasi bersama: tautan ZoneMinder ditonjolkan + tombol logout -->
+  <header id="dashHeader"></header>
+  <div class="page-toolbar">
+    <span class="toolbar-info" id="logCountHeader">0 Entri Log</span>
+    <button id="toggleRefreshBtn" class="btn btn-outline btn-small" onclick="toggleAutoRefresh()">
+      &#9208; Pause Auto-Refresh
+    </button>
+    <button class="btn btn-primary btn-small" onclick="fetchLogsFromFile()">
+      &#128260; Refresh
+    </button>
+  </div>
 
   <div class="main-layout">
     <!-- Tabs Bar -->
@@ -870,5 +878,6 @@ client.loop_forever()</div>
       setInterval(loadCheckerConfig, 10000);
     });
   </script>
+  <script src="app_shell.js"></script>
 </body>
 </html>
