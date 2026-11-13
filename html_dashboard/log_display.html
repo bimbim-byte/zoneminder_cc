@@ -320,7 +320,76 @@
       .main-layout { overflow: visible; }
       .table-wrapper { height: 400px; }
     }
-      /* Toolbar aksi halaman, di bawah header bersama. */
+    /* Panel hapus log */
+    .delete-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .delete-stat {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .delete-stat-lbl {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .02em;
+    }
+    .delete-stat-val {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 2px;
+    }
+    .delete-block {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: #fff;
+    }
+    .delete-block.delete-danger {
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+    .delete-label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 650;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .delete-hint {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .delete-hint code {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-family: monospace;
+      font-size: 10.5px;
+    }
+    .delete-status {
+      display: none;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 6px;
+      line-height: 1.5;
+    }
+    .delete-status.is-on { display: block; }
+    .delete-status.is-ok { background: #dcfce7; color: #166534; border: 1px solid #a7f3d0; }
+    .delete-status.is-err { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    /* Toolbar aksi halaman, di bawah header bersama. */
     .page-toolbar {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       padding: 9px 24px; background: #fff;
@@ -345,9 +414,68 @@
     <button class="btn btn-primary btn-small" onclick="fetchLogsFromFile()">
       &#128260; Refresh
     </button>
+    <button class="btn btn-danger btn-small" id="btnOpenDelete" onclick="toggleDeletePanel()">
+      Hapus Log
+    </button>
   </div>
 
   <div class="main-layout">
+
+    <div class="card" id="deletePanel" style="display:none; flex-shrink:0;">
+      <h3>
+        <span>Hapus Log MQTT</span>
+        <span class="badge badge-paused" id="deleteSummaryBadge">Memuat...</span>
+      </h3>
+
+      <div class="delete-grid">
+        <div class="delete-stat">
+          <div class="delete-stat-lbl">Jumlah entri</div>
+          <div class="delete-stat-val" id="dlgCount">-</div>
+        </div>
+        <div class="delete-stat">
+          <div class="delete-stat-lbl">Ukuran berkas</div>
+          <div class="delete-stat-val" id="dlgSize">-</div>
+        </div>
+        <div class="delete-stat">
+          <div class="delete-stat-lbl">Rentang waktu</div>
+          <div class="delete-stat-val" id="dlgRange" style="font-size:11.5px; font-weight:600;">-</div>
+        </div>
+      </div>
+
+      <div class="delete-block">
+        <label class="delete-label" for="deleteDays">Hapus entri yang lebih tua dari</label>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="number" id="deleteDays" class="form-control" min="0" value="30"
+                 style="width:90px; height:32px;">
+          <span style="font-size:12px; color:var(--muted);">hari</span>
+          <button class="btn btn-outline btn-small" style="margin-left:auto;"
+                  onclick="deleteOlderThan()">Hapus yang Lama</button>
+        </div>
+        <div class="delete-hint">
+          Entri yang tanggalnya tidak terbaca <b>tidak ikut dihapus</b>, supaya data
+          tidak hilang hanya karena formatnya rusak. Isi <code>0</code> untuk menghapus semua.
+        </div>
+      </div>
+
+      <div class="delete-block delete-danger">
+        <label class="delete-label">Hapus seluruh riwayat</label>
+        <div class="delete-hint" style="margin-bottom:6px;">
+          Seluruh entri log dihapus permanen. Berkas log tetap ada (menjadi kosong),
+          konfigurasi checker dan kredensial tidak tersentuh.
+          Ketik <code>HAPUS</code> untuk mengaktifkan tombol ini.
+        </div>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="deleteConfirmText" class="form-control"
+                 placeholder="Ketik HAPUS" style="flex:1; height:32px;"
+                 oninput="syncDeleteAllButton()">
+          <button class="btn btn-danger btn-small" id="btnDeleteAll" disabled
+                  onclick="deleteAllLogs()">Hapus Semua</button>
+        </div>
+      </div>
+
+      <div id="deleteStatus" class="delete-status"></div>
+    </div>
+
     <!-- Tabs Bar -->
     <div class="tabs-bar">
       <button class="tab-btn active" id="tabBtnLog" onclick="switchTab('log')">📋 Live Stream Log Kamera MQTT</button>
@@ -438,6 +566,8 @@
             <option value="OFFLINE">Hanya OFFLINE</option>
             <option value="SUMMARY">Hanya Summary</option>
           </select>
+          <button class="btn btn-danger btn-small" id="btnDeleteSelected" disabled
+                  onclick="deleteSelectedLogs()">Hapus Terpilih (<span id="selCount">0</span>)</button>
         </div>
       </div>
 
@@ -445,6 +575,10 @@
         <table>
           <thead>
             <tr>
+              <th style="width: 34px;">
+                <input type="checkbox" id="checkAllLogs" title="Pilih semua yang tampil"
+                       onchange="toggleSelectAllLogs(this.checked)">
+              </th>
               <th style="width: 150px;">Waktu</th>
               <th style="width: 170px;">Topik MQTT</th>
               <th style="width: 100px;">Status</th>
@@ -591,6 +725,14 @@ client.loop_forever()</div>
     let refreshInterval = null;
     let allLogs = [];
     let checkerConfig = { enabled: false, interval: 600 };
+
+    // Entri yang sedang TAMPIL setelah pencarian/filter. "Pilih semua" hanya
+    // boleh menyentuh baris ini: menghapus baris yang tersembunyi karena
+    // filter adalah cara paling mudah kehilangan data tanpa sadar.
+    let visibleLogs = [];
+
+    // _id entri yang dicentang operator.
+    let selectedIds = new Set();
 
     // =========================================================================
     // 1. TABS MANAGEMENT
@@ -752,9 +894,12 @@ client.loop_forever()</div>
       const badgeFiltered = document.getElementById("filteredCountBadge");
 
       if (!Array.isArray(allLogs) || allLogs.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='4' style='color:var(--muted); text-align:center; padding:30px;'>Belum ada log aktivitas kamera yang terekam.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='5' style='color:var(--muted); text-align:center; padding:30px;'>Belum ada log aktivitas kamera yang terekam.</td></tr>";
         if (counterHeader) counterHeader.innerText = "0 Entri Log";
         if (badgeFiltered) badgeFiltered.innerText = "0 Entri";
+        visibleLogs = [];
+        selectedIds.clear();
+        updateSelectedCount();
         return;
       }
 
@@ -786,8 +931,11 @@ client.loop_forever()</div>
 
       if (badgeFiltered) badgeFiltered.innerText = `${filtered.length} dari ${allLogs.length} Entri`;
 
+      visibleLogs = filtered;
+
       if (filtered.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='4' style='color:var(--muted); text-align:center; padding:30px;'>Tidak ada log yang sesuai dengan filter pencarian.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='5' style='color:var(--muted); text-align:center; padding:30px;'>Tidak ada log yang sesuai dengan filter pencarian.</td></tr>";
+        updateSelectedCount();
         return;
       }
 
@@ -818,8 +966,16 @@ client.loop_forever()</div>
           payloadContent = escapeHtml(raw);
         }
 
+        const id = item._id;
+        const isChecked = id !== undefined && selectedIds.has(id);
+
         html += `
           <tr>
+            <td style="text-align:center;">
+              ${id === undefined ? '' : `<input type="checkbox" class="log-check"
+                  data-id="${id}" ${isChecked ? 'checked' : ''}
+                  onchange="toggleSelectLog(${id}, this.checked)">`}
+            </td>
             <td style="font-family:monospace; color:var(--muted); font-size:11.5px; white-space:nowrap;">${escapeHtml(item.timestamp)}</td>
             <td><code style="color:var(--warning); font-size:11.5px; font-weight:600;">${escapeHtml(item.topic)}</code></td>
             <td>${statusBadge}</td>
@@ -829,6 +985,16 @@ client.loop_forever()</div>
       });
 
       tbody.innerHTML = html;
+      updateSelectedCount();
+
+      // Kotak "pilih semua" hanya tercentang bila seluruh baris yang tampil
+      // sudah dipilih. Sebagian terpilih dibiarkan tidak tercentang —
+      // checkbox HTML tidak punya keadaan "setengah" tanpa pengaturan lain.
+      const all = document.getElementById('checkAllLogs');
+      if (all) {
+        all.checked = filtered.length > 0
+          && filtered.every(x => x._id !== undefined && selectedIds.has(x._id));
+      }
     }
 
     function filterLogs() {
@@ -850,6 +1016,183 @@ client.loop_forever()</div>
     function startAutoRefresh() {
       clearInterval(refreshInterval);
       refreshInterval = setInterval(fetchLogsFromFile, 3000);
+    }
+
+    // =========================================================================
+    // 4. HAPUS LOG MQTT
+    // =========================================================================
+    function toggleDeletePanel() {
+      const panel = document.getElementById('deletePanel');
+      const btn = document.getElementById('btnOpenDelete');
+      if (!panel) return;
+      const isOpen = panel.style.display !== 'none';
+      panel.style.display = isOpen ? 'none' : 'block';
+      if (btn) btn.textContent = isOpen ? 'Hapus Log' : 'Tutup Panel Hapus';
+      if (!isOpen) refreshDeleteSummary();
+    }
+
+    function setDeleteStatus(message, kind) {
+      const el = document.getElementById('deleteStatus');
+      if (!el) return;
+      if (!message) {
+        el.className = 'delete-status';
+        el.textContent = '';
+        return;
+      }
+      el.className = 'delete-status is-on ' + (kind === 'err' ? 'is-err' : 'is-ok');
+      el.textContent = message;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes && bytes !== 0) return '-';
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+    }
+
+    async function refreshDeleteSummary() {
+      const badge = document.getElementById('deleteSummaryBadge');
+      try {
+        const res = await fetch('/api/mqtt-logs/summary');
+        const data = await res.json();
+        if (data.status !== 'ok') throw new Error(data.message || 'gagal');
+
+        document.getElementById('dlgCount').textContent = data.count;
+        document.getElementById('dlgSize').textContent = formatBytes(data.bytes);
+        document.getElementById('dlgRange').textContent =
+          data.oldest && data.newest
+            ? `${data.oldest}  sampai  ${data.newest}`
+            : 'belum ada entri';
+
+        if (badge) {
+          badge.className = data.count > 0 ? 'badge badge-paused' : 'badge badge-ok';
+          badge.textContent = data.count > 0
+            ? `${data.count} entri dapat dihapus`
+            : 'Log kosong';
+        }
+      } catch (err) {
+        if (badge) {
+          badge.className = 'badge badge-err';
+          badge.textContent = 'Gagal memuat ringkasan';
+        }
+        setDeleteStatus('Gagal memuat ringkasan log: ' + err.message, 'err');
+      }
+    }
+
+    // Tombol "Hapus Semua" hanya aktif setelah operator mengetik HAPUS.
+    // Perbandingan tidak peka huruf besar-kecil dan mengabaikan spasi, supaya
+    // tidak gagal hanya karena salah kapital.
+    function syncDeleteAllButton() {
+      const input = document.getElementById('deleteConfirmText');
+      const btn = document.getElementById('btnDeleteAll');
+      if (!input || !btn) return;
+      btn.disabled = input.value.trim().toUpperCase() !== 'HAPUS';
+    }
+
+    async function performDelete(body) {
+      const res = await fetch('/api/mqtt-logs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.status !== 'success') {
+        throw new Error(data.message || `HTTP ${res.status}`);
+      }
+      return data;
+    }
+
+    async function deleteOlderThan() {
+      const input = document.getElementById('deleteDays');
+      const days = parseInt(input.value, 10);
+
+      if (isNaN(days) || days < 0) {
+        setDeleteStatus('Jumlah hari harus 0 atau lebih.', 'err');
+        return;
+      }
+
+      const label = days === 0
+        ? 'SEMUA entri (karena diisi 0)'
+        : `entri yang lebih tua dari ${days} hari`;
+
+      if (!confirm(`Hapus ${label}?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+
+      try {
+        const data = await performDelete({ mode: 'older_than', older_than: days });
+        setDeleteStatus(data.message, 'ok');
+        await refreshDeleteSummary();
+        await fetchLogsFromFile();
+      } catch (err) {
+        setDeleteStatus('Gagal menghapus: ' + err.message, 'err');
+      }
+    }
+
+    async function deleteAllLogs() {
+      const input = document.getElementById('deleteConfirmText');
+      if (input.value.trim().toUpperCase() !== 'HAPUS') return;
+
+      if (!confirm('Hapus SELURUH riwayat log MQTT?\n\nTindakan ini tidak bisa dibatalkan.')) {
+        return;
+      }
+
+      const btn = document.getElementById('btnDeleteAll');
+      if (btn) btn.disabled = true;
+
+      try {
+        const data = await performDelete({ mode: 'all' });
+        setDeleteStatus(data.message, 'ok');
+        input.value = '';
+        syncDeleteAllButton();
+        selectedIds.clear();
+        await refreshDeleteSummary();
+        await fetchLogsFromFile();
+      } catch (err) {
+        setDeleteStatus('Gagal menghapus: ' + err.message, 'err');
+        syncDeleteAllButton();
+      }
+    }
+
+    function toggleSelectAllLogs(checked) {
+      selectedIds.clear();
+      if (checked) {
+        visibleLogs.forEach(item => {
+          if (item && item._id !== undefined) selectedIds.add(item._id);
+        });
+      }
+      renderLogs();
+    }
+
+    function toggleSelectLog(id, checked) {
+      if (checked) selectedIds.add(id);
+      else selectedIds.delete(id);
+      updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+      const counter = document.getElementById('selCount');
+      const btn = document.getElementById('btnDeleteSelected');
+      const n = selectedIds.size;
+      if (counter) counter.textContent = n;
+      if (btn) btn.disabled = n === 0;
+    }
+
+    async function deleteSelectedLogs() {
+      const ids = Array.from(selectedIds);
+      if (!ids.length) return;
+
+      if (!confirm(`Hapus ${ids.length} entri log yang dipilih?\n\nTindakan ini tidak bisa dibatalkan.`)) {
+        return;
+      }
+
+      try {
+        const data = await performDelete({ mode: 'ids', ids });
+        setDeleteStatus(data.message, 'ok');
+        selectedIds.clear();
+        await refreshDeleteSummary();
+        await fetchLogsFromFile();
+      } catch (err) {
+        setDeleteStatus('Gagal menghapus: ' + err.message, 'err');
+      }
     }
 
     function escapeHtml(text) {

@@ -41,19 +41,207 @@
           </div>
         </div>
 
-        <div id="panelExcel" class="ui-field" style="display:none;">
-          <label class="ui-label" for="excelFile">Berkas Excel (.xlsx / .xls / .csv)</label>
-          <input type="file" id="excelFile" class="ui-input" accept=".xlsx, .xls, .csv"
-                 style="height:auto; padding:6px 8px;" onchange="handleExcelUpload(event)">
-          <div class="ui-hint">
-            Kolom yang dikenali: <b>Name</b>, <b>Source Path</b>, <b>Function</b>,
-            <b>Width</b>, <b>Height</b>, <b>Max FPS</b>, dan <b>Zone</b>.
-            Kolom Zone menerima angka 1&ndash;5 atau nama mode
-            (Paling Ringan, Ringan, Sedang, Berat, Paling Berat).
-            Kosongkan untuk mengikuti mode global.
+        <div id="panelExcel" style="display:none; flex-direction:column; gap:12px;">
+
+          <div class="ui-field">
+            <label class="ui-label" for="excelFile">Berkas Excel (.xlsx / .xls / .csv)</label>
+            <input type="file" id="excelFile" class="ui-input" accept=".xlsx, .xls, .csv"
+                   style="height:auto; padding:6px 8px;" onchange="handleExcelUpload(event)">
+            <div class="ui-hint">
+              Hanya <b>sheet pertama</b> yang dibaca. Baris pertama wajib berisi nama kolom.
+            </div>
           </div>
+
           <div class="ui-row">
-            <button class="ui-btn" onclick="downloadExcelTemplate()">Unduh Template</button>
+            <button class="ui-btn" onclick="downloadExcelTemplate()">Unduh Template Kosong</button>
+            <button class="ui-btn" onclick="downloadExcelExample()">Unduh Contoh Terisi</button>
+            <button class="ui-btn" onclick="toggleExcelGuide()" id="btnExcelGuide"
+                    aria-expanded="false" aria-controls="excelGuide">
+              Panduan Kolom
+            </button>
+          </div>
+
+          <!--
+            Panduan kolom dibuka-tutup, bukan selalu tampil, supaya panel unggah
+            tetap ringkas bagi operator yang sudah paham. Isinya diturunkan dari
+            perilaku pembaca Excel yang sebenarnya di handleExcelUpload(): setiap
+            kolom, nilai yang diterima, nilai bawaan saat kosong, dan akibatnya
+            bila salah isi.
+          -->
+          <div id="excelGuide" style="display:none; flex-direction:column; gap:12px;">
+
+            <div class="excel-note">
+              <b>Kolom wajib hanya dua:</b> <code>Name</code> dan <code>Source Path</code>.
+              Kolom lain boleh dihilangkan atau dikosongkan &mdash; nilainya diambil dari
+              panel <b>Pengaturan Default</b> di bawah. Urutan kolom bebas; yang menentukan
+              adalah <b>nama header</b>-nya, bukan posisinya.
+            </div>
+
+            <div style="border:1px solid var(--c-border); border-radius:var(--r-md); overflow:hidden;">
+              <table class="ui-table">
+                <thead>
+                  <tr>
+                    <th style="width:132px;">Nama Kolom</th>
+                    <th style="width:62px;">Wajib</th>
+                    <th>Isi &amp; Nilai yang Diterima</th>
+                    <th style="width:154px;">Bila Dikosongkan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>Name</code></td>
+                    <td><span class="ui-badge ui-badge-err">Ya</span></td>
+                    <td>
+                      Nama kamera di ZoneMinder. Huruf, angka, garis bawah, dan tanda hubung.
+                      Karakter lain otomatis diubah menjadi <code>_</code>.
+                      <div class="excel-ex">Contoh: <code>CAM_LOBBY_01</code></div>
+                    </td>
+                    <td>Diisi otomatis <code>CCTV_&lt;nomor&gt;</code></td>
+                  </tr>
+                  <tr>
+                    <td><code>Source Path</code></td>
+                    <td><span class="ui-badge ui-badge-err">Ya</span></td>
+                    <td>
+                      URL RTSP lengkap kamera, <b>wajib</b> diawali <code>rtsp://</code>.
+                      Baris tanpa ini ditolak saat pendaftaran.
+                      <div class="excel-ex">Contoh: <code>rtsp://admin:pass@192.168.1.10:554/ch1</code></div>
+                      <div class="excel-ex">Header lain yang diterima: <code>Path</code></div>
+                    </td>
+                    <td>Baris dilewati dengan status gagal</td>
+                  </tr>
+                  <tr>
+                    <td><code>Function</code></td>
+                    <td><span class="ui-badge ui-badge-neutral">Tidak</span></td>
+                    <td>
+                      Mode kerja kamera: <code>Monitor</code>, <code>Modect</code>,
+                      <code>Record</code>, <code>Mocord</code>, atau <code>Nodect</code>.
+                      <div class="excel-ex">
+                        <b>Monitor</b> = siaran langsung saja, tanpa rekam.
+                        <b>Modect</b> = rekam saat ada gerakan (butuh zone).
+                        <b>Record</b> = rekam terus-menerus.
+                      </div>
+                    </td>
+                    <td>Ikut Pengaturan Default</td>
+                  </tr>
+                  <tr>
+                    <td><code>Width</code><br><code>Height</code></td>
+                    <td><span class="ui-badge ui-badge-neutral">Tidak</span></td>
+                    <td>
+                      Resolusi kamera dalam piksel, angka saja tanpa satuan.
+                      <b>Harus sesuai resolusi asli stream</b> &mdash; bila salah, gambar gepeng
+                      dan zone deteksi tidak menutupi seluruh bidang pandang.
+                      <div class="excel-ex">Contoh: <code>1920</code> dan <code>1080</code></div>
+                    </td>
+                    <td>1920 &times; 1080</td>
+                  </tr>
+                  <tr>
+                    <td><code>Max FPS</code></td>
+                    <td><span class="ui-badge ui-badge-neutral">Tidak</span></td>
+                    <td>
+                      Batas frame per detik. Kosong atau <code>0</code> berarti mengikuti
+                      FPS asli kamera. Angka besar membebani CPU server.
+                      <div class="excel-ex">Saran: <code>15</code> untuk pemantauan biasa</div>
+                    </td>
+                    <td>Tidak dibatasi</td>
+                  </tr>
+                  <tr>
+                    <td><code>Zone</code></td>
+                    <td><span class="ui-badge ui-badge-neutral">Tidak</span></td>
+                    <td>
+                      Mode zone deteksi untuk kamera ini. Menerima <b>angka 1&ndash;5</b>
+                      atau <b>nama mode</b> (lihat tabel di bawah). Nilai di sini
+                      <b>mengalahkan</b> mode global.
+                      <div class="excel-ex">
+                        Header lain yang diterima: <code>Zone Mode</code>,
+                        <code>Mode Zone</code>, <code>zone</code>
+                      </div>
+                    </td>
+                    <td>Ikut Mode Zone Global</td>
+                  </tr>
+                  <tr>
+                    <td><code>Type</code></td>
+                    <td><span class="ui-badge ui-badge-neutral">Tidak</span></td>
+                    <td>
+                      Tipe sumber di ZoneMinder. Untuk kamera IP biarkan
+                      <code>Ffmpeg</code>; hampir tidak pernah perlu diubah.
+                    </td>
+                    <td><code>Ffmpeg</code></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <div class="ui-label" style="margin-bottom:6px;">
+                Nilai kolom <code>Zone</code> yang diterima
+              </div>
+              <div class="ui-grid-3" id="excelZoneTable"></div>
+              <div class="ui-hint" style="margin-top:6px;">
+                Angka kecil = lebih sensitif dan lebih berat di CPU; angka besar = lebih hemat
+                CPU tetapi hanya gerakan besar yang memicu alarm. Tanpa zone, kamera berfungsi
+                <b>Modect tetap tidak akan pernah menghasilkan alarm</b>.
+              </div>
+            </div>
+
+            <div>
+              <div class="ui-label" style="margin-bottom:6px;">Contoh isi spreadsheet yang benar</div>
+              <div style="overflow-x:auto; border:1px solid var(--c-border); border-radius:var(--r-md);">
+                <table class="ui-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th><th>Source Path</th><th>Function</th>
+                      <th>Width</th><th>Height</th><th>Max FPS</th><th>Zone</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="is-mono">CAM_LOBBY_01</td>
+                      <td class="is-mono">rtsp://admin:pass@192.168.1.10:554/ch1</td>
+                      <td>Modect</td><td>1920</td><td>1080</td><td>15</td>
+                      <td><span class="ui-badge ui-badge-info">3 (Sedang)</span></td>
+                    </tr>
+                    <tr>
+                      <td class="is-mono">CAM_PARKIR_02</td>
+                      <td class="is-mono">rtsp://admin:pass@192.168.1.11:554/ch1</td>
+                      <td>Modect</td><td>1920</td><td>1080</td><td>15</td>
+                      <td><span class="ui-badge ui-badge-info">Ringan</span></td>
+                    </tr>
+                    <tr>
+                      <td class="is-mono">CAM_GUDANG_03</td>
+                      <td class="is-mono">rtsp://admin:pass@192.168.1.12:554/ch1</td>
+                      <td>Record</td><td>1280</td><td>720</td><td>10</td>
+                      <td><span class="ui-badge ui-badge-neutral">(kosong)</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="ui-hint" style="margin-top:6px;">
+                Baris ketiga sengaja mengosongkan Zone: kamera itu memakai mode dari panel
+                Pengaturan Default. Function <code>Record</code> juga tidak butuh zone karena
+                merekam terus-menerus, bukan menunggu gerakan.
+              </div>
+            </div>
+
+            <div class="excel-note excel-note-warn">
+              <b>Yang sering membuat gagal:</b>
+              <ul style="margin:6px 0 0 16px; padding:0; line-height:1.75;">
+                <li>Nama header tidak sama persis, mis. <code>SourcePath</code> atau
+                    <code>Nama</code> &mdash; spasi dan huruf besar-kecil berpengaruh.</li>
+                <li>URL RTSP diapit tanda kutip oleh Excel sehingga terbaca
+                    <code>"rtsp://..."</code> &mdash; hapus tanda kutipnya.</li>
+                <li>Resolusi ditulis <code>1920x1080</code> dalam satu sel &mdash; harus
+                    dua kolom terpisah berisi angka.</li>
+                <li>Berkas masih terbuka di Excel saat diunggah &mdash; tutup dulu agar
+                    versi terbaru yang terbaca.</li>
+              </ul>
+            </div>
+
+            <div class="excel-note">
+              Nilai Zone yang tidak dikenali <b>tidak</b> membuat unggahan gagal; nilainya
+              diabaikan dan kamera memakai mode global. Setelah unggah, daftar nilai yang
+              tidak dikenali ditampilkan agar bisa diperbaiki.
+            </div>
+
           </div>
         </div>
       </div>
@@ -192,7 +380,59 @@
     }
 
     document.getElementById('zoneMode').addEventListener('change', renderZoneHint);
-    loadZoneModes();
+    loadZoneModes().then(renderExcelZoneTable);
+
+    // =========================================================================
+    // PANDUAN KOLOM EXCEL
+    // =========================================================================
+    function toggleExcelGuide() {
+      const panel = document.getElementById('excelGuide');
+      const btn = document.getElementById('btnExcelGuide');
+      if (!panel) return;
+      const isOpen = panel.style.display !== 'none';
+      panel.style.display = isOpen ? 'none' : 'flex';
+      if (btn) {
+        btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+        btn.textContent = isOpen ? 'Panduan Kolom' : 'Tutup Panduan';
+      }
+    }
+
+    // Tabel nilai Zone dibangun dari /api/zones/modes, bukan ditulis ulang di
+    // HTML. Bila nanti ada mode baru di backend, panduan ikut menyesuaikan
+    // tanpa ada daftar kedua yang bisa basi.
+    function renderExcelZoneTable() {
+      const box = document.getElementById('excelZoneTable');
+      if (!box) return;
+      if (!ZONE_MODES.length) {
+        box.innerHTML = '<div class="ui-hint">Daftar mode belum termuat.</div>';
+        return;
+      }
+
+      box.innerHTML = ZONE_MODES.map((m, i) => `
+        <div style="border:1px solid var(--c-border); border-radius:var(--r-md);
+                    padding:8px 10px; background:var(--c-surface-2);">
+          <div style="font-size:12px; font-weight:650; color:var(--c-text);">
+            ${i + 1}. ${escapeHtml(m.short || m.label)}
+          </div>
+          <div class="excel-ex">
+            Isi kolom: <code>${i + 1}</code> / <code>${escapeHtml(m.short || m.label)}</code>
+            / <code>${escapeHtml(m.key)}</code>
+          </div>
+          <div class="ui-hint" style="margin-top:4px;">
+            ${escapeHtml(m.check_method)} &middot; ambang ${m.min_pixel_threshold}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(text) {
+      return String(text === undefined || text === null ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
     function switchTab(tab) {
       const isQuick = tab === 'quick';
@@ -321,24 +561,124 @@
       renderTable();
     }
 
+    // Lebar kolom dipakai bersama oleh template dan contoh supaya keduanya
+    // terlihat sama saat dibuka.
+    const EXCEL_COLS = [
+      { wch: 20 }, { wch: 12 }, { wch: 46 }, { wch: 11 },
+      { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 14 }
+    ];
+
+    // Satu daftar header dipakai sheet Kosong maupun Contoh.
+    const EXCEL_HEADERS = [
+      "Name", "Type", "Function", "Source Path",
+      "Width", "Height", "Max FPS", "Zone"
+    ];
+
+    // Baris contoh. Dipakai di sheet "Contoh" pada template dan di berkas
+    // contoh terpisah, sehingga keduanya tidak bisa menyimpang.
+    function excelExampleRows() {
+      return [
+        {
+          Name: "CAM_LOBBY_01", Type: "Ffmpeg", Function: "Modect",
+          "Source Path": "rtsp://admin:pass@192.168.1.10:554/ch1",
+          Width: 1920, Height: 1080, "Max FPS": 15, Zone: "3"
+        },
+        {
+          Name: "CAM_PARKIR_02", Type: "Ffmpeg", Function: "Modect",
+          "Source Path": "rtsp://admin:pass@192.168.1.11:554/ch1",
+          Width: 1920, Height: 1080, "Max FPS": 15, Zone: "Ringan"
+        },
+        {
+          // Zone sengaja kosong: kamera ini memakai mode dari Pengaturan Default.
+          Name: "CAM_GUDANG_03", Type: "Ffmpeg", Function: "Record",
+          "Source Path": "rtsp://admin:pass@192.168.1.12:554/ch1",
+          Width: 1280, Height: 720, "Max FPS": 10, Zone: ""
+        }
+      ];
+    }
+
+    function excelHeaderSheet() {
+      const ws = XLSX.utils.aoa_to_sheet([EXCEL_HEADERS]);
+      ws['!cols'] = EXCEL_COLS;
+      return ws;
+    }
+
+    function excelExampleSheet() {
+      // json_to_sheet dengan header eksplisit: kolom tetap lengkap walau ada
+      // baris yang nilai Zone-nya kosong. Tanpa header eksplisit, kolom Zone
+      // bisa hilang karena dianggap tidak dipakai.
+      const ws = XLSX.utils.json_to_sheet(excelExampleRows(), { header: EXCEL_HEADERS });
+      ws['!cols'] = EXCEL_COLS;
+      return ws;
+    }
+
+    function excelGuideSheet() {
+      // Sheet panduan ditulis DI DALAM berkas supaya penjelasan kolom tetap
+      // terbaca meski berkasnya dipindah ke komputer lain tanpa dashboard.
+      const rows = [
+        ["PANDUAN PENGISIAN - BURST ADD KAMERA CCTV"],
+        [],
+        ["Kolom wajib hanya Name dan Source Path. Kolom lain boleh dikosongkan."],
+        ["Urutan kolom bebas; yang menentukan adalah nama header-nya."],
+        ["Hanya sheet pertama yang dibaca saat berkas diunggah."],
+        [],
+        ["Nama Kolom", "Wajib", "Isi & Nilai yang Diterima", "Bila Dikosongkan"],
+        ["Name", "Ya", "Nama kamera. Huruf, angka, _ dan - . Karakter lain jadi _",
+         "CCTV_<nomor>"],
+        ["Source Path", "Ya", "URL RTSP lengkap, wajib diawali rtsp://",
+         "Baris ditolak (gagal)"],
+        ["Function", "Tidak", "Monitor | Modect | Record | Mocord | Nodect",
+         "Ikut Pengaturan Default"],
+        ["Width", "Tidak", "Lebar piksel, angka saja. Harus sesuai stream asli.", "1920"],
+        ["Height", "Tidak", "Tinggi piksel, angka saja. Harus sesuai stream asli.", "1080"],
+        ["Max FPS", "Tidak", "Batas frame per detik. Kosong/0 = ikut kamera.", "Tidak dibatasi"],
+        ["Zone", "Tidak", "Angka 1-5 atau nama mode (lihat tabel di bawah).",
+         "Ikut Mode Zone Global"],
+        ["Type", "Tidak", "Ffmpeg untuk kamera IP. Hampir tidak perlu diubah.", "Ffmpeg"],
+        [],
+        ["NILAI KOLOM ZONE"],
+        ["Angka", "Nama", "Keterangan"]
+      ];
+
+      // Daftar mode diambil dari server supaya berkas template tidak pernah
+      // menyebut mode yang sudah tidak ada.
+      if (ZONE_MODES.length) {
+        ZONE_MODES.forEach((m, i) => {
+          rows.push([String(i + 1), m.short || m.label,
+                     (m.check_method || '') + ', ambang ' + m.min_pixel_threshold]);
+        });
+      } else {
+        rows.push(["1-5", "Paling Ringan .. Paling Berat",
+                   "Buka dashboard untuk daftar terbaru"]);
+      }
+
+      rows.push(
+        [],
+        ["CATATAN PENTING"],
+        ["Tanpa zone, kamera dengan Function Modect TIDAK akan pernah menghasilkan alarm."],
+        ["Zone hanya diperlukan untuk Modect/Mocord. Record merekam terus-menerus."],
+        ["Resolusi yang salah membuat gambar gepeng dan zone tidak menutup seluruh bidang."],
+        ["Tutup berkas di Excel sebelum diunggah agar versi terbaru yang terbaca."]
+      );
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{ wch: 16 }, { wch: 8 }, { wch: 62 }, { wch: 26 }];
+      return ws;
+    }
+
     function downloadExcelTemplate() {
-      const data = [
-        { Name: "CAM_LOBBY_01", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.10:554/ch1", Width: 1920, Height: 1080, "Max FPS": 15, Zone: "medium" },
-        { Name: "CAM_PARKIR_02", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.11:554/ch1", Width: 1920, Height: 1080, "Max FPS": 15, Zone: "light" },
-        { Name: "CAM_GUDANG_03", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.12:554/ch1", Width: 1280, Height: 720, "Max FPS": 15, Zone: "" }
-      ];
-      const ws = XLSX.utils.json_to_sheet(data);
-
-      // Kolom Zone menerima angka 1-5 atau nama mode. Keduanya diterima agar
-      // pengisi template tidak perlu menghafal key internal.
-      ws['!cols'] = [
-        { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 46 },
-        { wch: 8 }, { wch: 8 }, { wch: 9 }, { wch: 14 }
-      ];
-
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Format CCTV");
+      XLSX.utils.book_append_sheet(wb, excelHeaderSheet(), "Format CCTV");
+      XLSX.utils.book_append_sheet(wb, excelExampleSheet(), "Contoh");
+      XLSX.utils.book_append_sheet(wb, excelGuideSheet(), "Panduan");
       XLSX.writeFile(wb, "Template_Burst_Add_CCTV.xlsx");
+    }
+
+    function downloadExcelExample() {
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, excelExampleSheet(), "Contoh");
+      XLSX.utils.book_append_sheet(wb, excelGuideSheet(), "Panduan");
+      XLSX.writeFile(wb, "Contoh_Burst_Add_CCTV.xlsx");
     }
 
     // Petakan isi kolom Zone dari Excel ke key mode yang dikenal backend.
