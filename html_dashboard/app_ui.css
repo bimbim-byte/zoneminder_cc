@@ -1,0 +1,451 @@
+/* ==========================================================================
+ * app_ui.css - Sistem desain bersama untuk seluruh halaman dashboard.
+ *
+ * Prinsip:
+ *   1. Minimalis: tanpa gradien dekoratif, tanpa bayangan berlapis, tanpa
+ *      emoji di dalam tombol. Warna netral + satu aksen biru.
+ *   2. Rapih: ritme spasi konsisten (kelipatan 4px), sudut membulat halus,
+ *      garis batas tipis sebagai pemisah utama, bukan bayangan.
+ *   3. Terbaca: label 11.5px, isi 13px, monospace untuk angka/URL.
+ *
+ * Semua halaman memuat berkas ini sehingga perubahan tampilan cukup di satu
+ * tempat. Header navigasi tetap ditangani app_shell.js.
+ * ========================================================================== */
+
+:root {
+    --c-primary: #2563eb;
+    --c-primary-hover: #1d4ed8;
+    --c-primary-soft: #eff6ff;
+
+    --c-success: #059669;
+    --c-success-soft: #ecfdf5;
+    --c-danger: #dc2626;
+    --c-danger-soft: #fef2f2;
+    --c-warning: #d97706;
+    --c-warning-soft: #fffbeb;
+
+    --c-bg: #f6f7f9;
+    --c-surface: #ffffff;
+    --c-surface-2: #fafbfc;
+    --c-border: #e5e7eb;
+    --c-border-strong: #d1d5db;
+
+    --c-text: #111827;
+    --c-text-2: #4b5563;
+    --c-muted: #9ca3af;
+
+    --r-sm: 5px;
+    --r-md: 7px;
+    --r-lg: 10px;
+
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+            "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Consolas, Monaco, monospace;
+
+    --shadow-sm: 0 1px 2px rgba(17, 24, 39, .05);
+    --shadow-md: 0 1px 3px rgba(17, 24, 39, .08), 0 1px 2px rgba(17, 24, 39, .04);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--c-text);
+    background: var(--c-bg);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* --------------------------------------------------------------------------
+ * TATA LETAK
+ * -------------------------------------------------------------------------- */
+.ui-page {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.ui-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    overflow: hidden;
+    min-height: 0;
+}
+
+.ui-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.ui-row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; }
+.ui-spacer { margin-left: auto; }
+.ui-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.ui-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+
+/* --------------------------------------------------------------------------
+ * KARTU
+ * -------------------------------------------------------------------------- */
+.ui-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.ui-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--c-border);
+    flex-shrink: 0;
+}
+
+.ui-card-title {
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    color: var(--c-text);
+}
+
+.ui-card-sub {
+    font-size: 11.5px;
+    color: var(--c-muted);
+    font-weight: 400;
+    margin-top: 1px;
+}
+
+.ui-card-body {
+    padding: var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-height: 0;
+}
+
+.ui-card-body.is-flush { padding: 0; }
+
+/* --------------------------------------------------------------------------
+ * FORM
+ * -------------------------------------------------------------------------- */
+.ui-field { display: flex; flex-direction: column; gap: var(--sp-1); }
+
+.ui-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--c-text-2);
+    letter-spacing: .01em;
+}
+
+.ui-input,
+.ui-select,
+.ui-textarea {
+    width: 100%;
+    height: 32px;
+    padding: 0 var(--sp-2);
+    font-family: inherit;
+    font-size: 12.5px;
+    color: var(--c-text);
+    background: var(--c-surface);
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-md);
+    outline: none;
+    transition: border-color .14s, box-shadow .14s;
+}
+
+.ui-textarea {
+    height: auto;
+    min-height: 84px;
+    padding: var(--sp-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.55;
+    resize: vertical;
+}
+
+.ui-input:focus,
+.ui-select:focus,
+.ui-textarea:focus {
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+.ui-input:disabled,
+.ui-input[readonly],
+.ui-select:disabled {
+    background: var(--c-surface-2);
+    color: var(--c-muted);
+    cursor: not-allowed;
+}
+
+.ui-select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236b7280' d='M0 0h10L5 6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    padding-right: 26px;
+}
+
+.ui-hint {
+    font-size: 11px;
+    color: var(--c-muted);
+    line-height: 1.5;
+}
+
+.ui-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--c-text-2);
+    cursor: pointer;
+    user-select: none;
+}
+
+.ui-check input { width: 14px; height: 14px; cursor: pointer; accent-color: var(--c-primary); }
+
+/* --------------------------------------------------------------------------
+ * TOMBOL
+ * -------------------------------------------------------------------------- */
+.ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 var(--sp-3);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--c-text);
+    background: var(--c-surface);
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background .14s, border-color .14s, color .14s;
+}
+
+.ui-btn:hover:not(:disabled) { background: var(--c-surface-2); border-color: var(--c-muted); }
+.ui-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ui-btn:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 1px; }
+
+.ui-btn-primary {
+    color: #fff;
+    background: var(--c-primary);
+    border-color: var(--c-primary);
+}
+.ui-btn-primary:hover:not(:disabled) {
+    background: var(--c-primary-hover);
+    border-color: var(--c-primary-hover);
+}
+
+.ui-btn-success {
+    color: #fff;
+    background: var(--c-success);
+    border-color: var(--c-success);
+}
+.ui-btn-success:hover:not(:disabled) { filter: brightness(1.06); }
+
+.ui-btn-danger {
+    color: var(--c-danger);
+    background: var(--c-surface);
+    border-color: #fca5a5;
+}
+.ui-btn-danger:hover:not(:disabled) { background: var(--c-danger-soft); }
+
+.ui-btn-sm { height: 26px; padding: 0 var(--sp-2); font-size: 11.5px; border-radius: var(--r-sm); }
+.ui-btn-xs { height: 22px; padding: 0 6px; font-size: 11px; border-radius: var(--r-sm); }
+
+/* --------------------------------------------------------------------------
+ * TABEL
+ * -------------------------------------------------------------------------- */
+.ui-table-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    border-top: 1px solid var(--c-border);
+}
+
+.ui-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12.5px;
+}
+
+.ui-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    text-align: left;
+    white-space: nowrap;
+    color: var(--c-text-2);
+    background: var(--c-surface-2);
+    border-bottom: 1px solid var(--c-border);
+}
+
+.ui-table tbody td {
+    padding: var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--c-border);
+    vertical-align: middle;
+}
+
+.ui-table tbody tr:hover { background: var(--c-surface-2); }
+.ui-table tbody tr:last-child td { border-bottom: none; }
+
+.ui-table .is-mono {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--c-text-2);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ui-empty {
+    padding: var(--sp-6);
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--c-muted);
+}
+
+/* --------------------------------------------------------------------------
+ * BADGE & STATUS
+ * -------------------------------------------------------------------------- */
+.ui-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.6;
+    white-space: nowrap;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+
+.ui-badge-neutral { color: var(--c-text-2); background: var(--c-surface-2); border-color: var(--c-border); }
+.ui-badge-ok { color: var(--c-success); background: var(--c-success-soft); border-color: #a7f3d0; }
+.ui-badge-err { color: var(--c-danger); background: var(--c-danger-soft); border-color: #fecaca; }
+.ui-badge-warn { color: var(--c-warning); background: var(--c-warning-soft); border-color: #fde68a; }
+.ui-badge-info { color: var(--c-primary); background: var(--c-primary-soft); border-color: #bfdbfe; }
+
+/* Titik status kecil, dipakai di samping nama kamera. */
+.ui-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.ui-dot-ok { background: var(--c-success); }
+.ui-dot-err { background: var(--c-danger); }
+.ui-dot-off { background: var(--c-muted); }
+
+/* --------------------------------------------------------------------------
+ * TAB
+ * -------------------------------------------------------------------------- */
+.ui-tabs {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--c-surface-2);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+}
+
+.ui-tab {
+    padding: 5px var(--sp-3);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-text-2);
+    background: transparent;
+    border: none;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: background .14s, color .14s;
+    white-space: nowrap;
+}
+
+.ui-tab:hover { color: var(--c-text); }
+.ui-tab.active {
+    color: var(--c-primary);
+    background: var(--c-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+/* --------------------------------------------------------------------------
+ * PROGRESS
+ * -------------------------------------------------------------------------- */
+.ui-progress { display: none; flex-direction: column; gap: 5px; }
+.ui-progress.is-on { display: flex; }
+
+.ui-progress-track {
+    height: 6px;
+    background: var(--c-border);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.ui-progress-fill {
+    height: 100%;
+    width: 0;
+    background: var(--c-primary);
+    border-radius: 999px;
+    transition: width .25s ease;
+}
+
+.ui-progress-text { font-size: 11.5px; color: var(--c-text-2); }
+
+/* --------------------------------------------------------------------------
+ * TOOLBAR
+ * -------------------------------------------------------------------------- */
+.ui-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--c-surface-2);
+    border-bottom: 1px solid var(--c-border);
+    flex-shrink: 0;
+}
+
+.ui-toolbar-label {
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+    white-space: nowrap;
+}
+
+.ui-divider { width: 1px; height: 18px; background: var(--c-border-strong); margin: 0 2px; }
+
+/* --------------------------------------------------------------------------
+ * RESPONSIF
+ * -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+    .ui-page { height: auto; overflow: auto; }
+    .ui-body { overflow: visible; height: auto; }
+    .ui-grid-2, .ui-grid-3 { grid-template-columns: 1fr; }
+    .ui-table-wrap { max-height: 420px; }
+}

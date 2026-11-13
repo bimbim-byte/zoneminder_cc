@@ -385,6 +385,19 @@
               <option value="1920x1080" selected>1920 x 1080 (1080p)</option>
             </select>
           </div>
+          <div class="form-group full-width">
+            <label for="camZoneMode">Mode Zone Deteksi Otomatis</label>
+            <select id="camZoneMode" class="form-control"></select>
+            <div id="camZoneModeHint" class="form-hint" style="font-size:11px; color:var(--muted); margin-top:4px;"></div>
+            <div style="display:flex; gap:14px; margin-top:6px; font-size:11.5px;">
+              <label style="display:flex; align-items:center; gap:5px; font-weight:600;">
+                <input type="checkbox" id="camCreateZone" checked> Buat zone otomatis
+              </label>
+              <label style="display:flex; align-items:center; gap:5px; font-weight:600;">
+                <input type="checkbox" id="camOverwriteZone"> Timpa zone dashboard
+              </label>
+            </div>
+          </div>
           <input type="hidden" id="camColorspace" value="4">
         </div>
 
@@ -479,6 +492,19 @@
         </button>
         <button id="btnBulkOff" class="btn btn-danger btn-small" onclick="bulkSetAll('off')">
           ⏹ Matikan Semua
+        </button>
+
+        <span style="border-left:1px solid var(--border); height:20px; margin:0 4px;"></span>
+
+        <select id="bulkZoneModeSelect" class="bulk-select" title="Mode zone deteksi yang diterapkan ke seluruh kamera">
+          <option value="lightest">🎯 Zone: Paling Ringan (CPU paling hemat)</option>
+          <option value="light" selected>🎯 Zone: Ringan</option>
+          <option value="medium">🎯 Zone: Sedang</option>
+          <option value="heavy">🎯 Zone: Berat</option>
+          <option value="heaviest">🎯 Zone: Paling Berat</option>
+        </select>
+        <button id="btnBulkZone" class="btn btn-warning btn-small" onclick="bulkSetZoneMode()">
+          🎯 Buat Zone Semua
         </button>
 
         <span id="bulkStatusText" class="bulk-status"></span>
@@ -639,6 +665,123 @@
     }
 
     // =========================================================================
+    // 1b. MODE ZONE DETEKSI (5 MODE)
+    // =========================================================================
+    let ZONE_MODES = [];
+
+    async function loadZoneModes() {
+        const formSelect = document.getElementById('camZoneMode');
+        try {
+            const res = await fetch('/api/zones/modes');
+            const data = await res.json();
+            ZONE_MODES = data.modes || [];
+            window.ZONE_DEFAULT_MODE = data.default_mode;
+            if (formSelect) {
+                formSelect.innerHTML = ZONE_MODES
+                    .map(m => `<option value="${m.key}" ${m.key === data.default_mode ? 'selected' : ''}>${m.label}</option>`)
+                    .join('');
+            }
+            renderZoneModeHint();
+        } catch (err) {
+            console.error('Gagal memuat daftar mode zone:', err);
+            if (formSelect) {
+                formSelect.innerHTML = '<option value="light">2. Ringan</option>';
+            }
+        }
+    }
+
+    function renderZoneModeHint() {
+        const el = document.getElementById('camZoneModeHint');
+        const key = document.getElementById('camZoneMode')?.value;
+        const mode = ZONE_MODES.find(m => m.key === key);
+        if (!el) return;
+        el.innerHTML = mode
+            ? `${mode.description}<br><b>Efektif:</b> CheckMethod=${mode.check_method}, `
+              + `MinPixelThreshold=${mode.min_pixel_threshold} (angka kecil = lebih sensitif), Units=${mode.units}.`
+            : '';
+    }
+
+    async function setZoneForCamera(id, name) {
+        const mode = document.getElementById('bulkZoneModeSelect')?.value || window.ZONE_DEFAULT_MODE || 'light';
+        const overwrite = confirm(
+            `Buat/perbarui zone deteksi untuk kamera "${name || id}" dengan mode ini?\n\n` +
+            `Mode: ${mode}\n\n` +
+            `OK  = timpa zone buatan dashboard ("All") bila sudah ada.\n` +
+            `Cancel = batalkan.`
+        );
+        if (!overwrite && !confirm('Lanjutkan tanpa menimpa zone yang sudah ada? (zone yang ada akan dilewati)')) {
+            return;
+        }
+
+        try {
+            const res = await fetchWithAutoAuth(`/api/zones/${id}/set-mode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: mode, overwrite: overwrite })
+            });
+            const data = await res.json();
+            const zd = data.data || {};
+            if (data.status === 'success') {
+                alert(`✅ ${data.message}\nKoordinat: ${zd.coords || '-'} @ ${zd.width}x${zd.height}`);
+            } else if (data.status === 'skipped') {
+                alert(`⏭ Zone dilewati.\n\n${data.message}\n\nKamera ini sudah punya zone sendiri — ` +
+                      `konfigurasi manual tidak dihapus. Centang "Timpa zone dashboard" lalu ulangi bila memang ingin menggantinya.`);
+            } else {
+                alert(`❌ ${data.message}`);
+            }
+        } catch (err) {
+            alert(`Error: ${err.message}`);
+        }
+        await loadCameras();
+    }
+
+    async function bulkSetZoneMode() {
+        const mode = document.getElementById('bulkZoneModeSelect')?.value || 'light';
+        const label = document.getElementById('bulkZoneModeSelect')?.selectedOptions[0]?.textContent || mode;
+        const overwrite = confirm(
+            `Terapkan zone deteksi ke SELURUH kamera?\n\nMode: ${label}\n\n` +
+            `OK  = timpa zone buatan dashboard ("All").\n` +
+            `Cancel = lewati kamera yang sudah punya zone apa pun.`
+        );
+
+        const statusEl = document.getElementById('bulkStatusText');
+        const btn = document.getElementById('btnBulkZone');
+        if (btn) btn.disabled = true;
+        if (statusEl) statusEl.innerText = 'Menerapkan mode zone ke semua kamera...';
+
+        try {
+            const res = await fetchWithAutoAuth('/api/zones/bulk-set-mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: mode, overwrite: overwrite })
+            });
+            const data = await res.json();
+            if (data.status === 'completed') {
+                if (statusEl) {
+                    statusEl.innerText = `Zone ${data.mode_label}: ${data.created_count} dibuat, `
+                        + `${data.skipped_count} dilewati, ${data.fail_count} gagal dari ${data.total} kamera.`;
+                }
+                let msg = `Mode zone: ${data.mode_label}\n`;
+                msg += `✅ Dibuat: ${data.created_count}\n`;
+                msg += `⏭ Dilewati: ${data.skipped_count}\n`;
+                msg += `⚠️ Gagal: ${data.fail_count}`;
+                if (data.fail_count > 0) {
+                    msg += `\n\nKamera tanpa zone TIDAK akan mendeteksi gerakan meski Function-nya Modect.`;
+                }
+                alert(msg);
+            } else {
+                if (statusEl) statusEl.innerText = `Gagal: ${data.message}`;
+                alert(`❌ ${data.message}`);
+            }
+        } catch (err) {
+            if (statusEl) statusEl.innerText = `Error: ${err.message}`;
+            alert(`Error: ${err.message}`);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    // =========================================================================
     // 2. LOAD CAMERAS
     // =========================================================================
     async function loadCameras() {
@@ -717,6 +860,7 @@
                     <td>
                         <div class="action-group">
                             <button class="btn btn-warning btn-small" onclick="editCamera('${mon.Id}')">✏️ Edit</button>
+                            <button class="btn btn-primary btn-small" onclick="setZoneForCamera('${mon.Id}', '${escapeHtml(mon.Name)}')" title="Buat/perbarui zone deteksi sesuai mode yang dipilih di Kontrol Massal">🎯 Zone</button>
                             <button class="btn btn-danger btn-small" onclick="deleteCamera('${mon.Id}')">🗑️ Hapus</button>
                         </div>
                     </td>
@@ -921,32 +1065,6 @@
 
         const [width, height] = (document.getElementById('camResolution').value || '1920x1080').split('x');
 
-        const params = new URLSearchParams();
-        params.append('Monitor[Name]', camName);
-        params.append('Monitor[Type]', 'Ffmpeg');
-        params.append('Monitor[Function]', document.getElementById('camFunction').value);
-        params.append('Monitor[Enabled]', '1');
-        params.append('Monitor[Path]', camPath);
-        params.append('Monitor[Method]', 'rtsp');
-        params.append('Monitor[Options]', 'rtsp_transport=tcp');
-        params.append('Monitor[Width]', width || '1920');
-        params.append('Monitor[Height]', height || '1080');
-        params.append('Monitor[Colours]', '4');
-        params.append('Monitor[TargetColorspace]', '4');
-        params.append('Monitor[ServerId]', '0');
-
-        // WAJIB diawali ZM_API: URL tanpa prefix akan dijawab aplikasi Flask
-        // sebagai permintaan berkas statis (404), bukan diteruskan ke
-        // ZoneMinder. Save/update kamera akan selalu gagal bila prefix ini
-        // hilang.
-        let targetUrl = originalId
-            ? `${ZM_API}/monitors/${originalId}.json`
-            : `${ZM_API}/monitors.json`;
-
-        if (!originalId && inputId) {
-            params.append('Monitor[Id]', inputId);
-        }
-
         const saveBtn = document.getElementById('btnSave');
         const origText = saveBtn ? saveBtn.innerText : '';
         if (saveBtn) {
@@ -955,20 +1073,54 @@
         }
 
         try {
-            const res = await fetchWithAutoAuth(targetUrl, {
+            // Penyimpanan dilakukan di backend, bukan langsung dari browser.
+            // Alasannya: ZoneMinder membalas {"message":"Saved"} tanpa Id,
+            // sehingga browser tidak mungkin tahu ID kamera baru — dan zone
+            // tidak bisa dibuat tanpa ID itu. Backend mencari ID berdasarkan
+            // nama setelah menyimpan, lalu langsung membuat zone-nya.
+            const res = await fetchWithAutoAuth('/api/zones/save-camera', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params.toString()
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: originalId || '',
+                    customId: originalId ? '' : inputId,
+                    name: camName,
+                    path: camPath,
+                    function: document.getElementById('camFunction').value,
+                    width: width || '1920',
+                    height: height || '1080',
+                    colorspace: document.getElementById('camColorspace')?.value || '4',
+                    zoneMode: document.getElementById('camZoneMode')?.value,
+                    createZone: document.getElementById('camCreateZone')?.checked ?? true,
+                    overwriteZone: document.getElementById('camOverwriteZone')?.checked ?? false
+                })
             });
 
             const data = await res.json().catch(() => ({}));
 
-            if (res.ok || (data && (data.message === 'Saved' || data.Id))) {
-                alert(originalId ? `Kamera '${camName}' (ID: ${originalId}) berhasil diperbarui!` : `Kamera '${camName}' berhasil didaftarkan ke ZoneMinder!`);
+            if (res.ok && data.status === 'success') {
+                const zr = data.zone || {};
+                let zoneNote = '';
+
+                if (zr.created) {
+                    zoneNote = `\n\n🎯 Zone deteksi dibuat: ${zr.label || zr.mode}`
+                             + ` (${zr.width}x${zr.height})`;
+                } else if (zr.skipped) {
+                    zoneNote = `\n\n⏭ Zone dilewati: ${zr.reason || '-'}`;
+                } else if (zr.reason) {
+                    zoneNote = `\n\n⚠️ Zone TIDAK dibuat: ${zr.reason}`
+                             + `\nTanpa zone, kamera ini tidak akan mendeteksi gerakan meski memakai Modect.`;
+                }
+
+                const head = data.editing
+                    ? `Kamera '${data.name}' (ID: ${data.monitor_id}) berhasil diperbarui!`
+                    : `Kamera '${data.name}' berhasil didaftarkan (ID: ${data.monitor_id})!`;
+
+                alert(head + zoneNote);
                 resetForm();
                 await loadCameras();
             } else {
-                alert('Gagal menyimpan kamera: ' + (data.message || JSON.stringify(data) || res.statusText));
+                alert('Gagal menyimpan kamera: ' + (data.message || res.statusText));
             }
         } catch (err) {
             alert('Terjadi kesalahan jaringan: ' + err.message);
@@ -1147,6 +1299,13 @@
     // daftar kamera tidak pernah dimuat (hanya menyisakan teks "Memuat data
     // kamera dari ZoneMinder..." di tabel).
     document.addEventListener('DOMContentLoaded', async () => {
+        // Daftar mode zone dimuat lebih dulu: dropdown-nya dipakai baik oleh
+        // form kamera maupun oleh tombol "Zone" di tabel.
+        loadZoneModes();
+
+        const zoneSelect = document.getElementById('camZoneMode');
+        if (zoneSelect) zoneSelect.addEventListener('change', renderZoneModeHint);
+
         await checkZmConnection();
         await loadCameras();
         await loadCheckerConfig();

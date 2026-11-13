@@ -3,354 +3,203 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZoneMinder - Upgraded Burst Add CCTV</title>
+  <title>Burst Add Kamera - CCTV Dashboard</title>
+  <link rel="stylesheet" href="/app_ui.css">
   <!-- Library SheetJS untuk Ekspor & Impor File Excel -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --success: #16a34a;
-      --danger: #dc2626;
-      --warning: #d97706;
-      --bg: #f8fafc;
-      --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #1e293b;
-      --muted: #64748b;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-    header {
-      background: linear-gradient(135deg, #0f172a, #1e293b);
-      color: white;
-      padding: 14px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      flex-shrink: 0;
-    }
-    header h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    .header-actions { display: flex; align-items: center; gap: 12px; }
-    .btn-back {
-      color: white;
-      text-decoration: none;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.25);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      transition: .2s;
-    }
-    .btn-back:hover { background: rgba(255,255,255,0.22); }
-
-    .main-layout {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      padding: 16px 24px;
-      gap: 14px;
-      overflow: hidden;
-    }
-
-    /* Tabs Bar */
-    .tabs-bar {
-      display: flex;
-      gap: 8px;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 6px;
-      flex-shrink: 0;
-    }
-    .tab-btn {
-      padding: 8px 16px;
-      background: none;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      transition: .2s;
-    }
-    .tab-btn.active {
-      background: var(--primary);
-      color: white;
-    }
-
-    /* Top Grid */
-    .top-panel {
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 14px;
-      flex-shrink: 0;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 16px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-    }
-    .card h3 {
-      font-size: 14px;
-      color: var(--primary);
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: .2s;
-    }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-primary:hover { background: var(--primary-dark); }
-    .btn-success { background: var(--success); color: white; }
-    .btn-success:hover { background: #15803d; }
-    .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
-    .btn-outline:hover { background: #f1f5f9; }
-    .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
-
-    .form-control {
-      width: 100%;
-      padding: 7px 10px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 12px;
-      background: #fff;
-    }
-    textarea.form-control {
-      resize: vertical;
-      min-height: 70px;
-      font-family: monospace;
-      font-size: 11.5px;
-    }
-
-    /* Progress Bar */
-    .progress-container {
-      display: none;
-      flex-direction: column;
-      gap: 4px;
-      margin-top: 10px;
-    }
-    .progress-bar-bg {
-      width: 100%;
-      height: 10px;
-      background: #e2e8f0;
-      border-radius: 5px;
-      overflow: hidden;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--success);
-      transition: width .2s;
-    }
-    .progress-text { font-size: 12px; color: var(--muted); font-weight: 600; }
-
-    /* Table Section */
-    .table-section {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      min-height: 0;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-    }
-    .table-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      flex-shrink: 0;
-    }
-    .table-wrapper {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-    }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th, td { padding: 8px 10px; border: 1px solid var(--border); text-align: left; }
-    th { position: sticky; top: 0; background: #0f172a; color: white; z-index: 5; }
-    tr:nth-child(even) { background: #f8fafc; }
-    .badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .badge-ok { background: #dcfce7; color: #166534; }
-    .badge-err { background: #fee2e2; color: #991b1b; }
-    .badge-pending { background: #f1f5f9; color: #475569; }
-    .btn-del {
-      background: #fee2e2;
-      color: #991b1b;
-      border: none;
-      padding: 3px 7px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 11px;
-      font-weight: bold;
-    }
-      /* Toolbar aksi halaman, di bawah header bersama. */
-    .page-toolbar {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      padding: 9px 24px; background: #fff;
-      border-bottom: 1px solid var(--border); flex-shrink: 0;
-    }
-    .page-toolbar .toolbar-info {
-      font-size: 12.5px; color: var(--muted); font-weight: 600;
-    }
-    .page-toolbar .btn { height: 30px; font-size: 12px; padding: 0 12px; }
-
-</style>
 </head>
 <body>
 
-  <!-- Header navigasi bersama: tautan ZoneMinder ditonjolkan + tombol logout -->
+<div class="ui-page">
   <header id="dashHeader"></header>
-  <div class="page-toolbar">
-    <span class="toolbar-info" id="summaryCounter">Total: 0 Kamera</span>
-    <button id="btnSubmitAll" class="btn btn-success" disabled onclick="executeBurstAdd()">
-      &#9889; Daftarkan Semua ke ZoneMinder
-    </button>
-  </div>
 
-  <div class="main-layout">
-    <!-- Tabs -->
-    <div class="tabs-bar">
-      <button class="tab-btn active" onclick="switchTab('quick')">⚡ Opsi 1: Quick Paste List RTSP (Cepat)</button>
-      <button class="tab-btn" onclick="switchTab('excel')">📊 Opsi 2: Upload File Excel (.xlsx)</button>
-    </div>
+  <div class="ui-body">
 
-    <!-- Top Input Panels -->
-    <div class="top-panel">
-      <!-- Panel Input -->
-      <div class="card" id="panelQuick">
-        <h3>📝 Paste Daftar URL RTSP</h3>
-        <textarea id="rawRtspInput" class="form-control" placeholder="rtsp://admin:pass@192.168.1.101:554/ch1&#10;rtsp://admin:pass@192.168.1.102:554/ch1"></textarea>
-        <div style="display: flex; gap: 8px; margin-top: 8px;">
-          <input type="text" id="prefixName" class="form-control" placeholder="Prefix (misal: CAM_LT1_)" value="CAM_LT1_">
-          <button class="btn btn-primary" onclick="parseQuickList()">Generate & Preview</button>
+    <section class="ui-card">
+      <div class="ui-card-head">
+        <div>
+          <div class="ui-card-title">Sumber Data Kamera</div>
+          <div class="ui-card-sub">Paste daftar URL, atau unggah berkas Excel dengan kolom Zone.</div>
+        </div>
+        <div class="ui-tabs">
+          <button class="ui-tab active" id="tabQuick" onclick="switchTab('quick')">Paste URL</button>
+          <button class="ui-tab" id="tabExcel" onclick="switchTab('excel')">Unggah Excel</button>
         </div>
       </div>
 
-      <div class="card" id="panelExcel" style="display: none;">
-        <h3>📥 Template & Upload Excel</h3>
-        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <button class="btn btn-outline" style="flex: 1;" onclick="downloadExcelTemplate()">Unduh Format (.xlsx)</button>
+      <div class="ui-card-body">
+        <div id="panelQuick" class="ui-field">
+          <label class="ui-label" for="rawRtspInput">Daftar URL RTSP (satu per baris)</label>
+          <textarea id="rawRtspInput" class="ui-textarea"
+            placeholder="rtsp://admin:pass@192.168.1.101:554/ch1"></textarea>
+          <div class="ui-row">
+            <div class="ui-field" style="flex:1; min-width:180px;">
+              <label class="ui-label" for="prefixName">Prefix nama kamera</label>
+              <input type="text" id="prefixName" class="ui-input" value="CAM_LT1_">
+            </div>
+            <button class="ui-btn ui-btn-primary" style="margin-top:18px;" onclick="parseQuickList()">Buat Pratinjau</button>
+          </div>
         </div>
-        <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="form-control" onchange="handleExcelUpload(event)">
+
+        <div id="panelExcel" class="ui-field" style="display:none;">
+          <label class="ui-label" for="excelFile">Berkas Excel (.xlsx / .xls / .csv)</label>
+          <input type="file" id="excelFile" class="ui-input" accept=".xlsx, .xls, .csv"
+                 style="height:auto; padding:6px 8px;" onchange="handleExcelUpload(event)">
+          <div class="ui-hint">
+            Kolom yang dikenali: <b>Name</b>, <b>Source Path</b>, <b>Function</b>,
+            <b>Width</b>, <b>Height</b>, <b>Max FPS</b>, dan <b>Zone</b>.
+            Kolom Zone menerima angka 1&ndash;5 atau nama mode
+            (Paling Ringan, Ringan, Sedang, Berat, Paling Berat).
+            Kosongkan untuk mengikuti mode global.
+          </div>
+          <div class="ui-row">
+            <button class="ui-btn" onclick="downloadExcelTemplate()">Unduh Template</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ui-card">
+      <div class="ui-card-head">
+        <div>
+          <div class="ui-card-title">Pengaturan Default</div>
+          <div class="ui-card-sub">Dipakai untuk baris yang tidak menentukan nilainya sendiri.</div>
+        </div>
       </div>
 
-      <!-- Panduan & Pengaturan Global -->
-      <div class="card">
-        <h3>⚙️ Pengaturan Default & Panduan</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 12px;">
-          <div>
-            <label style="font-weight: 600;">Fungsi ZM:</label>
-            <select id="defaultFunc" class="form-control">
+      <div class="ui-card-body">
+        <div class="ui-grid-3">
+          <div class="ui-field">
+            <label class="ui-label" for="defaultFunc">Fungsi ZoneMinder</label>
+            <select id="defaultFunc" class="ui-select">
               <option value="Monitor" selected>Monitor</option>
               <option value="Modect">Modect</option>
               <option value="Record">Record</option>
             </select>
           </div>
-          <div>
-            <label style="font-weight: 600;">Resolusi:</label>
-            <select id="defaultRes" class="form-control">
-              <option value="1920x1080" selected>1920 x 1080</option>
-              <option value="1280x720">1280 x 720</option>
-              <option value="640x480">640 x 480</option>
+          <div class="ui-field">
+            <label class="ui-label" for="defaultRes">Resolusi</label>
+            <select id="defaultRes" class="ui-select">
+              <option value="1920x1080" selected>1920 &times; 1080</option>
+              <option value="1280x720">1280 &times; 720</option>
+              <option value="640x480">640 &times; 480</option>
             </select>
           </div>
-          <div>
-            <label style="font-weight: 600;">Max FPS:</label>
-            <input type="number" id="defaultFps" class="form-control" placeholder="15">
+          <div class="ui-field">
+            <label class="ui-label" for="defaultFps">Max FPS</label>
+            <input type="number" id="defaultFps" class="ui-input" placeholder="15">
           </div>
         </div>
 
-        <!-- Progress Box -->
-        <div id="progressBox" class="progress-container">
-          <div class="progress-bar-bg">
-            <div id="progressFill" class="progress-bar-fill"></div>
+        <div class="ui-field">
+          <label class="ui-label" for="zoneMode">Mode Zone Deteksi Global</label>
+          <select id="zoneMode" class="ui-select"></select>
+          <div id="zoneModeHint" class="ui-hint">
+            Zone deteksi wajib ada agar Modect benar-benar mendeteksi gerakan.
           </div>
-          <div id="progressText" class="progress-text">Memproses 0 / 0 kamera...</div>
+        </div>
+
+        <div class="ui-row" style="gap:18px;">
+          <label class="ui-check">
+            <input type="checkbox" id="createZone" checked>
+            Buat zone deteksi untuk setiap kamera
+          </label>
+          <label class="ui-check">
+            <input type="checkbox" id="overwriteZone">
+            Timpa zone dashboard yang sudah ada
+          </label>
+        </div>
+
+        <div id="progressBox" class="ui-progress">
+          <div class="ui-progress-track">
+            <div id="progressFill" class="ui-progress-fill"></div>
+          </div>
+          <div id="progressText" class="ui-progress-text">Memproses 0 / 0 kamera...</div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Table Preview Section -->
-    <div class="table-section">
-      <div class="table-header">
-        <h3 style="font-size: 14px; color: var(--text);">📋 Daftar Kamera yang Akan Didaftarkan</h3>
-        <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="clearAllRows()">Bersihkan Semua</button>
+    <section class="ui-card" style="flex:1;">
+      <div class="ui-toolbar">
+        <span class="ui-toolbar-label">Pratinjau</span>
+        <span id="summaryCounter" class="ui-badge ui-badge-neutral">0 Kamera</span>
+        <div class="ui-spacer"></div>
+        <button class="ui-btn ui-btn-sm" onclick="clearAllRows()">Bersihkan</button>
+        <button id="btnSubmitAll" class="ui-btn ui-btn-primary ui-btn-sm" disabled
+                onclick="executeBurstAdd()">Daftarkan Semua</button>
       </div>
 
-      <div class="table-wrapper">
-        <table>
+      <div class="ui-table-wrap">
+        <table class="ui-table">
           <thead>
             <tr>
-              <th style="width: 40px;">No</th>
-              <th style="width: 180px;">Nama Kamera</th>
-              <th>URL RTSP Stream</th>
-              <th style="width: 110px;">Fungsi</th>
-              <th style="width: 110px;">Resolusi</th>
-              <th style="width: 70px;">FPS</th>
-              <th style="width: 110px;">Status</th>
-              <th style="width: 50px;">Aksi</th>
+              <th style="width:44px;">No</th>
+              <th style="width:170px;">Nama Kamera</th>
+              <th>URL RTSP</th>
+              <th style="width:104px;">Fungsi</th>
+              <th style="width:156px;">Mode Zone</th>
+              <th style="width:92px;">Resolusi</th>
+              <th style="width:56px;">FPS</th>
+              <th style="width:132px;">Status</th>
+              <th style="width:44px;"></th>
             </tr>
           </thead>
           <tbody id="cameraTableBody">
             <tr>
-              <td colspan="8" style="text-align: center; color: var(--muted); padding: 30px;">
-                Belum ada data kamera. Paste daftar URL RTSP atau upload file Excel di atas.
+              <td colspan="9" class="ui-empty">
+                Belum ada data kamera. Paste daftar URL RTSP atau unggah berkas Excel di atas.
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
+
   </div>
+</div>
 
   <script>
     let cameraList = [];
+    let ZONE_MODES = [];
+
+    // Mode zone dimuat dari server: angka yang ditampilkan dijamin sama
+    // dengan yang benar-benar dikirim ke ZoneMinder.
+    async function loadZoneModes() {
+      const select = document.getElementById('zoneMode');
+      const hint = document.getElementById('zoneModeHint');
+      try {
+        const res = await fetch('/api/zones/modes');
+        const data = await res.json();
+        ZONE_MODES = data.modes || [];
+        select.innerHTML = ZONE_MODES
+          .map(m => `<option value="${m.key}" ${m.key === data.default_mode ? 'selected' : ''}>${m.label}</option>`)
+          .join('');
+        renderZoneHint();
+      } catch (err) {
+        select.innerHTML = '<option value="light">2. Ringan</option>';
+        hint.innerText = 'Daftar mode tidak dapat dimuat. Memakai mode default.';
+      }
+    }
+
+    function renderZoneHint() {
+      const key = document.getElementById('zoneMode').value;
+      const mode = ZONE_MODES.find(m => m.key === key);
+      const hint = document.getElementById('zoneModeHint');
+      hint.innerHTML = mode
+        ? `${mode.description}<br><b>Efektif:</b> CheckMethod=${mode.check_method}, `
+          + `MinPixelThreshold=${mode.min_pixel_threshold} (angka kecil = lebih sensitif), Units=${mode.units}.`
+        : 'Zone deteksi wajib ada agar Modect benar-benar mendeteksi gerakan.';
+    }
+
+    document.getElementById('zoneMode').addEventListener('change', renderZoneHint);
+    loadZoneModes();
 
     function switchTab(tab) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      if (tab === 'quick') {
-        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
-        document.getElementById('panelQuick').style.display = 'block';
-        document.getElementById('panelExcel').style.display = 'none';
-      } else {
-        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
-        document.getElementById('panelQuick').style.display = 'none';
-        document.getElementById('panelExcel').style.display = 'block';
-      }
+      const isQuick = tab === 'quick';
+      document.getElementById('tabQuick').classList.toggle('active', isQuick);
+      document.getElementById('tabExcel').classList.toggle('active', !isQuick);
+      document.getElementById('panelQuick').style.display = isQuick ? 'block' : 'none';
+      document.getElementById('panelExcel').style.display = isQuick ? 'none' : 'block';
     }
 
     function renderTable() {
@@ -359,42 +208,73 @@
       const summary = document.getElementById('summaryCounter');
 
       if (cameraList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 30px;">Belum ada data kamera. Silakan masukkan data di atas.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="ui-empty">Belum ada data kamera. Silakan masukkan data di atas.</td></tr>`;
         submitBtn.disabled = true;
-        summary.innerText = "Total: 0 Kamera";
+        summary.innerText = "0 Kamera";
         return;
       }
+
+      const globalMode = document.getElementById('zoneMode').value;
+      const globalLabel = ZONE_MODES.find(m => m.key === globalMode)?.label || globalMode;
 
       let html = '';
       cameraList.forEach((cam, idx) => {
         const isUrlOk = cam.Path && cam.Path.toLowerCase().startsWith('rtsp://');
-        const badgeStatus = cam.executionStatus
-          ? (cam.executionStatus === 'SUCCESS' ? '<span class="badge badge-ok">✅ Berhasil</span>' : `<span class="badge badge-err" title="${cam.executionError || ''}">❌ Gagal</span>`)
-          : (isUrlOk ? '<span class="badge badge-pending">Siap</span>' : '<span class="badge badge-err">Invalid URL</span>');
+        let badgeStatus = cam.executionStatus
+          ? (cam.executionStatus === 'SUCCESS' ? '<span class="ui-badge ui-badge-ok">Berhasil</span>' : `<span class="ui-badge ui-badge-err" title="${cam.executionError || ''}">Gagal</span>`)
+          : (isUrlOk ? '<span class="ui-badge ui-badge-neutral">Siap</span>' : '<span class="ui-badge ui-badge-err">URL invalid</span>');
+
+        if (cam.executionStatus === 'SUCCESS' && cam.zoneStatus) {
+          const zt = cam.zoneStatus === 'failed' ? (cam.zoneReason || 'zone gagal') : (cam.zoneReason || '');
+          if (cam.zoneStatus === 'created') {
+            badgeStatus += ' <span class="ui-badge ui-badge-ok" title="Zone deteksi dibuat">Zone dibuat</span>';
+          } else if (cam.zoneStatus === 'skipped') {
+            badgeStatus += ` <span class="ui-badge ui-badge-warn" title="${zt}">Zone dilewati</span>`;
+          } else {
+            badgeStatus += ` <span class="ui-badge ui-badge-err" title="${zt}">Zone gagal</span>`;
+          }
+        }
+
+        // Mode zone per baris: nilai dari Excel bila ada, selain itu ikut
+        // pilihan global. Ditampilkan apa adanya supaya operator bisa
+        // memastikan kolom Excel benar-benar terbaca.
+        const rowMode = cam.ZoneMode || '';
+        const zoneOptions = ZONE_MODES.map(m =>
+          `<option value="${m.key}" ${rowMode === m.key ? 'selected' : ''}>${m.short || m.label}</option>`
+        ).join('');
+        const inherited = !rowMode;
 
         html += `
           <tr>
             <td>${idx + 1}</td>
-            <td><input type="text" class="form-control" value="${cam.Name}" onchange="updateCamField(${idx}, 'Name', this.value)"></td>
-            <td><input type="text" class="form-control" value="${cam.Path}" onchange="updateCamField(${idx}, 'Path', this.value)"></td>
+            <td><input type="text" class="ui-input" value="${cam.Name}" onchange="updateCamField(${idx}, 'Name', this.value)"></td>
+            <td><input type="text" class="ui-input" value="${cam.Path}" onchange="updateCamField(${idx}, 'Path', this.value)"></td>
             <td>
-              <select class="form-control" onchange="updateCamField(${idx}, 'Function', this.value)">
+              <select class="ui-select" onchange="updateCamField(${idx}, 'Function', this.value)">
                 <option value="Monitor" ${cam.Function === 'Monitor' ? 'selected' : ''}>Monitor</option>
                 <option value="Modect" ${cam.Function === 'Modect' ? 'selected' : ''}>Modect</option>
                 <option value="Record" ${cam.Function === 'Record' ? 'selected' : ''}>Record</option>
               </select>
             </td>
+            <td>
+              <select class="ui-select ${inherited ? 'zone-inherit' : ''}"
+                      title="${inherited ? 'Ikut mode global: ' + globalLabel : 'Mode dari Excel'}"
+                      onchange="updateCamField(${idx}, 'ZoneMode', this.value)">
+                <option value="" ${inherited ? 'selected' : ''}>↳ Global (${globalLabel})</option>
+                ${zoneOptions}
+              </select>
+            </td>
             <td>${cam.Width}x${cam.Height}</td>
             <td>${cam.MaxFPS || '-'}</td>
             <td>${badgeStatus}</td>
-            <td><button class="btn-del" onclick="deleteRow(${idx})">✕</button></td>
+            <td><button class="ui-btn ui-btn-danger ui-btn-xs" title="Hapus baris" onclick="deleteRow(${idx})">Hapus</button></td>
           </tr>
         `;
       });
 
       tbody.innerHTML = html;
       submitBtn.disabled = false;
-      summary.innerText = `Total: ${cameraList.length} Kamera`;
+      summary.innerText = `${cameraList.length} Kamera`;
     }
 
     function updateCamField(idx, field, val) {
@@ -443,13 +323,44 @@
 
     function downloadExcelTemplate() {
       const data = [
-        { Name: "CAM_LOBBY_01", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.10:554/ch1", Width: 1920, Height: 1080, "Max FPS": 15 },
-        { Name: "CAM_PARKIR_02", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.11:554/ch1", Width: 1920, Height: 1080, "Max FPS": 15 }
+        { Name: "CAM_LOBBY_01", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.10:554/ch1", Width: 1920, Height: 1080, "Max FPS": 15, Zone: "medium" },
+        { Name: "CAM_PARKIR_02", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.11:554/ch1", Width: 1920, Height: 1080, "Max FPS": 15, Zone: "light" },
+        { Name: "CAM_GUDANG_03", Type: "Ffmpeg", Function: "Monitor", "Source Path": "rtsp://admin:pass@192.168.1.12:554/ch1", Width: 1280, Height: 720, "Max FPS": 15, Zone: "" }
       ];
       const ws = XLSX.utils.json_to_sheet(data);
+
+      // Kolom Zone menerima angka 1-5 atau nama mode. Keduanya diterima agar
+      // pengisi template tidak perlu menghafal key internal.
+      ws['!cols'] = [
+        { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 46 },
+        { wch: 8 }, { wch: 8 }, { wch: 9 }, { wch: 14 }
+      ];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Format CCTV");
       XLSX.writeFile(wb, "Template_Burst_Add_CCTV.xlsx");
+    }
+
+    // Petakan isi kolom Zone dari Excel ke key mode yang dikenal backend.
+    // Menerima angka (1-5), nama Indonesia, maupun key internal (light, dsb).
+    // Nilai kosong berarti: warisi mode default dari panel Pengaturan.
+    const ZONE_ALIASES = {
+      '1': 'lightest', 'paling ringan': 'lightest', 'lightest': 'lightest',
+      '2': 'light', 'ringan': 'light', 'light': 'light',
+      '3': 'medium', 'sedang': 'medium', 'medium': 'medium',
+      '4': 'heavy', 'berat': 'heavy', 'heavy': 'heavy',
+      '5': 'heaviest', 'paling berat': 'heaviest', 'heaviest': 'heaviest',
+      'none': '', '-': '', 'tidak': '', 'off': '', 'skip': ''
+    };
+
+    function normalizeZoneCell(value) {
+      if (value === undefined || value === null) return '';
+      const key = String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!key) return '';
+      // Toleransi: "1. Paling Ringan" / "Zone: Ringan"
+      const cleaned = key.replace(/^zone\s*:\s*/, '').replace(/^\d+\.\s*/, '');
+      if (cleaned in ZONE_ALIASES) return ZONE_ALIASES[cleaned];
+      return key in ZONE_ALIASES ? ZONE_ALIASES[key] : '';
     }
 
     function handleExcelUpload(event) {
@@ -463,7 +374,17 @@
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(firstSheet);
 
-        rows.forEach((r, idx) => {
+        let withZone = 0;
+        let unknownZone = [];
+
+        rows.forEach((r) => {
+          const rawZone = r['Zone'] ?? r['Zone Mode'] ?? r['zone'] ?? r['Mode Zone'];
+          const zone = normalizeZoneCell(rawZone);
+          if (rawZone !== undefined && String(rawZone).trim() !== '' && !zone) {
+            unknownZone.push(String(rawZone).trim());
+          }
+          if (zone) withZone += 1;
+
           cameraList.push({
             Name: r['Name'] || `CCTV_${cameraList.length + 1}`,
             Type: r['Type'] || 'Ffmpeg',
@@ -472,12 +393,22 @@
             Width: String(r['Width'] || '1920'),
             Height: String(r['Height'] || '1080'),
             MaxFPS: String(r['Max FPS'] || ''),
-            Colours: '4'
+            Colours: '4',
+            ZoneMode: zone
           });
         });
 
         event.target.value = '';
         renderTable();
+
+        let msg = `${rows.length} baris terbaca.`;
+        if (withZone) msg += `\n${withZone} kamera memakai mode zone dari Excel.`;
+        if (unknownZone.length) {
+          msg += `\n\n⚠️ ${unknownZone.length} nilai Zone tidak dikenali dan diabaikan:\n`
+               + [...new Set(unknownZone)].slice(0, 6).join(', ')
+               + `\n\nPakai angka 1-5 atau nama mode.`;
+        }
+        alert(msg);
       };
       reader.readAsArrayBuffer(file);
     }
@@ -491,11 +422,13 @@
       const progressText = document.getElementById('progressText');
 
       submitBtn.disabled = true;
-      progressBox.style.display = 'flex';
+      progressBox.classList.add('is-on');
       progressFill.style.width = '10%';
       progressText.innerText = `Mengirim ${cameraList.length} kamera ke ZoneMinder...`;
 
       try {
+        // ZoneMode per kamera ikut dikirim. Bila kosong, backend memakai
+        // zoneMode global di bawah — jadi file Excel lama tetap berjalan.
         const payload = cameraList.map(c => ({
           Monitor: {
             Name: c.Name,
@@ -505,33 +438,56 @@
             Width: c.Width,
             Height: c.Height,
             MaxFPS: c.MaxFPS,
-            Colours: '4'
+            Colours: '4',
+            ZoneMode: c.ZoneMode || ''
           }
         }));
 
         const res = await fetch('/api/zoneminder/burst-add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ monitors: payload })
+          body: JSON.stringify({
+            monitors: payload,
+            zoneMode: document.getElementById('zoneMode').value,
+            createZone: document.getElementById('createZone').checked,
+            overwriteZone: document.getElementById('overwriteZone').checked
+          })
         });
 
         const data = await res.json();
         progressFill.style.width = '100%';
 
         if (res.ok && data.status === 'completed') {
-          progressText.innerText = `Selesai: ${data.success_count} Sukses, ${data.fail_count} Gagal.`;
-          
+          progressText.innerText = `Selesai: ${data.success_count} Sukses, ${data.fail_count} Gagal `
+            + `| Zone: ${data.zone_created_count || 0} dibuat, `
+            + `${data.zone_skipped_count || 0} dilewati, ${data.zone_fail_count || 0} gagal.`;
+
           // Tandai status pada baris tabel
           if (Array.isArray(data.details)) {
             data.details.forEach((det, idx) => {
               if (cameraList[idx]) {
                 cameraList[idx].executionStatus = det.status === 'success' ? 'SUCCESS' : 'FAILED';
                 cameraList[idx].executionError = det.error || '';
+                cameraList[idx].zoneStatus = det.zone || '';
+                cameraList[idx].zoneReason = det.zone_reason || '';
               }
             });
           }
           renderTable();
-          alert(`Pendaftaran Selesai!\n🟢 Berhasil: ${data.success_count}\n🔴 Gagal: ${data.fail_count}`);
+          renderTable();
+
+          // Kamera yang zone-nya gagal tetap terdaftar, tapi Modect-nya tidak
+          // akan pernah alarm. Itu harus dikatakan terus terang, bukan
+          // ditenggelamkan di dalam ringkasan sukses.
+          let msg = `Pendaftaran Selesai!\n🟢 Berhasil: ${data.success_count}\n🔴 Gagal: ${data.fail_count}`;
+          msg += `\n\nZone deteksi (mode: ${data.zone_mode || '-'}):`;
+          msg += `\n✅ Dibuat: ${data.zone_created_count || 0}`;
+          msg += `\n⏭ Dilewati: ${data.zone_skipped_count || 0}`;
+          msg += `\n⚠️ Gagal: ${data.zone_fail_count || 0}`;
+          if ((data.zone_fail_count || 0) > 0) {
+            msg += `\n\nKamera tanpa zone TIDAK akan mendeteksi gerakan meski berfungsi Modect.`;
+          }
+          alert(msg);
         } else {
           progressText.innerText = `Error: ${data.message || 'Gagal'}`;
           alert(`Error: ${data.message}`);

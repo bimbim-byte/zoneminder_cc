@@ -585,9 +585,55 @@ def add_single_camera():
 
         if res.status_code in [200, 201]:
             res_data = res.json()
+
+            # Zone deteksi WAJIB ada, kalau tidak Modect tidak akan pernah
+            # menghasilkan alarm (ZM hanya menilai gerakan di dalam zone).
+            # Kegagalan zone tidak membatalkan pendaftaran kamera: kamera
+            # tetap dibuat, dan status zone dilaporkan apa adanya ke UI.
+            zone_result = {"created": False, "skipped": True,
+                           "reason": "Pembuatan zone dinonaktifkan."}
+            zone_mode = normalize_zone_mode(data.get("zoneMode"))
+            if data.get("createZone", True) and zone_mode:
+                # ZM 1.36 hanya membalas {"message":"Saved"} tanpa Id, jadi
+                # urutannya: coba baca Id dari respons dulu (build lain bisa
+                # menyertakannya), lalu cari berdasarkan nama.
+                monitor = {}
+                if isinstance(res_data, dict):
+                    monitor = res_data.get("monitor", res_data) or {}
+                    if isinstance(monitor, list) and monitor:
+                        monitor = monitor[0].get("Monitor", monitor[0]) if isinstance(monitor[0], dict) else monitor[0]
+                monitor_id = (monitor or {}).get("Id") or (res_data or {}).get("Id")
+                if not monitor_id:
+                    monitor_id = find_monitor_id_by_name(clean_name)
+
+                if monitor_id:
+                    zone_result = ensure_zone_for_monitor(
+                        monitor_id,
+                        mode_key=zone_mode,
+                        overwrite=bool(data.get("overwriteZone", False)),
+                        width=width,
+                        height=height,
+                    )
+                else:
+                    zone_result = {
+                        "created": False, "skipped": False, "mode": zone_mode,
+                        "reason": "ID monitor baru tidak ditemukan pada respons ZoneMinder.",
+                    }
+
+            MONITOR_CACHE["ts"] = 0
+
+            message = f"Kamera '{clean_name}' berhasil didaftarkan ke ZoneMinder!"
+            if zone_result.get("created"):
+                message += f" Zone deteksi dibuat: {zone_result.get('label', zone_mode)}."
+            elif zone_result.get("skipped"):
+                message += f" Zone dilewati: {zone_result.get('reason', '-')}"
+            else:
+                message += f" PERINGATAN zone gagal: {zone_result.get('reason', '-')}"
+
             return jsonify({
                 "status": "success",
-                "message": f"Kamera '{clean_name}' berhasil didaftarkan ke ZoneMinder!",
+                "message": message,
+                "zone": zone_result,
                 "data": res_data
             }), 200
         else:
@@ -615,9 +661,16 @@ def burst_add_monitors():
     token = get_zm_token()
     auth_param = f"?token={token}" if token else ""
 
+    zone_mode = normalize_zone_mode(data.get("zoneMode"))
+    create_zone = bool(data.get("createZone", True)) and zone_mode is not None
+    overwrite_zone = bool(data.get("overwriteZone", False))
+
     results = []
     success_count = 0
     fail_count = 0
+    zone_created = 0
+    zone_skipped = 0
+    zone_failed = 0
 
     for idx, item in enumerate(monitors):
         monitor_data = item.get("Monitor", item)
@@ -664,7 +717,50 @@ def burst_add_monitors():
 
             if res.status_code in [200, 201] or "message" in res_json:
                 success_count += 1
-                results.append({"name": clean_name, "status": "success", "id": res_json.get("Id", "")})
+                entry = {"name": clean_name, "status": "success", "id": res_json.get("Id", "")}
+
+                if create_zone:
+                    monitor_id = res_json.get("Id")
+                    if not monitor_id:
+                        monitor = res_json.get("monitor", res_json)
+                        if isinstance(monitor, list) and monitor:
+                            monitor = monitor[0]
+                        if isinstance(monitor, dict):
+                            monitor_id = (monitor.get("Monitor", monitor) or {}).get("Id")
+                    if not monitor_id:
+                        # ZM 1.36 tidak menyertakan Id pada respons simpan.
+                        monitor_id = find_monitor_id_by_name(clean_name)
+
+                    # Mode zone per baris (dari kolom Excel) menang atas mode
+                    # global. Nilai kosong/tidak dikenal jatuh ke mode global,
+                    # sehingga berkas Excel lama tetap berperilaku sama.
+                    row_mode = normalize_zone_mode(monitor_data.get("ZoneMode"))
+                    effective_mode = row_mode or zone_mode
+
+                    if monitor_id:
+                        zr = ensure_zone_for_monitor(
+                            monitor_id, mode_key=effective_mode, overwrite=overwrite_zone,
+                            width=payload.get("Monitor[Width]"),
+                            height=payload.get("Monitor[Height]"),
+                        )
+                        zr["mode_source"] = "baris" if row_mode else "global"
+                    else:
+                        zr = {"created": False, "skipped": False,
+                              "reason": "ID monitor baru tidak ditemukan."}
+
+                    if zr.get("created"):
+                        zone_created += 1
+                        entry["zone"] = "created"
+                    elif zr.get("skipped"):
+                        zone_skipped += 1
+                        entry["zone"] = "skipped"
+                        entry["zone_reason"] = zr.get("reason", "")
+                    else:
+                        zone_failed += 1
+                        entry["zone"] = "failed"
+                        entry["zone_reason"] = zr.get("reason", "")
+
+                results.append(entry)
             else:
                 fail_count += 1
                 results.append({"name": clean_name, "status": "failed", "error": res.text[:120]})
@@ -672,11 +768,17 @@ def burst_add_monitors():
             fail_count += 1
             results.append({"name": clean_name, "status": "failed", "error": str(e)})
 
+    MONITOR_CACHE["ts"] = 0
+
     return jsonify({
         "status": "completed",
         "total": len(monitors),
         "success_count": success_count,
         "fail_count": fail_count,
+        "zone_mode": zone_mode,
+        "zone_created_count": zone_created,
+        "zone_skipped_count": zone_skipped,
+        "zone_fail_count": zone_failed,
         "details": results
     })
 
@@ -1104,6 +1206,561 @@ def zm_post(path, data, retry=True):
         return 0
 
 
+def zm_delete(path, retry=True):
+    """DELETE ke ZoneMinder API. Dipakai untuk membersihkan zone sementara."""
+    session, token = zm_authenticated_session()
+
+    q = {"token": token} if token else {}
+    try:
+        res = session.delete(f"{ZM_BASE_URL}/{path}", params=q, timeout=15)
+        if res.status_code in (401, 403) and retry:
+            global ZM_SESSION_AUTHED
+            ZM_SESSION.cookies.clear()
+            ZM_SESSION_AUTHED = False
+            return zm_delete(path, retry=False)
+        return res.status_code
+    except Exception as e:
+        log.error("ZM DELETE %s gagal: %s", path, e)
+        return 0
+
+
+# ==============================================================================
+# 7b. ZONE DETEKSI OTOMATIS — 5 MODE OPERASIONAL
+# ==============================================================================
+# ZoneMinder hanya mengevaluasi gerakan DI DALAM zone. Monitor tanpa zone
+# sama sekali tidak akan pernah menghasilkan alarm, sekalipun Function-nya
+# Modect: ZM merekam, tapi tidak ada piksel yang dinilai sebagai gerakan.
+# Karena itu setiap kamera baru wajib punya minimal satu zone.
+#
+# Semua mode di bawah memakai Units="Percent", sehingga nilainya tidak
+# bergantung pada resolusi kamera dan tidak perlu dihitung ulang saat
+# resolusi berubah. Ini juga menghindari jebakan Units="Pixels" yang membuat
+# ambang 5% pada kamera 4K membengkak jadi angka berbeda per kamera.
+#
+# PENTING — arah sensitivitas: MinPixelThreshold adalah ambang perbedaan
+# nilai warna per piksel (0-255). Angka KECIL = LEBIH SENSITIF. Ini
+# kontra-intuitif dan sering dibaca terbalik, jadi jangan "memperbaiki"
+# nilai-nilai ini tanpa memahami efeknya.
+#
+# Urutan mode = urutan beban CPU, dari paling murah ke paling mahal.
+ZONE_MODES = {
+    "lightest": {
+        "label": "1. Paling Ringan",
+        "short": "Paling Ringan",
+        "description": (
+            "CheckMethod=AlarmedPixels (tanpa filter blobs) + ambang 60%. "
+            "Beban CPU terendah, hanya gerakan besar yang memicu alarm. "
+            "Pilihan tepat untuk server dengan banyak kamera."
+        ),
+        "base_preset": "Fast, low sensitivity",
+        "check": {"CheckMethod": "AlarmedPixels", "MinPixelThreshold": 60, "MinAlarmPixels": 20},
+    },
+    "light": {
+        "label": "2. Ringan",
+        "short": "Ringan",
+        "description": (
+            "CheckMethod=AlarmedPixels dengan ambang 20% dan alarm 5%. "
+            "Beban CPU sama dengan Paling Ringan, tapi jauh lebih sensitif."
+        ),
+        "base_preset": "Fast, high sensitivity",
+        "check": {"CheckMethod": "AlarmedPixels", "MinPixelThreshold": 20, "MinAlarmPixels": 5},
+    },
+    "medium": {
+        "label": "3. Sedang",
+        "short": "Sedang",
+        "description": (
+            "CheckMethod=Blobs + ambang 25%. Nilai persis preset 'Default' "
+            "ZoneMinder. Objek dikelompokkan lebih dulu sehingga noise titik "
+            "ditolak. Titik seimbang antara akurasi dan beban CPU."
+        ),
+        "base_preset": "Default",
+        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 25, "MinAlarmPixels": 3,
+                  "MinBlobPixels": 2, "MinBlobs": 1},
+    },
+    "heavy": {
+        "label": "4. Berat",
+        "short": "Berat",
+        "description": (
+            "CheckMethod=Blobs + ambang 60% dan blob minimal 20. Hanya gerakan "
+            "besar yang lolos. Beban CPU tinggi, false alarm paling sedikit."
+        ),
+        "base_preset": "Best, low sensitivity",
+        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 60, "MinAlarmPixels": 36,
+                  "MinBlobPixels": 20, "MinBlobs": 1},
+    },
+    "heaviest": {
+        "label": "5. Paling Berat",
+        "short": "Paling Berat",
+        "description": (
+            "CheckMethod=Blobs + ambang 20% dan alarm 8%. Paling sensitif dan "
+            "paling mahal: filter serta deteksi blob berjalan penuh tiap frame. "
+            "Pakai hanya untuk sedikit kamera di area yang benar-benar penting."
+        ),
+        "base_preset": "Best, high sensitivity",
+        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 20, "MinAlarmPixels": 8,
+                  "MinBlobPixels": 5, "MinBlobs": 1},
+    },
+}
+
+# Mode default saat kamera didaftarkan tanpa menyebut mode. "light" dipilih
+# karena menjalankan Modect yang benar-benar berfungsi tanpa membebani CPU
+# seperti halnya Blobs pada jaringan banyak kamera.
+ZONE_MODE_DEFAULT = "light"
+
+# Nama zone yang dibuat otomatis. Dipakai untuk mengenali zone buatan
+# dashboard, supaya konfigurasi manual pengguna tidak pernah ditimpa.
+ZONE_DEFAULT_NAME = "All"
+
+# Preset ZoneMinder dibaca dari API zonePresets.json bila tersedia; bila
+# gagal, nilai cadangan ini dipakai. Isinya SAMA dengan yang tertanam di
+# zm_create.sql, jadi Dashboard tetap berfungsi walau ZM tidak merespons.
+ZONE_PRESET_FALLBACK = {
+    "Default": {
+        "Units": "Percent", "CheckMethod": "Blobs",
+        "MinPixelThreshold": 25, "MaxPixelThreshold": None, "MinAlarmPixels": 3,
+        "MaxAlarmPixels": None, "FilterX": None, "FilterY": None, "MinFilterPixels": None,
+        "MaxFilterPixels": None, "MinBlobPixels": 2, "MaxBlobPixels": None,
+        "MinBlobs": 1, "MaxBlobs": None, "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+    },
+    "Fast, low sensitivity": {
+        "Units": "Percent", "CheckMethod": "AlarmedPixels",
+        "MinPixelThreshold": 60, "MaxPixelThreshold": None, "MinAlarmPixels": 20,
+        "MaxAlarmPixels": None, "FilterX": None, "FilterY": None, "MinFilterPixels": None,
+        "MaxFilterPixels": None, "MinBlobPixels": None, "MaxBlobPixels": None,
+        "MinBlobs": None, "MaxBlobs": None, "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+    },
+    "Fast, high sensitivity": {
+        "Units": "Percent", "CheckMethod": "AlarmedPixels",
+        "MinPixelThreshold": 20, "MaxPixelThreshold": None, "MinAlarmPixels": 5,
+        "MaxAlarmPixels": None, "FilterX": None, "FilterY": None, "MinFilterPixels": None,
+        "MaxFilterPixels": None, "MinBlobPixels": None, "MaxBlobPixels": None,
+        "MinBlobs": None, "MaxBlobs": None, "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+    },
+    "Best, low sensitivity": {
+        "Units": "Percent", "CheckMethod": "Blobs",
+        "MinPixelThreshold": 60, "MaxPixelThreshold": None, "MinAlarmPixels": 36,
+        "MaxAlarmPixels": None, "FilterX": None, "FilterY": None, "MinFilterPixels": None,
+        "MaxFilterPixels": None, "MinBlobPixels": 20, "MaxBlobPixels": None,
+        "MinBlobs": 1, "MaxBlobs": None, "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+    },
+}
+
+_PRESET_CACHE = {"data": None, "ts": 0.0}
+
+
+def get_zm_zone_presets():
+    """Preset zone asli dari ZoneMinder, di-cache singkat.
+
+    Dibaca langsung dari ZM supaya nilai mode selalu konsisten dengan versi
+    ZoneMinder yang berjalan — bukan hasil salinan yang bisa basi setelah
+    upgrade. Bila API tidak menjawab, dipakai ZONE_PRESET_FALLBACK.
+    """
+    import time
+    now = time.time()
+    if _PRESET_CACHE["data"] and (now - _PRESET_CACHE["ts"]) < 300:
+        return _PRESET_CACHE["data"]
+
+    data = zm_api_get("zonePresets.json")
+    presets = {}
+    if isinstance(data, dict):
+        for raw in data.get("zonePresets", []) or []:
+            p = raw.get("ZonePreset", raw) if isinstance(raw, dict) else None
+            if isinstance(p, dict) and p.get("Name"):
+                presets[str(p["Name"])] = p
+
+    if not presets:
+        presets = ZONE_PRESET_FALLBACK
+    _PRESET_CACHE["data"] = presets
+    _PRESET_CACHE["ts"] = now
+    return presets
+
+
+def normalize_zone_mode(value):
+    """Petakan input bebas ke key mode yang valid. None bila tidak dikenali."""
+    if value is None:
+        return ZONE_MODE_DEFAULT
+    key = str(value).strip().lower().replace(" ", "_")
+    aliases = {
+        "paling_ringan": "lightest", "1": "lightest",
+        "ringan": "light", "2": "light",
+        "sedang": "medium", "3": "medium",
+        "berat": "heavy", "4": "heavy",
+        "paling_berat": "heaviest", "5": "heaviest",
+    }
+    if key in ZONE_MODES:
+        return key
+    return aliases.get(key)
+
+
+def zone_modes_public():
+    """Bentuk mode yang aman dikirim ke browser (tanpa data internal)."""
+    return [
+        {
+            "key": key,
+            "label": spec["label"],
+            "short": spec["short"],
+            "description": spec["description"],
+            "check_method": spec["check"]["CheckMethod"],
+            "min_pixel_threshold": spec["check"]["MinPixelThreshold"],
+        }
+        for key, spec in ZONE_MODES.items()
+    ]
+
+
+def build_zone_payload(mode_key, width, height):
+    """Susun payload zone layar penuh untuk ZoneMinder.
+
+    width/height HARUS berasal dari monitor sebagaimana disimpan ZoneMinder
+    (bukan dari input pengguna), karena koordinat zone memakai ruang resolusi
+    monitor dan ZM menghitungnya 0-based.
+    """
+    spec = ZONE_MODES[mode_key]
+    base = dict(ZONE_PRESET_FALLBACK["Default"])
+
+    # Preset dasar diambil dari ZoneMinder bila tersedia, lalu ditimpa nilai
+    # khusus mode. Hasilnya: field yang tidak kita sentuh tetap mengikuti
+    # preset asli, jadi upgrade ZoneMinder tidak membuat mode kita menyimpang.
+    presets = get_zm_zone_presets()
+    base_name = spec["base_preset"]
+    if base_name in presets:
+        for field in base.keys():
+            if field in presets[base_name]:
+                base[field] = presets[base_name][field]
+    base.update(spec["check"])
+
+    w = int(width) if str(width).isdigit() and int(width) > 1 else 1920
+    h = int(height) if str(height).isdigit() and int(height) > 1 else 1080
+    max_x = w - 1
+    max_y = h - 1
+
+    payload = {
+        "Zone[Name]": ZONE_DEFAULT_NAME,
+        "Zone[Type]": "Active",
+        "Zone[Units]": base.get("Units") or "Percent",
+        "Zone[NumCoords]": "4",
+        "Zone[Coords]": f"0 0 {max_x} 0 {max_x} {max_y} 0 {max_y}",
+        "Zone[Area]": str(w * h),
+        "Zone[AlarmRGB]": "16711680",  # 0xFF0000, merah penuh
+    }
+    for field, value in base.items():
+        if value is None or field in ("Units",):
+            continue
+        payload[f"Zone[{field}]"] = str(value)
+    return payload
+
+
+def _unwrap_zm(obj, *names):
+    """Ambil objek dari respons ZoneMinder yang bersarang.
+
+    ZM membungkus hasil dalam beberapa lapis tergantung endpoint, dan
+    jumlah lapisnya tidak konsisten antar versi:
+
+      {"zone":  {"Zone":  {...}}}                 -> /zones/{id}.json
+      {"monitor":{"Monitor":{...}}}               -> /monitors/{id}.json
+      {"monitors":[{"Monitor":{...}}, ...]}       -> /monitors.json
+
+    Fungsi ini menelusuri lapisan itu sampai menemukan dict yang benar-benar
+    berisi data, sehingga pemanggil tidak perlu menebak bentuknya.
+    """
+    cur = obj
+    seen = 0
+    while isinstance(cur, dict) and seen < 6:
+        advanced = False
+        for name in names:
+            if name in cur and isinstance(cur[name], (dict, list)):
+                cur = cur[name]
+                advanced = True
+                break
+        if advanced:
+            seen += 1
+            continue
+        break
+    if isinstance(cur, list):
+        cur = cur[0] if cur else None
+        if isinstance(cur, dict):
+            for name in names:
+                if name in cur and isinstance(cur[name], dict):
+                    cur = cur[name]
+                    break
+    return cur if isinstance(cur, dict) else None
+
+
+def get_monitor_zones(monitor_id):
+    """Daftar zone milik satu monitor. None bila ZM tidak menjawab.
+
+    CATATAN PENTING: endpoint bersarang /monitors/{id}/zones.json TIDAK ADA
+    pada ZoneMinder 1.36 (balas HTTP 404). Satu-satunya endpoint zone yang
+    tersedia adalah daftar global /zones.json, yang isinya harus disaring
+    per MonitorId. Jalur bersarang tetap dicoba lebih dulu agar build yang
+    menyediakannya (lebih hemat) tetap terpakai.
+    """
+    raw = None
+    nested = zm_api_get(f"monitors/{monitor_id}/zones.json")
+    if isinstance(nested, dict):
+        candidate = nested.get("zones")
+        if isinstance(candidate, list):
+            raw = candidate
+
+    if raw is None:
+        data = zm_api_get("zones.json")
+        if not isinstance(data, dict):
+            return None
+        raw = data.get("zones")
+        if not isinstance(raw, list):
+            return None
+
+    zones = []
+    for item in raw:
+        z = _unwrap_zm(item, "Zone")
+        if z is None and isinstance(item, dict):
+            z = item
+        if isinstance(z, dict) and z.get("Id") is not None:
+            zones.append(z)
+
+    # Daftar global memuat zone semua monitor, jadi wajib disaring.
+    return [z for z in zones if str(z.get("MonitorId", "")) == str(monitor_id)]
+
+
+def find_monitor_id_by_name(name):
+    """Cari ID monitor dari namanya — dipakai setelah POST pembuatan monitor.
+
+    ZoneMinder 1.36 membalas POST /monitors.json hanya dengan
+    {"message":"Saved"}, TANPA menyertakan Id. Tanpa pencarian ini, ID monitor
+    tidak pernah ditemukan sehingga zone otomatis selalu dilaporkan gagal
+    padahal kamera berhasil dibuat. Nama sudah dibersihkan (clean_name) dan
+    unik di ZoneMinder, jadi pencarian berdasarkan nama aman dipakai di sini.
+    """
+    want = str(name or "").strip()
+    if not want:
+        return None
+
+    data = zm_api_get("monitors.json")
+    if not isinstance(data, dict):
+        return None
+
+    for item in data.get("monitors", []) or []:
+        m = _unwrap_zm(item, "Monitor")
+        if isinstance(m, dict) and str(m.get("Name", "")) == want:
+            mid = m.get("Id")
+            if mid is not None:
+                return str(mid)
+    return None
+
+
+def resolve_monitor_geometry(monitor_id):
+    """Ambil Width/Height monitor SEBAGAIMANA DISIMPAN ZoneMinder.
+
+    Bentuk respons /monitors/{id}.json adalah {"monitor":{"Monitor":{...}}},
+    jadi objek harus ditelusuri dua lapis. Sebelumnya lapisan "Monitor" tidak
+    pernah dibuka, akibatnya Width/Height tidak ditemukan dan pembuatan zone
+    selalu gagal dengan alasan "resolusi tidak dapat dibaca" — padahal datanya
+    ada. Nilai dari form pengguna sengaja tidak dipakai di sini: zone harus
+    memakai ruang koordinat yang sama dengan frame yang benar-benar didekode ZM.
+    """
+    data = zm_api_get(f"monitors/{monitor_id}.json")
+    m = _unwrap_zm(data, "monitor", "Monitor")
+    if m and m.get("Width") and m.get("Height"):
+        w, h = str(m["Width"]), str(m["Height"])
+        if w.isdigit() and h.isdigit() and int(w) > 1 and int(h) > 1:
+            return w, h
+
+    # Jalur cadangan: daftar monitor global memuat Width/Height juga.
+    listing = zm_api_get("monitors.json")
+    if isinstance(listing, dict):
+        for item in listing.get("monitors", []):
+            cand = _unwrap_zm(item, "Monitor")
+            if cand and str(cand.get("Id", "")) == str(monitor_id):
+                w, h = str(cand.get("Width", "")), str(cand.get("Height", ""))
+                if w.isdigit() and h.isdigit() and int(w) > 1 and int(h) > 1:
+                    return w, h
+    return None, None
+
+
+def ensure_zone_for_monitor(monitor_id, mode_key=None, overwrite=False, width=None, height=None):
+    """Pastikan monitor punya zone deteksi sesuai mode yang diminta.
+
+    Idempotent dan aman terhadap konfigurasi manual:
+      - Bila monitor sudah punya zone dan overwrite=False, zone TIDAK disentuh.
+      - Bila overwrite=True, hanya zone yang dibuat dashboard (nama "All")
+        yang diganti; zone buatan pengguna dibiarkan utuh.
+
+    Mengembalikan dict berisi created/skipped/reason supaya UI bisa
+    melaporkan status zone secara jujur, bukan menebak.
+    """
+    mode = normalize_zone_mode(mode_key)
+    if mode is None:
+        return {"created": False, "skipped": True, "reason": f"Mode zone '{mode_key}' tidak dikenali."}
+
+    existing = get_monitor_zones(monitor_id)
+    if existing is None:
+        return {
+            "created": False, "skipped": True, "mode": mode,
+            "reason": "Tidak dapat membaca daftar zone dari ZoneMinder.",
+        }
+
+    auto_zones = [z for z in existing if str(z.get("Name", "")) == ZONE_DEFAULT_NAME]
+
+    if existing and not overwrite:
+        return {
+            "created": False, "skipped": True, "mode": mode,
+            "existing": len(existing),
+            "reason": f"Monitor sudah punya {len(existing)} zone. Konfigurasi manual tidak ditimpa.",
+        }
+
+    if not width or not height:
+        width, height = resolve_monitor_geometry(monitor_id)
+    if not width or not height:
+        return {
+            "created": False, "skipped": True, "mode": mode,
+            "reason": "Resolusi monitor tidak dapat dibaca dari ZoneMinder.",
+        }
+
+    payload = build_zone_payload(mode, width, height)
+
+    if overwrite:
+        # Buang HANYA zone buatan dashboard; zone milik pengguna tidak pernah
+        # disentuh, sekalipun overwrite=True.
+        for z in auto_zones:
+            zm_delete(f"zones/{z.get('Id')}.json")
+
+    # MonitorId WAJIB ada di payload. Tanpa itu ZM menolak simpan karena
+    # validasi checkMonitorId di model Zone gagal.
+    payload["Zone[MonitorId]"] = str(monitor_id)
+
+    # Endpoint bersarang 404 pada ZM 1.36, jadi jalur utama adalah zone global.
+    code = zm_post("zones.json", payload)
+    if code not in (200, 201):
+        code = zm_post(f"monitors/{monitor_id}/zones.json", payload)
+
+    if code in (200, 201):
+        return {
+            "created": True, "skipped": False, "mode": mode,
+            "label": ZONE_MODES[mode]["label"],
+            "coords": payload["Zone[Coords]"],
+            "width": width, "height": height,
+        }
+    return {
+        "created": False, "skipped": False, "mode": mode,
+        "reason": f"ZoneMinder menolak pembuatan zone (HTTP {code}).",
+    }
+
+
+@app.route("/api/zones/save-camera", methods=["POST"])
+def api_save_camera_with_zone():
+    """Simpan kamera (baru/edit) lalu buat zone deteksinya dalam satu panggilan.
+
+    Kenapa endpoint ini ada:
+      Halaman Kelola Kamera dulu mem-POST langsung ke /zm/api/monitors.json
+      dari browser. ZoneMinder 1.36 membalas {"message":"Saved"} TANPA Id,
+      sehingga browser tidak pernah tahu ID monitor yang baru dibuat — dan
+      pembuatan zone selalu gagal dengan "ID monitor baru tidak terbaca".
+      ID itu baru diketahui setelah daftar monitor dibaca ulang.
+
+      Endpoint ini melakukan penyimpanan di sisi server, lalu mencari ID
+      berdasarkan NAMA monitor (satu-satunya penanda yang dikirim balik oleh
+      ZM). Dengan begitu pembuatan zone berjalan tanpa menebak ID.
+
+    Body JSON:
+      id        : ID monitor saat mengedit (kosong/null = kamera baru)
+      name      : nama kamera
+      path      : URL RTSP
+      function  : Monitor | Modect | Record | Mocord | Nodect
+      width     : lebar piksel
+      height    : tinggi piksel
+      zoneMode  : lightest | light | medium | heavy | heaviest
+      createZone: bool
+      overwriteZone: bool
+      colorspace: opsional
+    """
+    body = request.json or {}
+
+    name = str(body.get("name", "")).strip()
+    path = str(body.get("path", "")).strip()
+    edit_id = str(body.get("id", "") or "").strip()
+
+    if not name or not path:
+        return jsonify({
+            "status": "error",
+            "message": "Nama kamera dan RTSP Path wajib diisi.",
+        }), 400
+
+    clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name)
+    width = str(body.get("width") or "1920")
+    height = str(body.get("height") or "1080")
+    function = str(body.get("function") or "Monitor")
+
+    payload = {
+        "Monitor[Name]": clean_name,
+        "Monitor[Type]": "Ffmpeg",
+        "Monitor[Function]": function,
+        "Monitor[Enabled]": "1",
+        "Monitor[Path]": path,
+        "Monitor[Method]": "rtsp",
+        "Monitor[Options]": "rtsp_transport=tcp",
+        "Monitor[Width]": width,
+        "Monitor[Height]": height,
+        "Monitor[Colours]": str(body.get("colorspace") or "4"),
+        "Monitor[TargetColorspace]": "4",
+        "Monitor[ServerId]": "0",
+    }
+
+    # ID kustom hanya dipakai saat membuat kamera baru. Saat mengedit, ID
+    # sudah ditentukan oleh URL target.
+    custom_id = str(body.get("customId", "") or "").strip()
+    if not edit_id and custom_id.isdigit():
+        payload["Monitor[Id]"] = custom_id
+
+    if edit_id:
+        target = f"monitors/{edit_id}.json"
+    else:
+        target = "monitors.json"
+
+    code = zm_post(target, payload)
+    if code not in (200, 201):
+        return jsonify({
+            "status": "error",
+            "message": f"ZoneMinder menolak penyimpanan kamera (HTTP {code}).",
+        }), 502
+
+    MONITOR_CACHE["ts"] = 0
+
+    # ID hasil simpan: pakai ID edit bila ada, lalu ID kustom, selain itu
+    # cari berdasarkan nama (satu-satunya penanda yang dikirim balik ZM).
+    monitor_id = edit_id or (custom_id if custom_id.isdigit() else "") \
+        or find_monitor_id_by_name(clean_name)
+    if monitor_id and not str(monitor_id).isdigit():
+        monitor_id = find_monitor_id_by_name(clean_name)
+
+    zone_result = {"created": False, "skipped": True,
+                   "reason": "Pembuatan zone dinonaktifkan."}
+    zone_mode = normalize_zone_mode(body.get("zoneMode"))
+
+    # Saat mengedit, zone lama sengaja dibiarkan agar penyesuaian manual di
+    # antarmuka ZoneMinder tidak terhapus.
+    if body.get("createZone", True) and zone_mode and not edit_id:
+        if not monitor_id:
+            zone_result = {
+                "created": False, "skipped": False, "mode": zone_mode,
+                "reason": "ID monitor baru tidak ditemukan setelah penyimpanan.",
+            }
+        else:
+            zone_result = ensure_zone_for_monitor(
+                monitor_id,
+                mode_key=zone_mode,
+                overwrite=bool(body.get("overwriteZone", False)),
+                width=width,
+                height=height,
+            )
+
+    return jsonify({
+        "status": "success",
+        "monitor_id": monitor_id,
+        "name": clean_name,
+        "editing": bool(edit_id),
+        "zone": zone_result,
+    })
+
+
 @app.route("/api/cameras/bulk-function", methods=["POST"])
 def bulk_set_function():
     """
@@ -1193,6 +1850,184 @@ def bulk_set_function():
         "success_count": ok_count,
         "fail_count": fail_count,
         "details": results,
+    })
+
+
+# ==============================================================================
+# 9. ZONE DETEKSI — 5 MODE OPERASIONAL
+# ==============================================================================
+@app.route("/api/zones/modes", methods=["GET"])
+def api_zone_modes():
+    """Daftar 5 mode zone beserta parameter efektifnya.
+
+    Nilai yang dikirim adalah hasil resolusi preset ZoneMinder yang hidup,
+    jadi UI menampilkan angka yang benar-benar akan ditulis ke ZM.
+    """
+    presets = get_zm_zone_presets()
+    modes = zone_modes_public()
+    for m in modes:
+        spec = ZONE_MODES[m["key"]]
+        base_name = spec["base_preset"]
+        source = presets.get(base_name)
+        m["base_preset"] = base_name
+        m["preset_available"] = bool(source)
+        m["units"] = (source or {}).get("Units", "Percent")
+    return jsonify({
+        "default_mode": ZONE_MODE_DEFAULT,
+        "zone_name": ZONE_DEFAULT_NAME,
+        "modes": modes,
+    })
+
+
+@app.route("/api/zones/<monitor_id>", methods=["GET"])
+def api_zones_for_monitor(monitor_id):
+    """Zone yang dimiliki satu monitor — dipakai UI untuk menampilkan status."""
+    if not re.fullmatch(r"\d+", str(monitor_id)):
+        return jsonify({"status": "error", "message": "ID kamera tidak valid."}), 400
+
+    zones = get_monitor_zones(monitor_id)
+    if zones is None:
+        return jsonify({
+            "status": "error",
+            "message": "Tidak dapat membaca daftar zone dari ZoneMinder.",
+        }), 502
+
+    return jsonify({
+        "status": "ok",
+        "monitor_id": str(monitor_id),
+        "count": len(zones),
+        "has_auto_zone": any(str(z.get("Name", "")) == ZONE_DEFAULT_NAME for z in zones),
+        "zones": [
+            {
+                "id": str(z.get("Id", "")),
+                "name": z.get("Name", ""),
+                "type": z.get("Type", ""),
+                "units": z.get("Units", ""),
+                "check_method": z.get("CheckMethod", ""),
+                "min_pixel_threshold": z.get("MinPixelThreshold"),
+                "min_alarm_pixels": z.get("MinAlarmPixels"),
+                "min_blob_pixels": z.get("MinBlobPixels"),
+                "coords": z.get("Coords", ""),
+            }
+            for z in zones
+        ],
+    })
+
+
+@app.route("/api/zones/<monitor_id>/set-mode", methods=["POST"])
+def api_set_zone_mode(monitor_id):
+    """Buat/perbarui zone deteksi satu kamera sesuai mode yang dipilih.
+
+    Body JSON:
+      mode      : lightest | light | medium | heavy | heaviest
+      overwrite : opsional (bool). true = ganti zone buatan dashboard.
+                  Zone buatan tangan pengguna TIDAK pernah dihapus.
+    """
+    if not re.fullmatch(r"\d+", str(monitor_id)):
+        return jsonify({"status": "error", "message": "ID kamera tidak valid."}), 400
+
+    body = request.json or {}
+    mode = normalize_zone_mode(body.get("mode"))
+    if mode is None:
+        return jsonify({
+            "status": "error",
+            "message": f"Mode zone '{body.get('mode')}' tidak dikenali. "
+                       f"Pilihan: {', '.join(ZONE_MODES.keys())}",
+        }), 400
+
+    result = ensure_zone_for_monitor(
+        monitor_id,
+        mode_key=mode,
+        overwrite=bool(body.get("overwrite", False)),
+    )
+
+    if result.get("created"):
+        MONITOR_CACHE["ts"] = 0
+        return jsonify({
+            "status": "success",
+            "message": f"Zone '{ZONE_DEFAULT_NAME}' dibuat di kamera {monitor_id} "
+                       f"dengan mode {ZONE_MODES[mode]['label']}.",
+            "data": result,
+        })
+    if result.get("skipped"):
+        return jsonify({
+            "status": "skipped",
+            "message": result.get("reason", "Zone dilewati."),
+            "data": result,
+        }), 200
+    return jsonify({
+        "status": "error",
+        "message": result.get("reason", "Gagal membuat zone."),
+        "data": result,
+    }), 502
+
+
+@app.route("/api/zones/bulk-set-mode", methods=["POST"])
+def api_bulk_zone_mode():
+    """Terapkan satu mode zone ke banyak kamera sekaligus.
+
+    Body JSON:
+      mode      : lightest | light | medium | heavy | heaviest
+      ids       : opsional, daftar ID kamera. Kosong = semua kamera.
+      overwrite : opsional (bool), default false.
+    """
+    body = request.json or {}
+    mode = normalize_zone_mode(body.get("mode"))
+    if mode is None:
+        return jsonify({
+            "status": "error",
+            "message": f"Mode zone '{body.get('mode')}' tidak dikenali. "
+                       f"Pilihan: {', '.join(ZONE_MODES.keys())}",
+        }), 400
+
+    overwrite = bool(body.get("overwrite", False))
+    target_ids = [str(x) for x in body.get("ids", []) if str(x).strip()]
+
+    monitors = get_all_monitors_cached()
+    if target_ids:
+        wanted = set(target_ids)
+        monitors = [m for m in monitors if m["id"] in wanted]
+
+    if not monitors:
+        return jsonify({"status": "error", "message": "Tidak ada kamera yang diproses."}), 400
+
+    details = []
+    created = skipped = failed = 0
+
+    for mon in monitors:
+        # Geometri diambil dari data monitor yang sudah ada di cache, sehingga
+        # tidak perlu satu request tambahan per kamera.
+        res = ensure_zone_for_monitor(
+            mon["id"], mode_key=mode, overwrite=overwrite,
+            width=mon.get("width"), height=mon.get("height"),
+        )
+        if res.get("created"):
+            created += 1
+            details.append({"id": mon["id"], "name": mon["name"], "status": "created"})
+        elif res.get("skipped"):
+            skipped += 1
+            details.append({
+                "id": mon["id"], "name": mon["name"],
+                "status": "skipped", "reason": res.get("reason", ""),
+            })
+        else:
+            failed += 1
+            details.append({
+                "id": mon["id"], "name": mon["name"],
+                "status": "failed", "reason": res.get("reason", ""),
+            })
+
+    MONITOR_CACHE["ts"] = 0
+
+    return jsonify({
+        "status": "completed",
+        "mode": mode,
+        "mode_label": ZONE_MODES[mode]["label"],
+        "total": len(monitors),
+        "created_count": created,
+        "skipped_count": skipped,
+        "fail_count": failed,
+        "details": details,
     })
 
 

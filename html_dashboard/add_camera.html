@@ -171,6 +171,33 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label for="zoneMode">Mode Zone Deteksi Otomatis</label>
+            <select id="zoneMode" class="form-control"></select>
+            <div class="form-hint" id="zoneModeHint">
+              Loading...
+            </div>
+            <div class="form-hint" style="margin-top:6px;">
+              Zone deteksi <b>wajib ada</b> agar Modect benar-benar menghasilkan alarm.
+              Tanpa zone, ZoneMinder hanya merekam tanpa pernah mendeteksi gerakan.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
+              <input type="checkbox" id="createZone" checked style="width:auto;">
+              Buat zone deteksi layar penuh otomatis
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-weight:600; margin-top:8px;">
+              <input type="checkbox" id="overwriteZone" style="width:auto;">
+              Timpa zone dashboard yang sudah ada
+            </label>
+            <div class="form-hint">
+              Biarkan tidak dicentang bila kamera sudah punya zone buatan sendiri —
+              konfigurasi manual Anda tidak akan pernah dihapus oleh dashboard.
+            </div>
+          </div>
+
           <button type="submit" id="btnSubmit" class="btn-submit">
             ➕ Daftarkan Kamera ke ZoneMinder
           </button>
@@ -189,6 +216,39 @@
   </div>
 
   <script>
+    // Daftar mode zone diambil dari server supaya angka yang ditampilkan
+    // selalu sama dengan yang benar-benar ditulis ke ZoneMinder.
+    let ZONE_MODES = [];
+
+    async function loadZoneModes() {
+      const select = document.getElementById('zoneMode');
+      const hint = document.getElementById('zoneModeHint');
+      try {
+        const res = await fetch('/api/zones/modes');
+        const data = await res.json();
+        ZONE_MODES = data.modes || [];
+        select.innerHTML = ZONE_MODES
+          .map(m => `<option value="${m.key}" ${m.key === data.default_mode ? 'selected' : ''}>${m.label}</option>`)
+          .join('');
+        renderZoneHint();
+      } catch (err) {
+        select.innerHTML = '<option value="light">2. Ringan</option>';
+        hint.innerText = 'Daftar mode tidak dapat dimuat dari server. Memakai mode default.';
+      }
+    }
+
+    function renderZoneHint() {
+      const key = document.getElementById('zoneMode').value;
+      const hint = document.getElementById('zoneModeHint');
+      const mode = ZONE_MODES.find(m => m.key === key);
+      if (!mode) { hint.innerText = ''; return; }
+      hint.innerHTML = `${mode.description}<br><b>Efektif:</b> CheckMethod=${mode.check_method}, `
+        + `MinPixelThreshold=${mode.min_pixel_threshold} (angka kecil = lebih sensitif), Units=${mode.units}.`;
+    }
+
+    document.getElementById('zoneMode').addEventListener('change', renderZoneHint);
+    loadZoneModes();
+
     function addLog(msg, type = 'info') {
       const box = document.getElementById('logBox');
       const time = new Date().toLocaleTimeString();
@@ -227,12 +287,29 @@
             zmFunction: func,
             width: width,
             height: height,
-            maxFps: maxFps
+            maxFps: maxFps,
+            zoneMode: document.getElementById('zoneMode').value,
+            createZone: document.getElementById('createZone').checked,
+            overwriteZone: document.getElementById('overwriteZone').checked
           })
         });
         const data = await res.json();
         if (res.ok && data.status === 'success') {
-          addLog(`[SUCCESS] ${data.message} 🎉`, 'success');
+          addLog(`[SUCCESS] ${data.message}`, 'success');
+
+          // Status zone dilaporkan terpisah: kamera bisa berhasil didaftarkan
+          // sementara zone-nya gagal. Menyembunyikan itu membuat pengguna
+          // mengira Modect berjalan padahal tidak akan pernah alarm.
+          const zone = data.zone || {};
+          if (zone.created) {
+            addLog(`[ZONE] Zone "${zone.name || 'All'}" dibuat (${zone.label || zone.mode}), `
+              + `koordinat ${zone.coords || '-'} @ ${zone.width}x${zone.height}.`, 'success');
+          } else if (zone.skipped) {
+            addLog(`[ZONE] Dilewati: ${zone.reason || '-'}`, 'info');
+          } else {
+            addLog(`[ZONE-GAGAL] ${zone.reason || 'Zone tidak dibuat. Modect tidak akan mendeteksi gerakan.'}`, 'err');
+          }
+
           document.getElementById('addCamForm').reset();
         } else {
           addLog(`[ERROR] ${data.message || 'Gagal mendaftarkan kamera'}`, 'err');
