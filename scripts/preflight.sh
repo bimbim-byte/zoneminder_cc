@@ -82,6 +82,41 @@ if [ -f .env ]; then
     else
         pass "DASH_SECRET_KEY terisi (panjang ${#DASH_KEY_VAL} karakter)"
     fi
+
+    # MQTT_USER/MQTT_PASS wajib ada: broker menolak koneksi anonim
+    # (allow_anonymous false). Tanpa keduanya, docker compose up langsung
+    # gagal dengan "required variable MQTT_PASS is missing a value".
+    MQTT_USER_VAL="$(grep -E '^MQTT_USER=' .env | tail -1 | cut -d= -f2- | tr -d '\r' | sed 's/[[:space:]]*$//' || true)"
+    MQTT_PASS_VAL="$(grep -E '^MQTT_PASS=' .env | tail -1 | cut -d= -f2- | tr -d '\r' | sed 's/[[:space:]]*$//' || true)"
+
+    if [ -z "${MQTT_USER_VAL:-}" ]; then
+        fail "MQTT_USER kosong di .env (broker menolak koneksi anonim)"
+    else
+        pass "MQTT_USER terisi ('$MQTT_USER_VAL')"
+    fi
+
+    if [ -z "${MQTT_PASS_VAL:-}" ]; then
+        fail "MQTT_PASS kosong di .env (compose akan berhenti: required variable)"
+    elif [ "$MQTT_PASS_VAL" = "ganti_dengan_password_mosquitto" ]; then
+        # Nilai contoh ini BUKAN password broker yang sebenarnya. Compose akan
+        # tetap jalan, tapi cctv_checker ditolak broker (rc=5). Samakan dengan
+        # password di mosquitto_config/passwd.
+        fail "MQTT_PASS masih nilai contoh -> cctv_checker akan DITOLAK broker. Set password yang benar (lihat bagian 3 .env.example)."
+    elif [ -f mosquitto_config/passwd ]; then
+        # Verifikasi nyata: apakah MQTT_USER terdaftar di file password broker?
+        # Hash di file memakai format \$7\$1000\$<b64 salt>\$<b64 verifier>
+        # (PBKDF2-SHA512, 1000 iterasi), jadi password tidak bisa dibaca balik.
+        # Yang diperiksa di sini hanya keberadaan usernya — kecocokan password
+        # tetap harus diuji dengan mosquitto_sub setelah stack menyala.
+        if grep -qE "^${MQTT_USER_VAL//./\\.}:" mosquitto_config/passwd 2>/dev/null; then
+            pass "MQTT_PASS terisi & MQTT_USER ada di mosquitto_config/passwd"
+            warn "Kecocokan password TIDAK bisa diverifikasi dari hash. Uji: docker compose logs cctv_checker_service | grep -i 'not authorised'"
+        else
+            fail "MQTT_USER '$MQTT_USER_VAL' tidak ada di mosquitto_config/passwd (broker akan menolak)."
+        fi
+    else
+        warn "mosquitto_config/passwd tidak ditemukan — broker akan gagal start."
+    fi
 else
     if [ -f .env.example ]; then
         fail "file .env BELUM ADA. Jalankan: cp .env.example .env"

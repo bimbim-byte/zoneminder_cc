@@ -287,7 +287,11 @@ Anda dapat menerima notifikasi popup suara/getar seketika saat ada kamera CCTV y
 ### 1. Parameter Koneksi Broker
 - **Broker Host / IP**: Masukkan alamat IP LAN komputer server Anda (contoh: `192.168.1.50`).
 - **Port**: **`1883`** (TCP Native MQTT).
-- **Username & Password**: *Dikosongkan (Anonymous)*.
+- **Username & Password**: **WAJIB DIISI** — sama dengan `MQTT_USER` dan
+  `MQTT_PASS` di file `.env` Anda (default user: `cctv`).
+  > ⚠️ Broker **menolak koneksi anonim** (`allow_anonymous false` di
+  > `mosquitto.conf`). Bila aplikasi HP dihubungkan tanpa username/password,
+  > koneksi langsung gagal dengan pesan *"not authorised"*.
 - **Client ID**: Acak / Bebas.
 
 ### 2. Topik Notifikasi (MQTT Topics)
@@ -498,7 +502,8 @@ Lalu sesuaikan isinya:
 ### Akun
 
 - **ZoneMinder Admin**: `admin` / `P@ssw0rd` *(ubah segera setelah instalasi)*
-- **Mosquitto MQTT Auth**: `Anonymous (Tanpa password)`
+- **Mosquitto MQTT Auth**: **Wajib login** — pakai `MQTT_USER` / `MQTT_PASS`
+  dari file `.env` (default user: `cctv`). Koneksi anonim ditolak.
 
 ### Troubleshooting:
 1. **Peringatan SSL di Browser (*Your connection is not private*):**

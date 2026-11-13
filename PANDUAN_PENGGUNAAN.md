@@ -69,11 +69,52 @@ Semua kredensial ZoneMinder disimpan di satu file `.env`. Salin dari template:
   cp .env.example .env
   ```
 
-Buka file `.env` dengan Notepad / nano, lalu pastikan dua baris ini sesuai akun ZoneMinder Anda:
+Buka file `.env` dengan Notepad / nano. Ada **dua hal yang wajib Anda ubah**,
+sisanya biarkan default:
+
+**1. Kunci keamanan dashboard (`DASH_SECRET_KEY`)** — baris ini masih berisi
+nilai contoh dan akan ditolak saat start. Buat kunci acak:
+
+- **Windows (PowerShell):**
+  ```powershell
+  [Convert]::ToBase64String((1..32 | % { Get-Random -Max 256 }))
+  ```
+- **Linux / WSL / Git Bash:**
+  ```bash
+  head -c 32 /dev/urandom | base64
+  ```
+- **Hanya punya Docker:**
+  ```bash
+  docker run --rm alpine/openssl rand -base64 32
+  ```
+
+Salin hasilnya ke baris berikut di `.env`:
 ```env
-ZM_USER=admin
-ZM_PASS=P@ssw0rd
+DASH_SECRET_KEY=hasil_perintah_di_atas
 ```
+
+**2. Kredensial MQTT (`MQTT_USER` & `MQTT_PASS`)** — dipakai `cctv_checker`
+untuk terhubung ke broker. Nilai ini **harus sama** dengan isi file
+`mosquitto_config/passwd`. Bila tidak sama, checker akan terus gagal konek
+dan log MQTT di dashboard tidak akan terisi.
+
+```env
+MQTT_USER=cctv
+MQTT_PASS=password_broker_anda
+```
+
+> Bingung password broker-nya? Setel ulang dengan perintah berikut (ganti
+> `PASSWORD_BARU`), lalu samakan `MQTT_PASS` di `.env`:
+> ```bash
+> docker compose exec mosquitto mosquitto_passwd -b /mosquitto/config/passwd cctv PASSWORD_BARU
+> docker compose restart mosquitto cctv-checker
+> ```
+
+Cek dulu semuanya sudah benar sebelum menyalakan:
+```bash
+bash scripts/preflight.sh
+```
+Jika hasilnya `HASIL: SIAP`, lanjut ke langkah berikutnya.
 
 > **Penting:** Jika Anda mengganti password di ZoneMinder, cukup ubah `ZM_PASS`
 > di file ini lalu jalankan `docker compose up -d`. Tidak perlu mengedit kode Python
@@ -262,7 +303,9 @@ Agar HP Anda berdering atau memunculkan popup notifikasi saat ada kamera CCTV ya
    - **Name:** `ZoneMinder CCTV Alert`
    - **Address / Server:** Masukkan IP Komputer Anda (misal `192.168.1.50`).
    - **Port:** `1883`
-   - **Username & Password:** Kosongkan (*Anonymous*).
+   - **Username & Password:** **WAJIB DIISI** — samakan dengan `MQTT_USER` dan
+     `MQTT_PASS` di file `.env` (default user: `cctv`).
+     ⚠️ Broker menolak koneksi anonim, jadi jangan dikosongkan.
 3. Klik **Save** dan pastikan status koneksi berubah hijau (*Connected*).
 4. Tambahkan tombol/widget baru bertipe **Text / Log**:
    - Masukkan Topic: `cctv/events`
