@@ -12,7 +12,7 @@
 # Dashboard manajemen TIDAK lagi dilayani di sini. Dashboard dipindahkan ke
 # blok :9443 di bawah agar tidak dapat diakses lewat URL root yang publik.
 # ============================================================================
-:443 {
+:{$CADDY_HTTPS_PORT:443} {
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 
     # Root domain -> ZoneMinder (redirect eksplisit supaya URL di address bar
@@ -43,7 +43,7 @@
 #   di :443 akan memaksa path-prefix yang rawan salah saat memanggil /api/*.
 #   Port terpisah membuatnya terisolasi total dari permukaan publik :443.
 # ============================================================================
-:9443 {
+:{$DASHBOARD_HTTPS_PORT:9443} {
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 
     # ZoneMinder tetap dijangkau dari dashboard melalui proxy (API + stream),
