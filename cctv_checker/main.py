@@ -72,7 +72,11 @@ ACTIVE_FUNCTIONS = ["Monitor", "Modect", "Record", "Mocord", "Nodect"]
 OFFLINE_FUNCTION = "None"
 
 zm_session = requests.Session()
+zm_session.verify = False
 access_token = None
+# Penanda login terakhir gagal. Mencegah percobaan login berulang yang
+# membanjiri log ZoneMinder dengan error autentikasi.
+ZM_LOGIN_FAILED = False
 
 
 # ==============================================================================
@@ -248,13 +252,31 @@ mqtt_client.on_message = on_mqtt_message
 # 3. ZONEMINDER API CLIENT
 # ==============================================================================
 def wait_for_zoneminder():
-    """Menunggu web server ZoneMinder siap menerima request."""
+    """Menunggu ZoneMinder siap TANPA menyentuh halaman berautentikasi.
+
+    PENTING - jangan kembalikan ini menjadi GET {ZM_HOST}/zm/.
+    Halaman /zm/ adalah halaman berautentikasi. Setiap permintaan tanpa sesi
+    yang sah membuat ZoneMinder menulis baris error berikut ke
+    /var/log/zoneminder/web_php.log:
+        ERR Unable to authenticate user from auth hash '<md5>'  auth.php:217
+    Versi lama fungsi ini memanggilnya sampai 30 kali per start container,
+    sehingga log ZoneMinder penuh error auth yang sebenarnya tidak berbahaya
+    tetapi membuat operator mengira ada masalah kredensial.
+
+    Tujuan fungsi ini hanya memastikan web server ZM sudah menerima koneksi,
+    jadi cukup pakai endpoint API host (tanpa kredensial, tanpa sesi). Bila
+    endpoint itu membalas HTTP apa pun, artinya web server sudah hidup.
+    """
     print("[CHECKER] Menunggu service ZoneMinder siap...", flush=True)
+    probe_url = f"{ZM_HOST}/zm/api/host/getVersion.json"
     for _ in range(30):
         try:
-            res = zm_session.get(f"{ZM_HOST}/zm/", timeout=3)
-            if res.status_code == 200:
-                print("[CHECKER] Service ZoneMinder terhubung dan siap!", flush=True)
+            res = zm_session.get(probe_url, timeout=3, verify=False)
+            if res.status_code:
+                print(
+                    f"[CHECKER] Service ZoneMinder terhubung (HTTP {res.status_code}).",
+                    flush=True,
+                )
                 return True
         except Exception:
             pass
@@ -263,9 +285,16 @@ def wait_for_zoneminder():
     return False
 
 
-def zm_login():
-    """Autentikasi ke ZoneMinder API jika AUTH aktif."""
-    global access_token
+def zm_login(force=False):
+    """Autentikasi ke ZoneMinder API jika AUTH aktif.
+
+    Hasil login di-cache (ZM_LOGIN_FAILED) supaya kredensial yang ditolak
+    tidak dikirim berulang kali. Checker berjalan tiap interval, jadi tanpa
+    cache satu password salah menghasilkan banjir error di log ZoneMinder.
+    """
+    global access_token, ZM_LOGIN_FAILED
+    if ZM_LOGIN_FAILED and not force:
+        return False
     login_url = f"{ZM_HOST}/zm/api/host/login.json"
     payload = {"user": ZM_USER, "pass": ZM_PASS}
     try:
@@ -273,14 +302,17 @@ def zm_login():
         if res.status_code == 200:
             data = res.json()
             access_token = data.get("access_token")
+            ZM_LOGIN_FAILED = False
             if access_token:
-                print(f"[ZM API] Login berhasil! Token diperoleh.", flush=True)
+                print("[ZM API] Login berhasil! Token diperoleh.", flush=True)
             else:
-                print(f"[ZM API] ZoneMinder berjalan (auth token opsional).", flush=True)
+                # access_token null = API_OPT_USE_AUTH=0; API terbuka sehingga
+                # tidak ada kredensial yang bisa divalidasi dari jalur ini.
+                print("[ZM API] ZoneMinder berjalan (auth token opsional).", flush=True)
             return True
-        else:
-            print(f"[ZM API] Login status: {res.status_code}", flush=True)
-            return False
+        print(f"[ZM API] Login status: {res.status_code}", flush=True)
+        ZM_LOGIN_FAILED = True
+        return False
     except Exception as e:
         print(f"[ZM API ERROR] Gagal koneksi login ZM: {e}", flush=True)
         return False

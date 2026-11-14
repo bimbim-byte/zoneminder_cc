@@ -86,9 +86,11 @@ def zm_login_params():
 
 def invalidate_zm_session():
     """Buang token & cookie ZM yang lama setelah kredensial berganti."""
-    global ZM_TOKEN, ZM_SESSION_AUTHED
+    global ZM_TOKEN, ZM_SESSION_AUTHED, ZM_LOGIN_RESULT
     ZM_TOKEN = None
     ZM_SESSION_AUTHED = False
+    # Kredensial baru disimpan: izinkan satu percobaan login lagi.
+    ZM_LOGIN_RESULT = (None, "", 0)
     try:
         ZM_SESSION.cookies.clear()
     except Exception:
@@ -147,22 +149,49 @@ def zm_authenticated_session():
         if token:
             return ZM_SESSION, token
 
-        # Tanpa token (mis. kredensial terisi tetapi autentikasi ZM dimatikan),
-        # login cookie tetap dicoba agar instalasi lama tetap berjalan.
-        if not ZM_SESSION.cookies.get_dict():
-            try:
-                ZM_SESSION.post(
-                    f"{ZM_HOST}/zm/index.php",
-                    data={
-                        "username": zm_credentials.user,
-                        "password": zm_credentials.password,
-                        "action": "login",
-                    },
-                    timeout=10,
-                )
-            except Exception as e:
-                log.error("Login cookie ZoneMinder gagal: %s", e)
-        ZM_SESSION_AUTHED = bool(ZM_SESSION.cookies.get_dict())
+        # --- Jalur cookie sesi (butuh ZM_ENABLE_AUTH_ADMIN=1 di ZoneMinder) ---
+        #
+        # JANGAN mengirim form login saat autentikasi web ZM mati. Setiap POST
+        # ke /zm/index.php yang berakhir di jalur "permintaan tidak sah"
+        # menulis baris ini ke /var/log/zoneminder/web_php.log:
+        #     ERR Unable to authenticate user from auth hash '<md5>'  auth.php:217
+        # Versi lama kode ini mengirim form dengan field username/password
+        # polos (bukan skema state-secret v1.36), sehingga SELALU ditolak dan
+        # SELALU menulis error di atas - berulang tiap interval pengecekan.
+        #
+        # Aturan sekarang:
+        #   1. Login hanya dicoba bila ZM_ENABLE_AUTH_ADMIN=1.
+        #   2. Hasil percobaan di-cache (ZM_LOGIN_RESULT). Password salah tidak
+        #      pernah dikirim ulang, sehingga log ZM tidak dibanjiri error.
+        #   3. Kredensial baru (disimpan dari halaman Pengaturan) mereset cache.
+        global ZM_LOGIN_RESULT
+
+        if not zm_web_auth_enabled():
+            ZM_SESSION_AUTHED = False
+            return ZM_SESSION, None
+
+        if ZM_SESSION.cookies.get_dict():
+            ZM_SESSION_AUTHED = True
+            return ZM_SESSION, None
+
+        if ZM_LOGIN_RESULT[0] is False:
+            # Sudah gagal sebelumnya dengan kredensial yang sama - jangan ulangi.
+            ZM_SESSION_AUTHED = False
+            return ZM_SESSION, None
+
+        ok, message = zm_cookie_login(
+            ZM_SESSION, zm_credentials.user, zm_credentials.password
+        )
+        ZM_LOGIN_RESULT = (ok, message, time.time())
+        if not ok:
+            log.warning(
+                "Login web ZoneMinder GAGAL: %s Percobaan ulang otomatis "
+                "DIHENTIKAN agar log ZoneMinder tidak dipenuhi error. Perbaiki "
+                "ZM_USER/ZM_PASS di halaman Pengaturan atau file .env, lalu "
+                "simpan ulang kredensial untuk mencoba lagi.",
+                message,
+            )
+        ZM_SESSION_AUTHED = ok
         return ZM_SESSION, None
 
 
@@ -195,35 +224,49 @@ def zm_connection_test(user=None, password=None):
     result["zm_version"] = data.get("version")
     token = data.get("access_token")
 
-    # ZM hanya mengembalikan access_token bila autentikasi diaktifkan. Saat
-    # ZM_OPT_USE_AUTH=0, API memang terbuka dan token bernilai null — ini
-    # bukan kegagalan, karena dashboard memakai cookie sesi ZM.
+    # PENTING: access_token VALID (bukan None) hanya ada saat
+    # API_OPT_USE_AUTH=1, dan saat itu token memang membuktikan password benar.
     if token:
         result["authenticated"] = True
         result["message"] = f"Kredensial valid. ZoneMinder v{result['zm_version'] or '?'}."
         return result
 
-    try:
-        probe = requests.get(
-            f"{ZM_BASE_URL}/monitors.json", params={"limit": 1}, timeout=10, verify=False
-        )
-    except Exception as exc:
-        result["message"] = f"Login OK tetapi API tidak dapat dijangkau: {exc}"
+    # Di sini token kosong, dan itu BUKAN bukti password benar: saat
+    # API_OPT_USE_AUTH=0, ZoneMinder mengembalikan access_token=null TANPA
+    # memeriksa kredensial sama sekali. Versi lama kode ini lalu memanggil
+    # /monitors.json tanpa token; karena API memang terbuka, hasilnya 200 dan
+    # password salah pun dilaporkan "authenticated: true". Operator dikira
+    # sudah benar, lalu bingung saat error muncul belakangan sebagai
+    # "Unable to authenticate user from auth hash" di log ZoneMinder.
+    #
+    # Jadi jalur API tidak dapat dipakai memvalidasi kredensial. Satu-satunya
+    # validator sebenarnya adalah login web (ZM_ENABLE_AUTH_ADMIN=1).
+    if zm_web_auth_enabled():
+        probe_session = requests.Session()
+        probe_session.verify = False
+        ok, message = zm_cookie_login(probe_session, creds["user"], creds["pass"])
+        result["authenticated"] = ok
+        result["detail"] = message
+        if ok:
+            result["message"] = (
+                f"Kredensial valid (login web ZoneMinder diverifikasi). "
+                f"ZoneMinder v{result['zm_version'] or '?'}."
+            )
+        else:
+            result["message"] = (
+                "Password ZoneMinder DITOLAK oleh login web. Periksa ZM_USER/ZM_PASS "
+                "di .env. Catatan: nilai ini adalah password akun WEB ZoneMinder "
+                "(Options > Users), bukan password database MySQL."
+            )
         return result
 
-    if probe.status_code == 200:
-        result["authenticated"] = True
-        result["message"] = (
-            f"Terhubung. ZoneMinder v{result['zm_version'] or '?'} berjalan dengan "
-            "autentikasi internal NONAKTIF (ZM_OPT_USE_AUTH=0), sehingga login "
-            "mengembalikan token kosong dan dashboard memakai cookie sesi ZM."
-        )
-    elif probe.status_code in (401, 403):
-        result["message"] = (
-            f"Login ditolak (HTTP {probe.status_code}). Periksa username/password ZM."
-        )
-    else:
-        result["message"] = f"API ZoneMinder mengembalikan HTTP {probe.status_code}."
+    result["authenticated"] = False
+    result["message"] = (
+        f"ZoneMinder terjangkau (v{result['zm_version'] or '?'}), tetapi kredensial "
+        "TIDAK dapat diverifikasi: API_OPT_USE_AUTH=0 dan ZM_ENABLE_AUTH_ADMIN=0. "
+        "Set ZM_ENABLE_AUTH_ADMIN=1 di .env agar dashboard benar-benar menguji "
+        "password, atau verifikasi manual di ZoneMinder > Options > Users."
+    )
     return result
 
 
@@ -248,7 +291,59 @@ if not zm_credentials.status().get("has_password"):
     )
 
 
+COMPONENT_SEPARATOR = "/"
+
+# Skema autentikasi web ZoneMinder v1.36 (WAJIB dipahami sebelum mengubah)
+# ------------------------------------------------------------------------------
+# ZoneMinder memakai DUA kredensial berbeda yang mudah tertukar:
+#
+#   1. PASSWORD API (API_OPT_USE_AUTH=1)
+#      Divalidasi pada POST /zm/api/host/login.json. Bila DIMATIKAN, endpoint
+#      itu mengembalikan access_token null TANPA memeriksa password sama
+#      sekali. Artinya di instalasi default, memanggilnya berulang kali selalu
+#      "berhasil" - tidak menghasilkan satu baris log pun, dan tidak bisa
+#      dipakai memvalidasi kredensial.
+#
+#   2. PASSWORD WEB / LOGIN (ZM_OPT_USE_AUTH=1)
+#      Divalidasi pada POST /zm/index.php {username, password, action=login}.
+#      Saat GAGAL, ZoneMinder menulis ke /var/log/zm/web_php.log:
+#         ERR Login denied for user "admin"                 auth.php:322
+#      Saat BERHASIL:
+#         INF Login successful for user "admin"             auth.php:372
+#
+# Di samping itu ada mekanisme `auth hash` (ZM_AUTH_RELAY=hashed) untuk URL
+# internal ZM (stream, gambar event, cron). Hash = md5 dari
+# secret+user+password_di_database+IP+jam+hari+bulan+tahun. Bila hash yang
+# dikirim tidak cocok, ZM menulis:
+#         ERR Unable to authenticate user from auth hash '<md5>'    auth.php:217
+# Error itu muncul saat nilai pembentuk hash berubah (pergantian jam, password
+# user berubah, atau IP klien berubah) - bukan karena satu permintaan salah.
+# Yang bisa dilakukan aplikasi: jangan memicu jalur itu berulang kali.
+ZM_CSRF_FIELD = "__csrf_magic"
+
+
+def zm_web_auth_enabled() -> bool:
+    """True bila autentikasi web ZoneMinder (ZM_ENABLE_AUTH_ADMIN) menyala.
+
+    Nilai ini menentukan apakah dashboard boleh mengirim form login ke
+    /zm/index.php. Saat autentikasi web mati, mengirim form tetap menulis
+    "Login denied" ke log ZoneMinder - jadi pengiriman WAJIB dilewati.
+    """
+    return os.environ.get("ZM_ENABLE_AUTH_ADMIN", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def zm_login_mode() -> str:
+    """Mode autentikasi ZM yang dipakai dashboard."""
+    return "cookie" if zm_web_auth_enabled() else "token"
+
+
 @app.route("/login", methods=["GET", "POST"])
+
 def login():
     next_url = request.args.get("next") or ""
     error = ""
@@ -1169,6 +1264,10 @@ MONITOR_CACHE_TTL = 10  # detik
 ZM_SESSION = requests.Session()
 ZM_SESSION.verify = False
 ZM_SESSION_AUTHED = False
+# Hasil percobaan login web terakhir: (berhasil, pesan, waktu).
+# Dipakai agar password salah TIDAK dikirim berulang kali - setiap
+# pengiriman yang ditolak menulis error auth ke log ZoneMinder.
+ZM_LOGIN_RESULT = (None, "", 0)
 
 
 def zm_login_session():
