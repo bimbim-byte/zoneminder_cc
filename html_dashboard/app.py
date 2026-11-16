@@ -1575,10 +1575,41 @@ def zm_delete(path, retry=True):
 # Modect: ZM merekam, tapi tidak ada piksel yang dinilai sebagai gerakan.
 # Karena itu setiap kamera baru wajib punya minimal satu zone.
 #
-# Semua mode di bawah memakai Units="Percent", sehingga nilainya tidak
-# bergantung pada resolusi kamera dan tidak perlu dihitung ulang saat
-# resolusi berubah. Ini juga menghindari jebakan Units="Pixels" yang membuat
-# ambang 5% pada kamera 4K membengkak jadi angka berbeda per kamera.
+# ------------------------------------------------------------------------------
+# DUA JEBAKAN FORMAT YANG PERNAH MEMBUAT "No zones to check"
+# ------------------------------------------------------------------------------
+# Keduanya sudah dibuktikan langsung pada ZoneMinder 1.36.32 di container ini.
+# Jangan diubah tanpa membaca ulang src/zm_zone.cpp.
+#
+# 1) FORMAT Coords
+#    ZM menyimpan Coords sebagai daftar pasangan "x,y" yang dipisah SPASI:
+#        "0,0 1279,0 1279,719 0,719"
+#    Bukan deret angka yang dipisah spasi seperti "0 0 1279 0 ...".
+#    Bukti: skema zone bawaan ZM sendiri (includes/actions/monitor.php:207)
+#    menulis sprintf('%d,%d %d,%d ...'). Parser C++ Zone::ParsePolygonString
+#    mencari ',' lebih dulu, lalu melewati satu spasi setelahnya.
+#
+#    Kode lama menulis "0 0 1279 0 1279 719 0 719". Akibatnya ZM mencatat:
+#        ERR-zm_zone.cpp/759 [Bogus coordinate 0 0 1279 0 1279 719 0 719 ...]
+#        ERR-zm_zone.cpp/780 [Not enough coordinates to form a polygon!]
+#        ERR-zm_zone.cpp/873 [... for zone 1/All for monitor ..., ignoring]
+#    Zone DIBUANG tanpa pesan apa pun ke API, daftar zones jadi kosong, lalu
+#    Monitor::DetectMotion() memunculkan Warning("No zones to check!").
+#    Zone tetap ada di database, jadi pembuatan zone terlihat "berhasil".
+#
+# 2) SEMANTIK ANGKA AMBANG (MinAlarmPixels / MinBlobPixels / FilterPixels)
+#    Di ZM 1.36.32 nilai ini adalah JUMLAH PIXEL MUTLAK, bukan persen.
+#    Zone::Load() menulis `if ( false && !strcmp(Units, "Percent") )` sebelum
+#    mengalikan persen — cabang itu dimatikan, jadi konversi tidak pernah
+#    terjadi. Nilai langsung dipakai apa adanya di Zone::CheckAlarms().
+#    Konsekuensinya: menulis "3" pada kamera 1280x720 berarti "3 piksel",
+#    bukan "3% dari 921600 px" (= 27648 piksel) seperti yang tertulis di
+#    komentar lama berkas ini. Itu akan memicu alarm dari noise 3 piksel.
+#    Karena itu mode di bawah menyimpan ambang dalam PERSEN, lalu
+#    build_zone_payload() mengalikannya dengan Area zone yang sebenarnya.
+#
+# Ukuran piksel polygon dihitung dengan algoritma shoelace yang sama
+# (Polygon::UpdateArea) supaya angka yang kita kirim = angka yang dipakai ZM.
 #
 # PENTING — arah sensitivitas: MinPixelThreshold adalah ambang perbedaan
 # nilai warna per piksel (0-255). Angka KECIL = LEBIH SENSITIF. Ini
@@ -1596,52 +1627,67 @@ ZONE_MODES = {
             "Pilihan tepat untuk server dengan banyak kamera."
         ),
         "base_preset": "Fast, low sensitivity",
-        "check": {"CheckMethod": "AlarmedPixels", "MinPixelThreshold": 60, "MinAlarmPixels": 20},
+        # Nilai *_pct adalah PERSEN dari luas zone; dikonversi ke piksel saat
+        # payload dibangun. Lihat catatan "SEMANTIK ANGKA AMBANG" di atas.
+        "check": {"CheckMethod": "AlarmedPixels", "MinPixelThreshold": 60,
+                  "MinAlarm_pct": 5, "MaxAlarm_pct": 75},
     },
     "light": {
         "label": "2. Ringan",
         "short": "Ringan",
         "description": (
-            "CheckMethod=AlarmedPixels dengan ambang 20% dan alarm 5%. "
+            "CheckMethod=AlarmedPixels dengan ambang 20% dan alarm 1%. "
             "Beban CPU sama dengan Paling Ringan, tapi jauh lebih sensitif."
         ),
         "base_preset": "Fast, high sensitivity",
-        "check": {"CheckMethod": "AlarmedPixels", "MinPixelThreshold": 20, "MinAlarmPixels": 5},
+        "check": {"CheckMethod": "AlarmedPixels", "MinPixelThreshold": 20,
+                  "MinAlarm_pct": 1, "MaxAlarm_pct": 75},
     },
     "medium": {
         "label": "3. Sedang",
         "short": "Sedang",
         "description": (
-            "CheckMethod=Blobs + ambang 25%. Nilai persis preset 'Default' "
-            "ZoneMinder. Objek dikelompokkan lebih dulu sehingga noise titik "
-            "ditolak. Titik seimbang antara akurasi dan beban CPU."
+            "CheckMethod=Blobs dengan ambang 25% dan alarm 3%. Nilai ini persis "
+            "preset 'Default' ZoneMinder (sudah dikonversi ke piksel). Objek "
+            "dikelompokkan lebih dulu sehingga noise titik ditolak. Titik "
+            "seimbang antara akurasi dan beban CPU."
         ),
         "base_preset": "Default",
-        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 25, "MinAlarmPixels": 3,
-                  "MinBlobPixels": 2, "MinBlobs": 1},
+        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 25,
+                  "MinAlarm_pct": 3, "MaxAlarm_pct": 75,
+                  "FilterX": 3, "FilterY": 3,
+                  "MinFilter_pct": 3, "MaxFilter_pct": 75,
+                  "MinBlob_pct": 2, "MaxBlob_pct": None, "MinBlobs": 1},
     },
     "heavy": {
         "label": "4. Berat",
         "short": "Berat",
         "description": (
-            "CheckMethod=Blobs + ambang 60% dan blob minimal 20. Hanya gerakan "
-            "besar yang lolos. Beban CPU tinggi, false alarm paling sedikit."
+            "CheckMethod=Blobs + ambang 60% dan blob minimal 0,5% luas frame. "
+            "Hanya gerakan besar yang lolos. Beban CPU tinggi, false alarm "
+            "paling sedikit."
         ),
         "base_preset": "Best, low sensitivity",
-        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 60, "MinAlarmPixels": 36,
-                  "MinBlobPixels": 20, "MinBlobs": 1},
+        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 60,
+                  "MinAlarm_pct": 5, "MaxAlarm_pct": 75,
+                  "FilterX": 7, "FilterY": 7,
+                  "MinFilter_pct": 3.5, "MaxFilter_pct": None,
+                  "MinBlob_pct": 0.5, "MaxBlob_pct": None, "MinBlobs": 1},
     },
     "heaviest": {
         "label": "5. Paling Berat",
         "short": "Paling Berat",
         "description": (
-            "CheckMethod=Blobs + ambang 20% dan alarm 8%. Paling sensitif dan "
+            "CheckMethod=Blobs + ambang 20% dan alarm 0,2%. Paling sensitif dan "
             "paling mahal: filter serta deteksi blob berjalan penuh tiap frame. "
             "Pakai hanya untuk sedikit kamera di area yang benar-benar penting."
         ),
         "base_preset": "Best, high sensitivity",
-        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 20, "MinAlarmPixels": 8,
-                  "MinBlobPixels": 5, "MinBlobs": 1},
+        "check": {"CheckMethod": "Blobs", "MinPixelThreshold": 20,
+                  "MinAlarm_pct": 0.2, "MaxAlarm_pct": 75,
+                  "FilterX": 3, "FilterY": 3,
+                  "MinFilter_pct": 0.14, "MaxFilter_pct": None,
+                  "MinBlob_pct": 0.12, "MaxBlob_pct": None, "MinBlobs": 1},
     },
 }
 
@@ -1654,39 +1700,39 @@ ZONE_MODE_DEFAULT = "light"
 # dashboard, supaya konfigurasi manual pengguna tidak pernah ditimpa.
 ZONE_DEFAULT_NAME = "All"
 
-# Preset ZoneMinder dibaca dari API zonePresets.json bila tersedia; bila
-# gagal, nilai cadangan ini dipakai. Isinya SAMA dengan yang tertanam di
-# zm_create.sql, jadi Dashboard tetap berfungsi walau ZM tidak merespons.
+# Preset ZoneMinder dipakai HANYA sebagai sumber nilai non-ambang
+# (Units, CheckMethod, ExtendAlarmFrames). Nilai ambangnya SENGAJA tidak
+# diambil dari sini: pada ZM 1.36.32 API mengembalikan ambang dalam persen
+# (skema Percent) sedangkan runtime membacanya sebagai piksel mutlak, jadi
+# menyalinnya mentah-mentah menghasilkan alarm palsu. Ambang selalu dihitung
+# di build_zone_payload() dari ZONE_MODES + luas zone sebenarnya.
 ZONE_PRESET_FALLBACK = {
     "Default": {
         "Units": "Percent", "CheckMethod": "Blobs",
-        "MinPixelThreshold": 25, "MaxPixelThreshold": None, "MinAlarmPixels": 3,
-        "MaxAlarmPixels": None, "FilterX": None, "FilterY": None, "MinFilterPixels": None,
-        "MaxFilterPixels": None, "MinBlobPixels": 2, "MaxBlobPixels": None,
-        "MinBlobs": 1, "MaxBlobs": None, "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+        "ExtendAlarmFrames": 0, "OverloadFrames": 0,
     },
     "Fast, low sensitivity": {
         "Units": "Percent", "CheckMethod": "AlarmedPixels",
-        "MinPixelThreshold": 60, "MaxPixelThreshold": None, "MinAlarmPixels": 20,
-        "MaxAlarmPixels": None, "FilterX": None, "FilterY": None, "MinFilterPixels": None,
-        "MaxFilterPixels": None, "MinBlobPixels": None, "MaxBlobPixels": None,
-        "MinBlobs": None, "MaxBlobs": None, "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+        "ExtendAlarmFrames": 0, "OverloadFrames": 0,
     },
     "Fast, high sensitivity": {
         "Units": "Percent", "CheckMethod": "AlarmedPixels",
-        "MinPixelThreshold": 20, "MaxPixelThreshold": None, "MinAlarmPixels": 5,
-        "MaxAlarmPixels": None, "FilterX": None, "FilterY": None, "MinFilterPixels": None,
-        "MaxFilterPixels": None, "MinBlobPixels": None, "MaxBlobPixels": None,
-        "MinBlobs": None, "MaxBlobs": None, "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+        "ExtendAlarmFrames": 0, "OverloadFrames": 0,
     },
     "Best, low sensitivity": {
         "Units": "Percent", "CheckMethod": "Blobs",
-        "MinPixelThreshold": 60, "MaxPixelThreshold": None, "MinAlarmPixels": 36,
-        "MaxAlarmPixels": None, "FilterX": None, "FilterY": None, "MinFilterPixels": None,
-        "MaxFilterPixels": None, "MinBlobPixels": 20, "MaxBlobPixels": None,
-        "MinBlobs": 1, "MaxBlobs": None, "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+        "ExtendAlarmFrames": 0, "OverloadFrames": 0,
+    },
+    "Best, high sensitivity": {
+        "Units": "Percent", "CheckMethod": "Blobs",
+        "ExtendAlarmFrames": 0, "OverloadFrames": 0,
     },
 }
+
+# Kolom numerik yang BOLEH disalin dari preset ZM. Field ambang pixel
+# sengaja tidak ada di sini — lihat catatan di atas ZONE_PRESET_FALLBACK.
+_PRESET_SAFE_FIELDS = ("Units", "CheckMethod", "ExtendAlarmFrames", "OverloadFrames")
+
 
 _PRESET_CACHE = {"data": None, "ts": 0.0}
 
@@ -1750,6 +1796,45 @@ def zone_modes_public():
     ]
 
 
+def polygon_area(points):
+    """Luas polygon dengan algoritma shoelace — rumus yang SAMA dengan
+    ZoneMinder (Polygon::UpdateArea di src/zm_poly.cpp).
+
+    Dipakai supaya angka yang dikirim dashboard identik dengan yang nanti
+    dipakai ZM saat mengevaluasi gerakan. Bila keduanya berbeda, ambang
+    piksel ikut berbeda dari yang dimaksud.
+    """
+    n = len(points)
+    if n < 3:
+        return 0
+    total = 0.0
+    for i in range(n):
+        x1, y1 = points[i]
+        x2, y2 = points[(i + 1) % n]
+        total += (float(x1) * float(y2)) - (float(x2) * float(y1))
+    return int(round(abs(total) / 2.0))
+
+
+def build_full_frame_points(width, height):
+    """Empat sudut frame dalam koordinat piksel monitor (0-based).
+
+    Urutan mengikuti jejak blok zone bawaan ZoneMinder
+    (includes/actions/monitor.php): (0,0) -> (W-1,0) -> (W-1,H-1) -> (0,H-1).
+    """
+    return [(0, 0), (width - 1, 0), (width - 1, height - 1), (0, height - 1)]
+
+
+def format_zone_coords(points):
+    """Serialkan titik ke format Coords yang benar-benar dibaca ZoneMinder.
+
+    WAJIB pasangan "x,y" dipisah SPASI: "0,0 1279,0 1279,719 0,719".
+    Deret angka dipisah spasi ("0 0 1279 0 ...") DITOLAK parser ZM dan zone
+    dibuang tanpa error ke API — penyebab "No zones to check". Lihat catatan
+    "DUA JEBAKAN FORMAT" di atas ZONE_MODES.
+    """
+    return " ".join(f"{int(x)},{int(y)}" for x, y in points)
+
+
 def build_zone_payload(mode_key, width, height):
     """Susun payload zone layar penuh untuk ZoneMinder.
 
@@ -1758,37 +1843,64 @@ def build_zone_payload(mode_key, width, height):
     monitor dan ZM menghitungnya 0-based.
     """
     spec = ZONE_MODES[mode_key]
-    base = dict(ZONE_PRESET_FALLBACK["Default"])
-
-    # Preset dasar diambil dari ZoneMinder bila tersedia, lalu ditimpa nilai
-    # khusus mode. Hasilnya: field yang tidak kita sentuh tetap mengikuti
-    # preset asli, jadi upgrade ZoneMinder tidak membuat mode kita menyimpang.
-    presets = get_zm_zone_presets()
-    base_name = spec["base_preset"]
-    if base_name in presets:
-        for field in base.keys():
-            if field in presets[base_name]:
-                base[field] = presets[base_name][field]
-    base.update(spec["check"])
 
     w = int(width) if str(width).isdigit() and int(width) > 1 else 1920
     h = int(height) if str(height).isdigit() and int(height) > 1 else 1080
-    max_x = w - 1
-    max_y = h - 1
+
+    # Polygon dan luasnya dihitung, bukan ditebak: luas HARUS berasal dari
+    # polygon yang benar-benar dikirim, karena dari situ ZM menurunkan
+    # ambang dan skor alarm.
+    points = build_full_frame_points(w, h)
+    area = polygon_area(points)
+
+    # Nilai non-ambang boleh ikut preset ZM supaya perilaku tetap selaras
+    # bila ZoneMinder di-upgrade. Field ambang TIDAK diambil dari preset.
+    preset = {}
+    presets = get_zm_zone_presets()
+    if isinstance(presets, dict) and spec["base_preset"] in presets:
+        src = presets[spec["base_preset"]]
+        if isinstance(src, dict):
+            preset = {k: src[k] for k in _PRESET_SAFE_FIELDS if k in src}
 
     payload = {
         "Zone[Name]": ZONE_DEFAULT_NAME,
         "Zone[Type]": "Active",
-        "Zone[Units]": base.get("Units") or "Percent",
-        "Zone[NumCoords]": "4",
-        "Zone[Coords]": f"0 0 {max_x} 0 {max_x} {max_y} 0 {max_y}",
-        "Zone[Area]": str(w * h),
+        "Zone[Units]": str(preset.get("Units") or "Percent"),
+        "Zone[NumCoords]": str(len(points)),
+        "Zone[Coords]": format_zone_coords(points),
+        # Luas polygon dalam piksel. ZM menghitung ulang saat load, tapi
+        # nilai yang benar di sini membuat baris database langsung konsisten
+        # dan mudah diverifikasi.
+        "Zone[Area]": str(area),
         "Zone[AlarmRGB]": "16711680",  # 0xFF0000, merah penuh
+        "Zone[CheckMethod]": str(spec["check"]["CheckMethod"]),
+        "Zone[MinPixelThreshold]": str(spec["check"]["MinPixelThreshold"]),
+        "Zone[ExtendAlarmFrames]": str(preset.get("ExtendAlarmFrames") or 0),
+        "Zone[OverloadFrames]": str(preset.get("OverloadFrames") or 0),
     }
-    for field, value in base.items():
-        if value is None or field in ("Units",):
+
+    # Ambang di bawah ini JUMLAH PIKEL MUTLAK pada ZM 1.36.x, jadi persen
+    # dari ZONE_MODES dikalikan luas zone lebih dulu. Tanpa konversi ini,
+    # "3" akan berarti 3 piksel dan alarm menyala karena noise sekecil apa pun.
+    for key, column in (
+        ("MinAlarm_pct", "MinAlarmPixels"),
+        ("MaxAlarm_pct", "MaxAlarmPixels"),
+        ("MinFilter_pct", "MinFilterPixels"),
+        ("MaxFilter_pct", "MaxFilterPixels"),
+        ("MinBlob_pct", "MinBlobPixels"),
+        ("MaxBlob_pct", "MaxBlobPixels"),
+    ):
+        pct = spec["check"].get(key)
+        if pct is None:
             continue
-        payload[f"Zone[{field}]"] = str(value)
+        payload[f"Zone[{column}]"] = str(int(round(area * float(pct) / 100.0)))
+
+    # Hitungan blob adalah cacah objek, bukan piksel — tidak dikonversi.
+    for key in ("MinBlobs", "MaxBlobs", "FilterX", "FilterY"):
+        value = spec["check"].get(key)
+        if value is not None:
+            payload[f"Zone[{key}]"] = str(value)
+
     return payload
 
 
@@ -1975,17 +2087,114 @@ def ensure_zone_for_monitor(monitor_id, mode_key=None, overwrite=False, width=No
     if code not in (200, 201):
         code = zm_post(f"monitors/{monitor_id}/zones.json", payload)
 
-    if code in (200, 201):
+    if code not in (200, 201):
+        return {
+            "created": False, "skipped": False, "mode": mode,
+            "reason": f"ZoneMinder menolak pembuatan zone (HTTP {code}).",
+        }
+
+    # ------------------------------------------------------------------
+    # VERIFIKASI SETELAH SIMPAN — jangan percaya "Saved".
+    #
+    # ZoneMinder 1.36 membalas {"message":"Saved"} walau polygon-nya tidak
+    # bisa diparse. Itu persis yang terjadi sebelumnya: zone tercatat di
+    # database, API melaporkan sukses, tapi saat runtime zone dibuang dan
+    # Modect berhenti dengan "No zones to check". Tanpa pembacaan ulang di
+    # sini, kegagalan itu tidak akan pernah terlihat dari dashboard.
+    # ------------------------------------------------------------------
+    verify = verify_zone_saved(monitor_id, payload)
+    if verify.get("ok"):
         return {
             "created": True, "skipped": False, "mode": mode,
             "label": ZONE_MODES[mode]["label"],
             "coords": payload["Zone[Coords]"],
             "width": width, "height": height,
+            "zone_id": verify.get("zone_id"),
+            "area": verify.get("area"),
         }
+
     return {
         "created": False, "skipped": False, "mode": mode,
-        "reason": f"ZoneMinder menolak pembuatan zone (HTTP {code}).",
+        "reason": verify.get("reason") or "Zone tersimpan tetapi tidak terbaca ulang.",
+        "coords": payload["Zone[Coords]"],
+        "width": width, "height": height,
     }
+
+
+def verify_zone_saved(monitor_id, payload):
+    """Baca ulang zone yang baru disimpan dan pastikan ZM bisa memakainya.
+
+    Yang diperiksa adalah hal-hal yang membuat Zone::Load() membuang zone
+    secara diam-diam:
+      - zone benar-benar ada untuk MonitorId ini,
+      - Coords tersimpan dalam format pasangan "x,y",
+      - polygon menghasilkan >= 3 titik dan luas > 0,
+      - Type bukan Inactive/Privacy.
+
+    Tanpa pemeriksaan ini, "zone berhasil dibuat" hanya berarti baris
+    database bertambah — bukan berarti Modect akan mendeteksi gerakan.
+    """
+    zones = get_monitor_zones(monitor_id)
+    if zones is None:
+        return {"ok": False, "reason": "Zone tersimpan tetapi daftar zone tidak dapat dibaca ulang."}
+
+    wanted_coords = str(payload.get("Zone[Coords]", ""))
+    zone = None
+    for z in zones:
+        if str(z.get("Name", "")) == ZONE_DEFAULT_NAME and str(z.get("Coords", "")) == wanted_coords:
+            zone = z
+            break
+    if zone is None:
+        # Fallback: cocokkan berdasarkan nama saja (ZM kadang menormalkan spasi).
+        for z in zones:
+            if str(z.get("Name", "")) == ZONE_DEFAULT_NAME:
+                zone = z
+                break
+    if zone is None:
+        return {"ok": False, "reason": "Zone tersimpan tetapi tidak ditemukan saat dibaca ulang."}
+
+    zone_type = str(zone.get("Type", ""))
+    if zone_type in ("Inactive", "Privacy"):
+        return {"ok": False, "reason": f"Zone bertipe '{zone_type}' sehingga tidak dinilai Modect."}
+
+    stored = str(zone.get("Coords", "") or "").strip()
+    if not stored:
+        return {"ok": False, "reason": "Zone tersimpan tanpa titik koordinat."}
+
+    if "," not in stored:
+        # Bentuk yang ditolak parser C++: deret angka dipisah spasi.
+        return {
+            "ok": False,
+            "reason": (
+                "Koordinat zone tidak dalam format 'x,y' sehingga akan ditolak "
+                f"ZoneMinder dan memicu 'No zones to check'. Tersimpan sebagai: {stored}"
+            ),
+        }
+
+    points = []
+    for pair in stored.split():
+        if "," not in pair:
+            return {
+                "ok": False,
+                "reason": f"Titik koordinat '{pair}' tidak valid (harus 'x,y').",
+            }
+        try:
+            px, py = pair.split(",", 1)
+            points.append((float(px), float(py)))
+        except (TypeError, ValueError):
+            return {"ok": False, "reason": f"Titik koordinat '{pair}' tidak dapat dibaca."}
+
+    if len(points) < 3:
+        return {
+            "ok": False,
+            "reason": f"Zone hanya punya {len(points)} titik; ZoneMinder butuh minimal 3.",
+        }
+
+    area = polygon_area(points)
+    if area <= 0:
+        return {"ok": False, "reason": "Luas zone nol — gerakan tidak akan pernah terdeteksi."}
+
+    return {"ok": True, "zone_id": zone.get("Id"), "area": area, "points": len(points)}
 
 
 @app.route("/api/zones/save-camera", methods=["POST"])
