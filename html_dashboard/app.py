@@ -669,6 +669,13 @@ def add_single_camera():
         "Monitor[TargetColorspace]": "4",
         "Monitor[ServerId]": "0",
     }
+
+    # Setelan encoding otomatis (MP4/h264) - lihat MONITOR_ENCODING_DEFAULTS.
+    enc_payload, enc_warnings = build_encoding_payload(
+        read_encoding_overrides(data)
+    )
+    zm_payload.update(enc_payload)
+
     if max_fps:
         zm_payload["Monitor[MaxFPS]"] = max_fps
 
@@ -731,6 +738,7 @@ def add_single_camera():
                 "status": "success",
                 "message": message,
                 "zone": zone_result,
+                "encoding_warnings": enc_warnings,
                 "data": res_data
             }), 200
         else:
@@ -800,6 +808,13 @@ def burst_add_monitors():
             "Monitor[TargetColorspace]": "4",
             "Monitor[ServerId]": "0"
         }
+
+        # Setelan encoding otomatis, dengan penimpaan per baris Excel.
+        enc_payload, enc_warnings = build_encoding_payload(
+            read_encoding_overrides(monitor_data)
+        )
+        payload.update(enc_payload)
+
         if monitor_data.get("MaxFPS"):
             payload["Monitor[MaxFPS]"] = str(monitor_data.get("MaxFPS"))
 
@@ -815,6 +830,8 @@ def burst_add_monitors():
             if res.status_code in [200, 201] or "message" in res_json:
                 success_count += 1
                 entry = {"name": clean_name, "status": "success", "id": res_json.get("Id", "")}
+                if enc_warnings:
+                    entry["encoding_warnings"] = enc_warnings
 
                 if create_zone:
                     monitor_id = res_json.get("Id")
@@ -1781,6 +1798,206 @@ def normalize_zone_mode(value):
     return aliases.get(key)
 
 
+# ==============================================================================
+# DEFAULT ENCODING MONITOR - SINGLE SOURCE OF TRUTH
+# ==============================================================================
+# Semua jalur pendaftaran kamera - tunggal, burst, dan unggah Excel - memakai
+# blok ini. Kamera yang baru didaftarkan langsung merekam ke MP4 h264 tanpa
+# perlu disetel manual satu per satu di antarmuka ZoneMinder.
+#
+# NILAI DI BAWAH SUDAH DIUJI TERHADAP ZONEMINDER 1.36.32 YANG BERJALAN:
+#   * OutputContainer TIDAK boleh dikirim sebagai null atau string kosong: API
+#     menolak dengan "Please choose one of the following values : Auto, Mp4,
+#     Mkv" dan SELURUH pembuatan monitor gagal. Karena itu field ini ada di
+#     ENCODING_SKIP_FIELDS: tidak dikirim sama sekali, dan kolomnya tetap NULL
+#     di database - persis keadaan yang diinginkan.
+#   * OutputCodec 27 adalah kode h264; 0 = Auto, 27 = h264, 173 = h265.
+#   * DefaultRate dan DefaultScale hanya memengaruhi stream ke browser, bukan
+#     perekaman. Nilai 0 pada DefaultScale berarti 100 persen, yaitu resolusi
+#     asli kamera.
+#
+# Hubungan SectionLength dengan Pre/PostEventCount diperiksa oleh
+# validate_encoding_defaults() dan dilaporkan sebagai PERINGATAN, bukan
+# pemblokiran, supaya nilai tidak lazim tetap bisa dipakai.
+MONITOR_ENCODING_DEFAULTS = {
+    "SaveJPEGs": "0",            # 0 = jangan simpan JPEG, MP4 saja
+    "VideoWriter": "1",          # 1 = aktifkan penulis video
+    "OutputCodec": "27",         # 27 = h264 (terverifikasi di ZM 1.36.32)
+    "Encoder": "libx264",
+    "EncoderParameters": "crf=23",
+    "PreEventCount": "50",       # frame sebelum alarm disertakan
+    "PostEventCount": "50",      # frame sesudah alarm disertakan
+    "StreamReplayBuffer": "0",
+    "AlarmFrameCount": "1",
+    "SectionLength": "300",      # detik maksimum satu berkas rekaman
+    "MinSectionLength": "60",
+    "DefaultRate": "100",        # stream browser: 100 persen
+    "DefaultScale": "0",         # 0 dibaca ZM sebagai 100 persen (resolusi asli)
+    "DefaultCodec": "auto",
+}
+
+# Field yang SEKALI-KALI tidak boleh dikirim ke API ZoneMinder. Mengirim
+# OutputContainer dengan nilai kosong membuat ZM menolak SELURUH permintaan
+# simpan, jadi field ini dibuang di satu tempat saja: build_encoding_payload().
+ENCODING_SKIP_FIELDS = ("OutputContainer",)
+
+# Field yang boleh ditimpa per kamera dari UI maupun kolom Excel.
+# Urutannya sekaligus menjadi daftar kunci yang diterima dari berkas Excel.
+ENCODING_OVERRIDE_FIELDS = (
+    "Encoder", "OutputCodec", "EncoderParameters",
+    "PreEventCount", "PostEventCount", "AlarmFrameCount",
+    "SectionLength", "MinSectionLength",
+    "DefaultRate", "DefaultScale", "DefaultCodec",
+    "VideoWriter", "SaveJPEGs", "StreamReplayBuffer",
+)
+
+# Field numerik untuk sanity check di validate_encoding_defaults().
+_ENCODING_NUMERIC_FIELDS = (
+    "OutputCodec", "PreEventCount", "PostEventCount", "AlarmFrameCount",
+    "SectionLength", "MinSectionLength", "DefaultRate", "DefaultScale",
+    "VideoWriter", "SaveJPEGs", "StreamReplayBuffer",
+)
+
+
+def _encoding_int(value):
+    """Baca nilai integer secara longgar. None bila tidak masuk akal."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return int(float(text))
+    except (TypeError, ValueError):
+        return None
+
+
+def resolve_encoding_defaults(overrides=None):
+    """Default encoding + penimpaan per kamera, sudah dibersihkan.
+
+    overrides: dict opsional dari UI atau baris Excel. Kunci yang tidak
+    dikenal dibuang, dan nilai kosong diabaikan (jatuh ke default) sehingga
+    satu sel Excel yang kosong tidak mengosongkan setelan kamera.
+    """
+    result = dict(MONITOR_ENCODING_DEFAULTS)
+    if isinstance(overrides, dict):
+        for key in ENCODING_OVERRIDE_FIELDS:
+            if key not in overrides:
+                continue
+            value = overrides[key]
+            if value is None:
+                continue
+            text = str(value).strip()
+            if text == "":
+                continue
+            result[key] = text
+    return result
+
+
+def validate_encoding_defaults(values):
+    """Periksa kewajaran setelan encoding. Mengembalikan daftar peringatan.
+
+    SENGAJA hanya peringatan, bukan penolakan: nilai tidak lazim tetap
+    disimpan, tapi pengguna diberi tahu supaya tidak menemukan rekaman yang
+    terpotong-potong tanpa sebab yang jelas.
+    """
+    warnings = []
+    nums = {key: _encoding_int(values.get(key)) for key in _ENCODING_NUMERIC_FIELDS}
+
+    section = nums.get("SectionLength")
+    pre = nums.get("PreEventCount")
+    post = nums.get("PostEventCount")
+
+    if section is not None and section > 0:
+        # Pre/PostEventCount dihitung dalam FRAME, sedangkan SectionLength
+        # dalam DETIK. Pada 15 fps, 50 frame kira-kira 3,3 detik. Bila jumlah
+        # frame pre+post melebihi panjang section, ZM tidak punya cukup frame
+        # untuk memenuhi permintaan dan potongan rekaman bisa terpangkas.
+        if pre is not None and pre > section:
+            warnings.append(
+                "PreEventCount (%s) lebih besar dari SectionLength (%s). "
+                "Nilai ini dalam frame, sedangkan SectionLength dalam detik."
+                % (pre, section)
+            )
+        if post is not None and post > section:
+            warnings.append(
+                "PostEventCount (%s) lebih besar dari SectionLength (%s). "
+                "Nilai ini dalam frame, sedangkan SectionLength dalam detik."
+                % (post, section)
+            )
+        if pre is not None and post is not None and (pre + post) > section:
+            warnings.append(
+                "PreEventCount + PostEventCount (%s) melebihi SectionLength (%s). "
+                "Rekaman berpotensi terpotong pada bagian pre/post event."
+                % (pre + post, section)
+            )
+
+    scale = nums.get("DefaultScale")
+    if scale is not None and scale < 0:
+        warnings.append(
+            "DefaultScale (%s) negatif; nilai 0 berarti 100 persen (resolusi asli)." % scale
+        )
+
+    rate = nums.get("DefaultRate")
+    if rate is not None and rate < 0:
+        warnings.append("DefaultRate (%s) negatif." % rate)
+
+    codec = str(values.get("OutputCodec", "")).strip()
+    if codec and codec not in ("0", "27", "173"):
+        # 0=Auto, 27=h264, 173=h265 pada ZM 1.36.32. Kode lain tetap diterima
+        # ZM bila memang terdaftar, jadi ini hanya catatan.
+        warnings.append("OutputCodec=%s bukan 0/27/173 (Auto/h264/h265)." % codec)
+
+    if str(values.get("VideoWriter", "")).strip() in ("0", "") \
+            and str(values.get("SaveJPEGs", "")).strip() == "0":
+        warnings.append(
+            "VideoWriter=0 dan SaveJPEGs=0: tidak ada berkas rekaman yang akan "
+            "tersimpan. Hanya berguna bila perekaman memang sengaja dimatikan."
+        )
+
+    return warnings
+
+
+def build_encoding_payload(overrides=None):
+    """Bentuk pasangan Monitor[*] siap kirim untuk field encoding.
+
+    Mengembalikan tuple (payload, warnings). Field di ENCODING_SKIP_FIELDS
+    selalu dibuang di sini - satu-satunya tempat pembuangan - sehingga tidak
+    ada jalur pendaftaran yang bisa tidak sengaja mengirim OutputContainer
+    kosong lalu menggagalkan seluruh penyimpanan.
+    """
+    values = resolve_encoding_defaults(overrides)
+    payload = {}
+    for key in values:
+        if key in ENCODING_SKIP_FIELDS:
+            continue
+        value = values[key]
+        if value is None:
+            continue
+        payload["Monitor[%s]" % key] = str(value)
+    return payload, validate_encoding_defaults(values)
+
+
+def read_encoding_overrides(source):
+    """Ambil penimpaan encoding dari body request maupun baris Excel.
+
+    Menerima bentuk bersarang {"encoding": {...}} yang dipakai UI, dan bentuk
+    datar {"Encoder": "...", "SectionLength": "300"} yang dipakai kolom Excel.
+    """
+    if not isinstance(source, dict):
+        return {}
+    nested = source.get("encoding")
+    flat = nested if isinstance(nested, dict) else source
+    return {key: flat[key] for key in ENCODING_OVERRIDE_FIELDS if key in flat}
+
+
+  
 def zone_modes_public():
     """Bentuk mode yang aman dikirim ke browser (tanpa data internal)."""
     return [
@@ -2256,6 +2473,13 @@ def api_save_camera_with_zone():
         "Monitor[ServerId]": "0",
     }
 
+    # Setelan encoding otomatis (MP4/h264). Saat MENGEDIT field ini tetap
+    # dikirim supaya kamera lama ikut memakai standar encoding yang sama.
+    enc_payload, enc_warnings = build_encoding_payload(
+        read_encoding_overrides(body)
+    )
+    payload.update(enc_payload)
+
     # ID kustom hanya dipakai saat membuat kamera baru. Saat mengedit, ID
     # sudah ditentukan oleh URL target.
     custom_id = str(body.get("customId", "") or "").strip()
@@ -2306,6 +2530,7 @@ def api_save_camera_with_zone():
 
     return jsonify({
         "status": "success",
+        "encoding_warnings": enc_warnings,
         "monitor_id": monitor_id,
         "name": clean_name,
         "editing": bool(edit_id),
