@@ -69,7 +69,7 @@ Semua kredensial ZoneMinder disimpan di satu file `.env`. Salin dari template:
   cp .env.example .env
   ```
 
-Buka file `.env` dengan Notepad / nano. Ada **dua hal yang wajib Anda ubah**,
+Buka file `.env` dengan Notepad / nano. Hanya **satu hal yang wajib Anda ubah**,
 sisanya biarkan default:
 
 **1. Kunci keamanan dashboard (`DASH_SECRET_KEY`)** — baris ini masih berisi
@@ -92,23 +92,6 @@ Salin hasilnya ke baris berikut di `.env`:
 ```env
 DASH_SECRET_KEY=hasil_perintah_di_atas
 ```
-
-**2. Kredensial MQTT (`MQTT_USER` & `MQTT_PASS`)** — dipakai `cctv_checker`
-untuk terhubung ke broker. Nilai ini **harus sama** dengan isi file
-`mosquitto_config/passwd`. Bila tidak sama, checker akan terus gagal konek
-dan log MQTT di dashboard tidak akan terisi.
-
-```env
-MQTT_USER=cctv
-MQTT_PASS=password_broker_anda
-```
-
-> Bingung password broker-nya? Setel ulang dengan perintah berikut (ganti
-> `PASSWORD_BARU`), lalu samakan `MQTT_PASS` di `.env`:
-> ```bash
-> docker compose exec mosquitto mosquitto_passwd -b /mosquitto/config/passwd cctv PASSWORD_BARU
-> docker compose restart mosquitto cctv-checker
-> ```
 
 Cek dulu semuanya sudah benar sebelum menyalakan:
 ```bash
@@ -157,8 +140,7 @@ docker compose up -d
 
 *Output yang diharapkan:*
 ```text
-[+] Running 5/5
- ✔ Container mosquitto_broker       Started
+[+] Running 4/4
  ✔ Container zoneminder             Started
  ✔ Container camera-dashboard       Started
  ✔ Container cctv_checker_service   Started
@@ -178,7 +160,6 @@ Pastikan pada kolom **STATUS**, semua kontainer berstatus **`Up`** (bukan *Exite
 - `caddy_proxy` (Port 80, 443 HTTPS)
 - `camera-dashboard` (Port 8080)
 - `zoneminder` (Port 8082)
-- `mosquitto_broker` (Port 1883, 9001)
 - `cctv_checker_service`
 
 ---
@@ -220,7 +201,7 @@ Saat pertama kali membuka `https://`, browser akan memunculkan peringatan keaman
 
 ## 🎯 Panduan Menu & Fitur yang Tersedia
 
-Setelah portal terbuka di `https://<IP_ANDA>/`, Anda akan melihat 6 menu utama:
+Setelah portal terbuka di `https://<IP_ANDA>/`, Anda akan melihat 5 menu utama:
 
 | No | Nama Menu | Fungsi |
 | :---: | :--- | :--- |
@@ -228,10 +209,9 @@ Setelah portal terbuka di `https://<IP_ANDA>/`, Anda akan melihat 6 menu utama:
 | **2** | **Kelola Monitor ZoneMinder** (`/zoneminder.html`) | Mengatur kamera yang sudah ada, mengedit nama/resolusi/fungsi, menyalakan/mematikan kamera (*Quick OFF*), **kontrol massal seluruh kamera** (aktifkan semua / matikan semua / pulihkan fungsi asli), dan mengatur CCTV Health Checker. |
 | **3** | **Tambah Kamera Tunggal** (`/add_camera.html`) | Menambahkan 1 kamera baru secara cepat dengan memasukkan alamat RTSP stream kamera. |
 | **4** | **Burst Add Massal** (`/burst.html`) | Mendaftarkan puluhan kamera sekaligus cukup dengan *copy-paste* daftar RTSP atau *upload* file Excel (.xlsx). |
-| **5** | **Live MQTT Monitor Log** (`/log_display.html`) | Memantau log status kamera hidup/mati secara *real-time*, mengatur jeda waktu pemeriksaan (*delay interval*), dan panduan memasang notifikasi ke HP. |
-| **6** | **Wall Dashboard** (`/wall`) | Menampilkan banyak kamera secara grid live. Pilih **seluruh kamera** atau **sebagian group** (bisa lebih dari satu group), lalu atur jumlah kolom, rasio, resolusi, dan FPS. Hanya kamera yang terlihat di layar yang dimuat, sehingga tidak membebani ZoneMinder. |
+| **5** | **Wall Dashboard** (`/wall`) | Menampilkan banyak kamera secara grid live. Pilih **seluruh kamera** atau **sebagian group** (bisa lebih dari satu group), lalu atur jumlah kolom, rasio, resolusi, dan FPS. Hanya kamera yang terlihat di layar yang dimuat, sehingga tidak membebani ZoneMinder. |
 
-### Detail Menu 6: Wall Dashboard
+### Detail Menu 5: Wall Dashboard
 
 **Langkah penggunaan:**
 1. Dari portal, klik **Wall Dashboard (Grid Kamera)**, atau buka langsung `https://<IP_ANDA>/wall`.
@@ -294,26 +274,6 @@ Di halaman `zoneminder.html`, tepat di atas tabel kamera ada baris **⚡ Kontrol
 
 ---
 
-## 📱 Cara Memasang Notifikasi di HP (Android / iOS)
-
-Agar HP Anda berdering atau memunculkan popup notifikasi saat ada kamera CCTV yang mati:
-
-1. Download aplikasi **MQTT Dash** (di Play Store) atau **IoT MQTT Panel** (di App Store / Play Store).
-2. Buka aplikasi dan tambahkan koneksi broker baru:
-   - **Name:** `ZoneMinder CCTV Alert`
-   - **Address / Server:** Masukkan IP Komputer Anda (misal `192.168.1.50`).
-   - **Port:** `1883`
-   - **Username & Password:** **WAJIB DIISI** — samakan dengan `MQTT_USER` dan
-     `MQTT_PASS` di file `.env` (default user: `cctv`).
-     ⚠️ Broker menolak koneksi anonim, jadi jangan dikosongkan.
-3. Klik **Save** dan pastikan status koneksi berubah hijau (*Connected*).
-4. Tambahkan tombol/widget baru bertipe **Text / Log**:
-   - Masukkan Topic: `cctv/events`
-   - Aktifkan centang **"Enable notifications on receive"**.
-5. Selesai! Sekarang saat ada kamera yang putus (*OFFLINE*) atau hidup kembali (*ONLINE*), HP Anda akan menerima notifikasi instan.
-
----
-
 ## 🛠️ Perintah-Perintah Penting Command Prompt
 
 Berikut daftar perintah yang sering Anda perlukan:
@@ -355,8 +315,6 @@ docker logs -f caddy_proxy
 ## 🔑 Informasi Akun & Port Default
 - **ZoneMinder Login**: Username `admin`, Password `P@ssw0rd` *(atur di file `.env`)*
 - **Port HTTPS Web Portal**: `443`
-- **Port Mosquitto MQTT Native**: `1883` (untuk aplikasi HP / script Python)
-- **Port Mosquitto MQTT WebSocket**: `9001` (untuk browser)
 - **Port Alternatif Direct ZoneMinder**: `8082` (contoh: `http://192.168.1.50:8082/zm/`)
 - **Port Alternatif Direct Dashboard**: `8080` (contoh: `http://192.168.1.50:8080/`)
 

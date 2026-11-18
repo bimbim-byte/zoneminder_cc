@@ -20,11 +20,6 @@
     @root path /
     redir @root /zm/ 302
 
-    # Topic MQTT WebSocket (dipakai klien browser).
-    handle /mqtt {
-        reverse_proxy mosquitto:9001
-    }
-
     # Sisanya (termasuk /zm*, /cgi-bin*, /css*, /js*, /graphics*, /ajax*)
     # seluruhnya milik ZoneMinder.
     handle {
@@ -35,7 +30,7 @@
 # ============================================================================
 # PORT :9443 — TERBATAS (Dashboard manajemen)
 #
-# Semua halaman dashboard (portal, kelola kamera, burst add, log MQTT, dan
+# Semua halaman dashboard (portal, kelola kamera, burst add, dan
 # pengaturan kredensial) hanya ada di sini, dilindungi login Flask.
 #
 # Kenapa port terpisah, bukan path seperti /admin?

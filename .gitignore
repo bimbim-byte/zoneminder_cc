@@ -14,7 +14,6 @@ caddy/certs/*.csr
 data/*.json
 data/*.log
 !data/.gitkeep
-mqtt_logs.json
 checker_config.json
 
 # Brankas kredensial terenkripsi & akun dashboard (hash password).

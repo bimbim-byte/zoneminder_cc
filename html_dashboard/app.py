@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import threading
-from datetime import datetime, timedelta
 
 import requests
 from flask import (
@@ -36,7 +35,6 @@ app = Flask(__name__, static_folder=".", template_folder=".")
 ZM_HOST = os.environ.get("ZM_HOST", "http://zoneminder:80")
 ZM_BASE_URL = os.environ.get("ZM_BASE_URL", f"{ZM_HOST}/zm/api")
 
-MQTT_LOG_FILE = os.environ.get("MQTT_LOG_FILE", "/app/data/mqtt_logs.json")
 CHECKER_CONFIG_FILE = os.environ.get("CHECKER_CONFIG_FILE", "/app/data/checker_config.json")
 
 DASH_SECRET_KEY = os.environ.get("DASH_SECRET_KEY", "")
@@ -511,6 +509,26 @@ def change_password():
     })
 
 # ==============================================================================
+# UTILITAS: REDAKSI KREDENSIAL RTSP
+# ==============================================================================
+def _redact_rtsp(text):
+    """Buang kredensial dari URL RTSP apa pun di dalam sebuah string.
+
+    Path monitor di ZoneMinder berbentuk rtsp://user:pass@host/stream dan ikut
+    terkirim ke browser saat daftar kamera dibaca. Nilai kredensial TIDAK
+    boleh keluar ke klien, jadi disaring di sini — bukan hanya saat menulis.
+    """
+    if not isinstance(text, str) or "@" not in text or "rtsp://" not in text.lower():
+        return text
+    try:
+        scheme, _, rest = text.partition("//")
+        hostpart = rest.rsplit("@", 1)[-1]
+        return f"{scheme}//{hostpart}" if hostpart else "rtsp://<kredensial-dihilangkan>"
+    except Exception:
+        return "<kredensial-dihilangkan>"
+
+
+# ==============================================================================
 # 2. API PROXY KE ZONEMINDER
 # ==============================================================================
 @app.route("/api/zm/health.json", methods=["GET"])
@@ -898,308 +916,7 @@ def burst_add_monitors():
 
 
 # ==============================================================================
-# 5. API MQTT LOGS
-# ==============================================================================
-def _redact_rtsp(text):
-    """Buang kredensial dari URL RTSP apa pun di dalam sebuah string.
-
-    Log lama (sebelum checker diperbaiki) memuat rtsp://user:pass@host di
-    dalam payload. Nilai itu TIDAK boleh keluar ke browser, jadi disaring
-    saat dibaca — bukan hanya saat ditulis.
-    """
-    if not isinstance(text, str) or "@" not in text or "rtsp://" not in text.lower():
-        return text
-    try:
-        scheme, _, rest = text.partition("//")
-        hostpart = rest.rsplit("@", 1)[-1]
-        return f"{scheme}//{hostpart}" if hostpart else "rtsp://<kredensial-dihilangkan>"
-    except Exception:
-        return "<kredensial-dihilangkan>"
-
-
-def _scrub_payload(value):
-    """Rekursif: bersihkan rtsp_url dan kredensial di semua bentuk payload."""
-    if isinstance(value, dict):
-        out = {}
-        for key, item in value.items():
-            if key == "rtsp_url":
-                out[key] = _redact_rtsp(item)
-            else:
-                out[key] = _scrub_payload(item)
-        return out
-    if isinstance(value, list):
-        return [_scrub_payload(item) for item in value]
-    if isinstance(value, str):
-        return _redact_rtsp(value)
-    return value
-
-
-def _mqtt_log_path():
-    """Lokasi berkas log MQTT yang benar-benar dipakai.
-
-    Ada dua kemungkinan: path dari environment (di dalam container:
-    /app/data/mqtt_logs.json) atau berkas di direktori kerja sebagai
-    cadangan untuk pengembangan tanpa Docker. Urutan ini harus sama dengan
-    jalur tulis, kalau tidak penghapusan akan menyentuh berkas yang salah.
-    """
-    if os.path.exists(MQTT_LOG_FILE):
-        return MQTT_LOG_FILE
-    return "mqtt_logs.json"
-
-
-# Penghapusan log menulis ulang seluruh berkas. Tanpa kunci ini, dua
-# permintaan bersamaan (mis. dua tab browser) bisa saling menimpa dan
-# menyisakan berkas setengah jadi.
-_mqtt_log_lock = threading.Lock()
-
-
-def _read_mqtt_logs_raw():
-    """Baca berkas log apa adanya sebagai list. None bila berkas tidak ada."""
-    target = _mqtt_log_path()
-    if not os.path.exists(target):
-        return None
-    with open(target, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data if isinstance(data, list) else []
-
-
-def _write_mqtt_logs_atomic(entries):
-    """Tulis ulang berkas log secara atomik.
-
-    Ditulis ke berkas sementara di direktori yang SAMA lalu di-rename.
-    os.replace bersifat atomik pada filesystem yang sama, sehingga
-    cctv_checker tidak pernah membaca berkas yang setengah tertulis saat
-    penghapusan berjalan. Menulis langsung ke berkas tujuan akan
-    meninggalkan JSON rusak bila proses berhenti di tengah jalan.
-    """
-    target = _mqtt_log_path()
-    directory = os.path.dirname(os.path.abspath(target))
-    os.makedirs(directory, exist_ok=True)
-    tmp_path = target + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(entries, f, indent=2, ensure_ascii=False)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp_path, target)
-    return target
-
-
-def _parse_log_timestamp(value):
-    """Timestamp log berbentuk 'YYYY-MM-DD HH:MM:SS' -> datetime, atau None.
-
-    Memakai datetime.strptime, BUKAN time.strptime: yang kedua mengembalikan
-    struct_time yang tidak punya .strftime() maupun operator perbandingan,
-    sehingga pemakaian di ringkasan langsung melempar AttributeError.
-    """
-    try:
-        return datetime.strptime(str(value), "%Y-%m-%d %H:%M:%S")
-    except Exception:
-        return None
-
-
-def _log_cutoff_string(days):
-    """Batas waktu 'N hari lalu' dalam format timestamp log yang sama.
-
-    Perbandingan dilakukan sebagai string, dan itu aman khusus untuk format
-    'YYYY-MM-DD HH:MM:SS': lebar tiap bagian tetap, urutan leksikografis
-    identik dengan urutan waktu. Format lain (mis. RFC 2822) tidak boleh
-    dibandingkan begitu.
-    """
-    cutoff = datetime.now() - timedelta(days=days)
-    return cutoff.strftime("%Y-%m-%d %H:%M:%S")
-
-
-@app.route("/api/mqtt-logs", methods=["GET"])
-def get_mqtt_logs():
-    """Membaca isi file log MQTT dan menyajikan dalam format JSON untuk log_display.html.
-
-    Setiap payload disaring sebelum dikirim: URL RTSP tidak pernah lagi
-    membawa user/password ke browser (lihat _redact_rtsp).
-
-    Setiap entri juga diberi ``_id`` (indeksnya di dalam berkas). Indeks
-    dipakai sebagai pegangan untuk menghapus satu entri tertentu, karena
-    baris log tidak punya ID sendiri. Dikirim setelah penyaringan supaya
-    urutannya selalu sama dengan isi berkas di server.
-    """
-    try:
-        logs = _read_mqtt_logs_raw()
-    except Exception as e:
-        return jsonify({"error": f"Gagal membaca file log: {str(e)}"}), 500
-
-    if logs is None:
-        return jsonify([])
-
-    out = []
-    for index, entry in enumerate(logs):
-        cleaned = _scrub_payload(entry)
-        if isinstance(cleaned, dict):
-            cleaned["_id"] = index
-        out.append(cleaned)
-    return jsonify(out)
-
-
-@app.route("/api/mqtt-logs/summary", methods=["GET"])
-def mqtt_logs_summary():
-    """Ringkasan ukuran log untuk ditampilkan sebelum operator menghapus."""
-    try:
-        logs = _read_mqtt_logs_raw()
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Gagal membaca log: {e}"}), 500
-
-    target = _mqtt_log_path()
-    size = os.path.getsize(target) if os.path.exists(target) else 0
-    entries = logs or []
-
-    oldest = None
-    newest = None
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        ts = _parse_log_timestamp(entry.get("timestamp"))
-        if ts is None:
-            continue
-        if oldest is None or ts < oldest:
-            oldest = ts
-        if newest is None or ts > newest:
-            newest = ts
-
-    return jsonify({
-        "status": "ok",
-        "count": len(entries),
-        "bytes": size,
-        "file": os.path.basename(target),
-        "oldest": oldest.strftime("%Y-%m-%d %H:%M:%S") if oldest else None,
-        "newest": newest.strftime("%Y-%m-%d %H:%M:%S") if newest else None,
-    })
-
-
-@app.route("/api/mqtt-logs", methods=["DELETE"])
-def delete_mqtt_logs():
-    """Menghapus entri log MQTT.
-
-    Body JSON (semua opsional):
-      mode      : "all" (default) | "ids" | "older_than"
-      ids       : daftar indeks entri yang dihapus (mode="ids")
-      older_than: jumlah HARI; entri lebih tua dari itu dibuang
-                  (mode="older_than"). Nilai 0 = semua entri.
-
-    Mengembalikan jumlah yang terhapus dan sisa entri, sehingga UI bisa
-    melaporkan hasil sebenarnya, bukan menebak.
-
-    Modul ini sengaja TIDAK menyentuh berkas lain: hanya log MQTT. Berkas
-    konfigurasi checker dan kredensial tidak pernah ikut terhapus.
-    """
-    body = request.get_json(silent=True) or {}
-    mode = str(body.get("mode") or "all").strip().lower()
-
-    if mode not in ("all", "ids", "older_than"):
-        return jsonify({
-            "status": "error",
-            "message": f"Mode hapus '{mode}' tidak dikenali. Pilihan: all, ids, older_than.",
-        }), 400
-
-    with _mqtt_log_lock:
-        try:
-            logs = _read_mqtt_logs_raw()
-        except Exception as e:
-            return jsonify({"status": "error", "message": f"Gagal membaca log: {e}"}), 500
-
-        if logs is None:
-            return jsonify({
-                "status": "success", "deleted": 0, "remaining": 0,
-                "message": "Berkas log belum ada — tidak ada yang perlu dihapus.",
-            })
-
-        before = len(logs)
-
-        if mode == "all":
-            kept = []
-        elif mode == "ids":
-            raw_ids = body.get("ids") or []
-            if not isinstance(raw_ids, list):
-                return jsonify({
-                    "status": "error",
-                    "message": "Parameter 'ids' harus berupa daftar angka.",
-                }), 400
-            try:
-                drop = {int(str(x).strip()) for x in raw_ids}
-            except (TypeError, ValueError):
-                return jsonify({
-                    "status": "error",
-                    "message": "Parameter 'ids' berisi nilai yang bukan angka.",
-                }), 400
-            if not drop:
-                return jsonify({
-                    "status": "error",
-                    "message": "Tidak ada entri yang dipilih untuk dihapus.",
-                }), 400
-            kept = [e for i, e in enumerate(logs) if i not in drop]
-        else:  # older_than
-            try:
-                days = int(body.get("older_than", 0))
-            except (TypeError, ValueError):
-                return jsonify({
-                    "status": "error",
-                    "message": "Parameter 'older_than' harus berupa angka hari.",
-                }), 400
-            if days < 0:
-                return jsonify({
-                    "status": "error",
-                    "message": "Parameter 'older_than' tidak boleh negatif.",
-                }), 400
-
-            cutoff = _log_cutoff_string(days)
-
-            def _keep(entry):
-                """Entri tanpa timestamp valid DIPERTAHANKAN.
-
-                Log yang timestamp-nya tidak terbaca tidak boleh hilang
-                hanya karena tidak bisa dibandingkan — kehilangan data
-                diam-diam lebih buruk daripada menyisakan entri rusak.
-                """
-                if not isinstance(entry, dict):
-                    return True
-                stamp = entry.get("timestamp")
-                if not stamp:
-                    return True
-                return str(stamp) >= cutoff
-
-            kept = [e for e in logs if _keep(e)]
-
-        deleted = before - len(kept)
-
-        if deleted == 0:
-            return jsonify({
-                "status": "success",
-                "deleted": 0,
-                "remaining": before,
-                "message": "Tidak ada entri yang memenuhi kriteria hapus.",
-            })
-
-        try:
-            _write_mqtt_logs_atomic(kept)
-        except Exception as e:
-            log.exception("Gagal menulis ulang log MQTT")
-            return jsonify({
-                "status": "error",
-                "message": f"Gagal menyimpan log setelah penghapusan: {e}",
-            }), 500
-
-    label = {"all": "semua entri", "ids": "entri terpilih",
-             "older_than": "entri lama"}.get(mode, "entri")
-    log.info("Log MQTT: %d entri dihapus (%s), sisa %d", deleted, label, len(kept))
-
-    return jsonify({
-        "status": "success",
-        "deleted": deleted,
-        "remaining": len(kept),
-        "mode": mode,
-        "message": f"{deleted} {label} dihapus. Sisa {len(kept)} entri.",
-    })
-
-
-# ==============================================================================
-# 6. API KONTROL CCTV CHECKER (TOGGLE AKTIF/MATI & DELAY INTERVAL)
+# 5. API KONTROL CCTV CHECKER (TOGGLE AKTIF/MATI & DELAY INTERVAL)
 # ==============================================================================
 def get_checker_config():
     default_cfg = {
@@ -1269,7 +986,7 @@ def checker_run_now():
 
 
 # ==============================================================================
-# 7. WALL DASHBOARD (GRID KAMERA + GROUP)
+# 6. WALL DASHBOARD (GRID KAMERA + GROUP)
 # ==============================================================================
 MONITOR_CACHE = {"data": None, "ts": 0}
 MONITOR_CACHE_TTL = 10  # detik
@@ -1516,7 +1233,7 @@ def api_camera_stream(monitor_id):
 # kontrol massal (bulk-function) dan pemetaan fungsi monitor.
 
 # ==============================================================================
-# 8. BULK CONTROL SELURUH KAMERA
+# 7. BULK CONTROL SELURUH KAMERA
 # ==============================================================================
 # ZM memakai "Function" sebagai mode operasi monitor. "None" = kamera mati.
 ZM_OFF_FUNCTION = "None"
@@ -2631,7 +2348,7 @@ def bulk_set_function():
 
 
 # ==============================================================================
-# 9. ZONE DETEKSI — 5 MODE OPERASIONAL
+# 8. ZONE DETEKSI — 5 MODE OPERASIONAL
 # ==============================================================================
 @app.route("/api/zones/modes", methods=["GET"])
 def api_zone_modes():

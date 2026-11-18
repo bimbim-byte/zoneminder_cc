@@ -12,13 +12,11 @@ for f in /mnt/c/Users/*/.wslconfig; do
   echo "-- $f"
   cat "$f"
 done
-echo "=== WIN PORTS (80/443/8080/8082/1883/9001) ==="
+echo "=== WIN PORTS (80/443/8080/8082) ==="
 if command -v netstat.exe >/dev/null 2>&1; then
-  netstat.exe -ano 2>/dev/null | grep -E ':(80|443|8080|8082|1883|9001)[[:space:]]' | head -30
+  netstat.exe -ano 2>/dev/null | grep -E ':(80|443|8080|8082)[[:space:]]' | head -30
 else
   echo "(netstat.exe unavailable)"
 fi
 echo "=== ZM STATE ==="
 cat scripts/zm_monitor_state.json 2>/dev/null || echo "(no state file)"
-echo "=== MOSQUITTO PASSWD ==="
-ls -la mosquitto.passwd mosquitto/acl 2>/dev/null || echo "(no auth files)"

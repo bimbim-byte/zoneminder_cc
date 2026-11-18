@@ -1,13 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 import os
-import re
 import socket
-import sys
 import threading
 import time
 from urllib.parse import urlparse
-import paho.mqtt.client as mqtt
+
 import requests
 import urllib3
 import warnings
@@ -18,24 +16,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # ==============================================================================
 # KONFIGURASI ENVIRONMENT
 # ==============================================================================
-LOG_FILE = os.environ.get("MQTT_LOG_FILE", "/app/data/mqtt_logs.json")
 CHECKER_CONFIG_FILE = os.environ.get("CHECKER_CONFIG_FILE", "/app/data/checker_config.json")
-
-# MQTT Broker
-MQTT_BROKER_HOST = os.environ.get("MQTT_BROKER_HOST", "mosquitto")
-MQTT_BROKER_PORT = int(os.environ.get("MQTT_BROKER_PORT", 1883))
-MQTT_TOPIC_SUB = os.environ.get("MQTT_TOPIC", "cctv/#")
-MQTT_USER = os.environ.get("MQTT_USER", "")
-MQTT_PASS = os.environ.get("MQTT_PASS", "")
-
-# Broker tidak lagi menerima klien anonim (lihat mosquitto.conf).
-# Tanpa kredensial, koneksi akan ditolak dengan rc=5 (not authorised).
-if not MQTT_USER or not MQTT_PASS:
-    print(
-        "[WARN] MQTT_USER/MQTT_PASS kosong. Broker menolak koneksi anonim — "
-        "isi keduanya di file .env.",
-        flush=True,
-    )
 
 # ZoneMinder
 ZM_HOST = os.environ.get("ZM_HOST", "http://zoneminder:80")
@@ -57,7 +38,6 @@ if not ZM_PASS:
 # Interval Pengecekan Kamera default (detik). 600 = 10 menit.
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", 600))
 RTSP_TIMEOUT = float(os.environ.get("RTSP_TIMEOUT", 3.0))
-RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", 10))
 
 # Status awal checker saat file konfigurasi belum ada.
 # Default false: tidak ada pengecekan RTSP diam-diam sebelum operator sadar.
@@ -80,10 +60,9 @@ ZM_LOGIN_FAILED = False
 
 
 # ==============================================================================
-# 1. FILE LOG & CONFIG MANAGEMENT
+# 1. FILE CONFIG MANAGEMENT
 # ==============================================================================
 def ensure_data_dir():
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
     os.makedirs(os.path.dirname(CHECKER_CONFIG_FILE), exist_ok=True)
 
 
@@ -102,7 +81,7 @@ def load_checker_config():
         "rtsp_timeout": RTSP_TIMEOUT,
         "run_now": False,
         "status": "Running" if CHECKER_ENABLED else "Paused",
-        "last_check": None
+        "last_check": None,
     }
     if os.path.exists(CHECKER_CONFIG_FILE):
         try:
@@ -128,128 +107,8 @@ def update_checker_config(cfg_updates):
             print(f"[ERROR] Gagal menyimpan config checker: {e}", flush=True)
 
 
-def clean_old_logs(logs):
-    """Menghapus entri log yang lebih dari RETENTION_DAYS."""
-    cutoff = datetime.now() - timedelta(days=RETENTION_DAYS)
-    filtered = []
-    for entry in logs:
-        try:
-            ts = datetime.strptime(entry.get("timestamp"), "%Y-%m-%d %H:%M:%S")
-            if ts >= cutoff:
-                filtered.append(entry)
-        except Exception:
-            filtered.append(entry)
-    return filtered
-
-
-def save_log_entry(topic, payload_str):
-    """Menyimpan log event yang diterima dari MQTT ke file JSON."""
-    ensure_data_dir()
-    with file_lock:
-        logs = []
-        if os.path.exists(LOG_FILE):
-            try:
-                with open(LOG_FILE, "r", encoding="utf-8") as f:
-                    logs = json.load(f)
-                    if not isinstance(logs, list):
-                        logs = []
-            except Exception:
-                logs = []
-
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        payload_data = payload_str
-        try:
-            payload_data = json.loads(payload_str)
-        except Exception:
-            pass
-
-        new_entry = {
-            "timestamp": now_str,
-            "topic": topic,
-            "payload": payload_data
-        }
-        logs.insert(0, new_entry)
-        logs = clean_old_logs(logs)
-
-        try:
-            with open(LOG_FILE, "w", encoding="utf-8") as f:
-                json.dump(logs, f, indent=2, ensure_ascii=False)
-            print(f"[LOG SAVED] [{now_str}] {topic}: {payload_str[:80]}", flush=True)
-        except Exception as e:
-            print(f"[ERROR] Gagal menulis ke {LOG_FILE}: {e}", flush=True)
-
-
 # ==============================================================================
-# 2. MQTT CLIENT HANDLERS & REMOTE CONTROL TOPICS
-# ==============================================================================
-if hasattr(mqtt, "CallbackAPIVersion"):
-    mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
-else:
-    mqtt_client = mqtt.Client()
-
-# Broker menolak klien anonim; kredensial wajib dikirim saat handshake.
-if MQTT_USER:
-    mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS or None)
-
-
-# Kode balasan MQTT yang perlu diterjemahkan agar operator tahu penyebabnya.
-MQTT_RC_REASONS = {
-    1: "versi protokol tidak didukung",
-    2: "client id ditolak",
-    3: "broker tidak tersedia",
-    4: "username/password salah format",
-    5: "TIDAK DIIZINKAN — periksa MQTT_USER/MQTT_PASS di .env",
-}
-
-
-def on_mqtt_connect(client, userdata, flags, rc):
-    if rc == 0:
-        print(f"[MQTT] Berhasil terhubung ke Broker ({MQTT_BROKER_HOST}:{MQTT_BROKER_PORT})", flush=True)
-        client.subscribe(MQTT_TOPIC_SUB)
-        print(f"[MQTT] Subscribed ke topik: '{MQTT_TOPIC_SUB}'", flush=True)
-    else:
-        reason = MQTT_RC_REASONS.get(rc, "penyebab tidak diketahui")
-        print(f"[MQTT ERROR] Gagal terhubung ke Broker MQTT (rc={rc}): {reason}", flush=True)
-
-
-def on_mqtt_message(client, userdata, msg):
-    try:
-        topic = msg.topic
-        payload_str = msg.payload.decode("utf-8", errors="ignore").strip()
-
-        # Handle remote MQTT control commands
-        if topic == "cctv/control/run_now":
-            print("[MQTT CONTROL] Perintah 'run_now' diterima via MQTT!", flush=True)
-            update_checker_config({"run_now": True})
-        elif topic == "cctv/control/pause":
-            print("[MQTT CONTROL] Perintah 'pause' diterima via MQTT!", flush=True)
-            update_checker_config({"enabled": False, "status": "Paused"})
-        elif topic == "cctv/control/resume":
-            print("[MQTT CONTROL] Perintah 'resume' diterima via MQTT!", flush=True)
-            update_checker_config({"enabled": True, "status": "Running"})
-        elif topic == "cctv/control/interval":
-            try:
-                new_sec = int(payload_str)
-                if new_sec >= 5:
-                    print(f"[MQTT CONTROL] Interval diubah ke {new_sec}s via MQTT!", flush=True)
-                    update_checker_config({"interval": new_sec})
-            except Exception:
-                pass
-
-        # Catat ke log hanya jika bukan control ping internal
-        if not topic.startswith("cctv/control/"):
-            save_log_entry(topic, payload_str)
-    except Exception as e:
-        print(f"[MQTT MESSAGE ERROR] {e}", flush=True)
-
-
-mqtt_client.on_connect = on_mqtt_connect
-mqtt_client.on_message = on_mqtt_message
-
-
-# ==============================================================================
-# 3. ZONEMINDER API CLIENT
+# 2. ZONEMINDER API CLIENT
 # ==============================================================================
 def wait_for_zoneminder():
     """Menunggu ZoneMinder siap TANPA menyentuh halaman berautentikasi.
@@ -355,15 +214,15 @@ def update_monitor_function(monitor_id, new_function):
 
 
 # ==============================================================================
-# 4. RTSP CONNECTIVITY CHECKER
+# 3. RTSP CONNECTIVITY CHECKER
 # ==============================================================================
 def redact_rtsp_url(rtsp_url):
-    """Buang kredensial dari URL RTSP sebelum dipublikasikan.
+    """Buang kredensial dari URL RTSP sebelum ditulis ke log container.
 
-    Payload MQTT (cctv/events, cctv/status/<nama>) bisa dibaca siapa pun yang
-    memegang kredensial broker, dan URL asli memuat user:password kamera.
-    Bagian kredensial WAJIB dibuang sebelum dikirim; yang tersisa hanya
-    host:port agar operator tetap tahu kamera mana yang bermasalah.
+    Log container bisa dibaca lewat `docker compose logs` dan sering
+    disalin-tempel ke tiket/chat. URL asli memuat user:password kamera, jadi
+    bagian kredensial WAJIB dibuang; yang tersisa hanya host:port agar
+    operator tetap tahu kamera mana yang bermasalah.
     """
     if not rtsp_url:
         return ""
@@ -378,7 +237,7 @@ def redact_rtsp_url(rtsp_url):
     scheme, _, rest = text.partition("//")
     hostpart = rest.rsplit("@", 1)[-1]
     if not hostpart or ":" not in hostpart and "." not in hostpart:
-        # Tidak ada host yang bisa dikenali — jangan tebak, buang seluruhnya.
+        # Tidak ada host yang bisa dikenali - jangan tebak, buang seluruhnya.
         return "rtsp://<kredensial-dihilangkan>"
     return f"{scheme}//{hostpart}"
 
@@ -412,7 +271,7 @@ def check_rtsp_online(rtsp_url, timeout=None):
 
 
 # ==============================================================================
-# 5. CAMERA HEALTH CHECK EXECUTION & CONTROLLER LOOP
+# 4. CAMERA HEALTH CHECK EXECUTION & CONTROLLER LOOP
 # ==============================================================================
 def perform_single_health_check(timeout_val=3.0):
     """Menjalankan 1 siklus pengecekan status kamera RTSP."""
@@ -454,51 +313,23 @@ def perform_single_health_check(timeout_val=3.0):
                         changed_count += 1
 
                 if status_changed or is_initial:
-                    msg_text = (
-                        f"Kamera '{name}' TERHUBUNG (ONLINE)"
-                        if is_online
-                        else f"Kamera '{name}' TERPUTUS (OFFLINE)"
-                    )
-
-                    # rtsp_url dipublikasikan TANPA kredensial: payload ini
-                    # disiarkan ke cctv/events dan cctv/status/<nama>, yang
-                    # bisa dibaca setiap klien broker.
-                    event_payload = {
-                        "timestamp": now_str,
-                        "monitor_id": mon_id,
-                        "name": name,
-                        "status": status_str,
-                        "rtsp_url": redact_rtsp_url(path),
-                        "message": msg_text
-                    }
-
-                    clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name).lower()
-                    mqtt_client.publish(
-                        f"cctv/status/{clean_name}",
-                        json.dumps(event_payload),
-                        qos=1
-                    )
-                    mqtt_client.publish(
-                        "cctv/events",
-                        json.dumps(event_payload),
-                        qos=1
+                    # URL ditulis TANPA kredensial: baris ini masuk ke log
+                    # container yang bisa dibaca siapa pun yang memegang akses
+                    # `docker compose logs`.
+                    print(
+                        f"[EVENT {now_str}] Kamera '{name}' "
+                        f"{'TERHUBUNG (ONLINE)' if is_online else 'TERPUTUS (OFFLINE)'} "
+                        f"-> {redact_rtsp_url(path)}",
+                        flush=True,
                     )
 
                 last_known_status[mon_id] = status_str
 
-            summary_payload = {
-                "timestamp": now_str,
-                "total_monitors": len(monitors),
-                "online": online_count,
-                "offline": offline_count,
-                "status_changed": changed_count
-            }
-            mqtt_client.publish("cctv/summary", json.dumps(summary_payload), qos=1)
-
             print(
                 f"[CHECKER {now_str}] Total: {len(monitors)} | "
-                f"🟢 Online: {online_count} | 🔴 Offline: {offline_count} | 🔄 Diperbarui: {changed_count}",
-                flush=True
+                f"Online: {online_count} | Offline: {offline_count} | "
+                f"Fungsi diperbarui: {changed_count}",
+                flush=True,
             )
         else:
             print(f"[CHECKER {now_str}] Belum ada monitor yang terdaftar di ZoneMinder.", flush=True)
@@ -554,29 +385,17 @@ def run_camera_health_check():
 
 
 # ==============================================================================
-# 6. MAIN SERVICE ENTRYPOINT
+# 5. MAIN SERVICE ENTRYPOINT
 # ==============================================================================
 def main():
     ensure_data_dir()
     print("=" * 60, flush=True)
-    print("[*] Starting CCTV Health Checker & MQTT Reporter Service", flush=True)
-    print(f"[*] Target Broker : {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}", flush=True)
+    print("[*] Starting CCTV Camera Health Checker Service", flush=True)
     print(f"[*] ZoneMinder    : {ZM_HOST}", flush=True)
     print(f"[*] Check Interval: {CHECK_INTERVAL} detik (Dapat diubah dinamis)", flush=True)
-    print(f"[*] Log File JSON : {LOG_FILE}", flush=True)
     print(f"[*] Config File   : {CHECKER_CONFIG_FILE}", flush=True)
     print("=" * 60, flush=True)
 
-    connected = False
-    while not connected:
-        try:
-            mqtt_client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, keepalive=60)
-            connected = True
-        except Exception as e:
-            print(f"[MQTT RETRY] Mosquitto belum siap ({e}). Coba lagi dalam 5 detik...", flush=True)
-            time.sleep(5)
-
-    mqtt_client.loop_start()
     run_camera_health_check()
 
 

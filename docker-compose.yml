@@ -108,7 +108,6 @@ services:
       - DASH_SECRET_KEY=${DASH_SECRET_KEY:?DASH_SECRET_KEY belum diisi di file .env}
       - ZM_CREDENTIALS_FILE=/app/data/zm_credentials.enc
       - DASH_USERS_FILE=/app/data/dashboard_users.json
-      - MQTT_LOG_FILE=/app/data/mqtt_logs.json
       - WSGI_THREADS=${WSGI_THREADS:-64}
       # Keamanan sesi login. Semua ini DIBACA oleh html_dashboard/auth.py dan
       # app.py; sebelumnya tidak diteruskan compose sehingga nilai .env
@@ -131,28 +130,12 @@ services:
       - zoneminder
 
   # --------------------------------------------------------
-  # 4. Mosquitto MQTT Broker
-  # --------------------------------------------------------
-  mosquitto:
-    image: eclipse-mosquitto:latest
-    container_name: mosquitto_broker
-    restart: always
-
-    ports:
-      - "${MQTT_TCP_PORT:-1883}:1883"   # Port MQTT TCP
-      - "${MQTT_WS_PORT:-9001}:9001"    # Port MQTT WebSocket
-
-    volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      # File password wajib ada: allow_anonymous=false di mosquitto.conf
-      # akan membuat broker GAGAL START bila file ini tidak ditemukan.
-      - ./mosquitto_config/passwd:/mosquitto/config/passwd:ro
-
-    networks:
-      - cctv_net
-
-  # --------------------------------------------------------
-  # 5. Camera Health Checker & MQTT Reporter Service
+  # 4. Camera Health Checker Service
+  #
+  # Menguji konektivitas TCP RTSP tiap kamera secara berkala dan mengubah
+  # fungsi monitor di ZoneMinder (`None` saat kamera mati, kembali ke fungsi
+  # aslinya saat hidup). Tanpa perantara pesan eksternal: hasilnya masuk log
+  # container (docker logs -f cctv_checker_service).
   # --------------------------------------------------------
   cctv-checker:
     build:
@@ -163,21 +146,12 @@ services:
 
     environment:
       - PYTHONUNBUFFERED=1
-      - MQTT_BROKER_HOST=mosquitto
-      - MQTT_BROKER_PORT=1883
-      - MQTT_TOPIC=cctv/#
-      # Broker menolak koneksi anonim. Nilai harus sama dengan user yang
-      # dibuat di ./mosquitto_config/passwd.
-      - MQTT_USER=${MQTT_USER:-cctv}
-      - MQTT_PASS=${MQTT_PASS:?MQTT_PASS belum diisi di file .env}
       - ZM_HOST=http://zoneminder:80
       - ZM_USER=${ZM_USER:?ZM_USER belum diisi di file .env}
       - ZM_PASS=${ZM_PASS:?ZM_PASS belum diisi di file .env}
       - CHECK_INTERVAL=${CHECK_INTERVAL:-600}
       - RTSP_TIMEOUT=${RTSP_TIMEOUT:-3.0}
-      - RETENTION_DAYS=${RETENTION_DAYS:-10}
       - CHECKER_ENABLED=${CHECKER_ENABLED:-false}
-      - MQTT_LOG_FILE=/app/data/mqtt_logs.json
       - CHECKER_CONFIG_FILE=/app/data/checker_config.json
 
     volumes:
@@ -188,7 +162,6 @@ services:
       - cctv_net
 
     depends_on:
-      - mosquitto
       - zoneminder
 
 # --------------------------------------------------------

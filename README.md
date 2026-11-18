@@ -1,6 +1,6 @@
-# 🛡️ ZoneMinder Central CCTV Management & MQTT Monitoring System
+# 🛡️ ZoneMinder Central CCTV Management System
 
-Sistem manajemen kamera CCTV terpusat berbasis **ZoneMinder NVR** dengan antarmuka web modern (*Single Page Application*), reverse proxy aman berbasis **HTTPS (Caddy)**, pendaftaran kamera massal (*Burst Add* via teks & Excel), serta deteksi keaktifan kamera otomatis berbasis *TCP Socket RTSP* yang dilaporkan secara *real-time* melalui broker **Mosquitto MQTT**.
+Sistem manajemen kamera CCTV terpusat berbasis **ZoneMinder NVR** dengan antarmuka web modern (*Single Page Application*), reverse proxy aman berbasis **HTTPS (Caddy)**, pendaftaran kamera massal (*Burst Add* via teks & Excel), serta deteksi keaktifan kamera otomatis berbasis *TCP Socket RTSP* (cek konektivitas berkala + auto-switch fungsi monitor di ZoneMinder).
 
 > 💡 **Panduan Pemula Lengkap:** Bagi pengguna baru yang membutuhkan tutorial langkah-demi-langkah Command Prompt / terminal dari awal, silakan baca **[PANDUAN_PENGGUNAAN.md](PANDUAN_PENGGUNAAN.md)**.
 
@@ -12,11 +12,10 @@ Sistem manajemen kamera CCTV terpusat berbasis **ZoneMinder NVR** dengan antarmu
 3. [Daftar URL & Akses Layanan](#-daftar-url--akses-layanan)
 4. [Panduan Instalasi Cepat](#-panduan-instalasi-cepat)
 5. [Panduan Penggunaan Fitur](#-panduan-penggunaan-fitur)
-6. [Panduan Notifikasi MQTT di HP & Device Lain](#-panduan-notifikasi-mqtt-di-hp-android--ios)
-7. [Keamanan & Berkas yang Diabaikan Git (.gitignore)](#-keamanan--berkas-yang-diabaikan-git-gitignore)
-8. [Pembaruan Sertifikat SSL / TLS](#-pembaruan-sertifikat-ssl--tls)
-9. [Struktur Direktori Proyek](#-struktur-direktori-proyek)
-10. [Informasi Akun Default & Troubleshooting](#-informasi-akun-default--troubleshooting)
+6. [Keamanan & Berkas yang Diabaikan Git (.gitignore)](#-keamanan--berkas-yang-diabaikan-git-gitignore)
+7. [Pembaruan Sertifikat SSL / TLS](#-pembaruan-sertifikat-ssl--tls)
+8. [Struktur Direktori Proyek](#-struktur-direktori-proyek)
+9. [Informasi Akun Default & Troubleshooting](#-informasi-akun-default--troubleshooting)
 
 ---
 
@@ -32,27 +31,26 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
                        │      Caddy Reverse Proxy      │ (:443 HTTPS & :80 HTTP)
                        └───────────────┬───────────────┘
                                        │
-            ┌──────────────────────────┼──────────────────────────┐
-            │ (/zm*, /cgi-bin*)        │ (/)                      │ (/mqtt)
-            ▼                          ▼                          ▼
-┌────────────────────────┐ ┌───────────────────────┐ ┌────────────────────────┐
-│     ZoneMinder NVR     │ │   Camera Dashboard    │ │     Mosquitto MQTT     │
-│  (Core NVR & CakePHP)  │ │ (Flask Backend & SPA) │ │ (Port 1883 TCP & 9001) │
-└───────────┬────────────┘ └───────────┬───────────┘ └────────────▲───────────┘
-            │                          │                          │
-            │         ┌────────────────┴──────────────────────────┤
-            ▼         ▼                                           │
-     ┌────────────────────────────────────────────────────────────┴┐
-     │                CCTV Health Checker & Reporter               │
-     │      (TCP Socket RTSP & Auto Function Switch & Control)     │
+            ┌──────────────────────────┴───────────────────────────┐
+            │ (/zm*, /cgi-bin*)                                 │ (/)
+            ▼                                                   ▼
+┌────────────────────────┐                     ┌───────────────────────┐
+│     ZoneMinder NVR     │◄──── API/stream ────┤   Camera Dashboard    │
+│  (Core NVR & CakePHP)  │                     │ (Flask Backend & SPA) │
+└───────────┬────────────┘                     └───────────┬───────────┘
+            │                                              │
+            │            config & kontrol checker          │
+            ▼                                              ▼
+     ┌─────────────────────────────────────────────────────────────┐
+     │                     CCTV Health Checker                     │
+     │      (TCP Socket RTSP & Auto Function Switch & Kontrol)     │
      └─────────────────────────────────────────────────────────────┘
 ```
 
 1. **Caddy Proxy (`caddy_proxy`)**: Reverse proxy HTTPS standar industri yang mengikat ke port universal `:443`, melayani traffic untuk domain maupun IP manapun dengan sertifikat TLS terintegrasi.
 2. **ZoneMinder (`zoneminder`)**: Core NVR (v1.36) dengan database MySQL internal untuk perekaman, streaming RTSP, event storage, dan motion detection.
 3. **Camera Dashboard (`camera-dashboard`)**: Web UI SPA berbasis HTML5, CSS3, dan Python Flask backend untuk manajemen monitor, ekspor/impor Excel, dan kontrol checker.
-4. **CCTV Health Checker (`cctv_checker_service`)**: Background service Python yang menguji konektivitas TCP RTSP setiap kamera secara berkala, auto-switch fungsi monitor di ZoneMinder (`Monitor` <-> `None`), serta mempublikasikan event ke broker Mosquitto MQTT.
-5. **Mosquitto MQTT Broker (`mosquitto_broker`)**: Broker MQTT v5/v3.1.1 pada port `1883` (TCP Native untuk aplikasi HP/IoT) dan `9001` (WebSocket).
+4. **CCTV Health Checker (`cctv_checker_service`)**: Background service Python yang menguji konektivitas TCP RTSP setiap kamera secara berkala dan auto-switch fungsi monitor di ZoneMinder (`Monitor` <-> `None`). Hasil pemeriksaan ditulis ke log container; tidak ada perantara pesan eksternal.
 
 ---
 
@@ -79,10 +77,10 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
   - **Lazy load viewport**: kamera hanya dimuat saat terlihat di layar, sehingga hemat bandwidth dan CPU.
   - **Batas stream bersamaan** (dapat diatur) dengan indikator `live` / `antre` untuk menjaga kestabilan server.
   - Mode layar penuh per kamera, jeda massal, dan URL langsung yang bisa dijadikan bookmark atau kiosk display.
-- **📡 Pusat Log & Notifikasi MQTT Real-Time**:
-  - Menampilkan log aktivitas kamera (Timestamp, Topik, Status ONLINE/OFFLINE, Payload).
-  - Filter pencarian instan berdasarkan nama kamera, topik, atau status.
-  - Panduan lengkap menghubungkan notifikasi alarm ke HP Android/iOS (MQTT Dash / IoT MQTT Panel), Home Assistant, atau script Python mandiri.
+- **📡 Log Kesehatan Kamera di Log Container**:
+  - Setiap perubahan status (ONLINE/OFFLINE) dan jumlah fungsi monitor yang diperbarui dicatat ke log `cctv_checker_service`.
+  - URL RTSP ditulis tanpa kredensial, sehingga aman disalin ke tiket atau chat.
+  - Lihat dengan: `docker logs -f cctv_checker_service`.
 
 ---
 
@@ -97,7 +95,6 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
 | **Kelola Monitor ZoneMinder** | `https://<IP_SERVER>/zoneminder.html` | CRUD kamera, edit, quick toggle, dan kendali checker |
 | **Burst Add Massal (Upgraded)** | `https://<IP_SERVER>/burst.html` | Pendaftaran massal via Quick Paste RTSP & Excel |
 | **Tambah Kamera Tunggal** | `https://<IP_SERVER>/add_camera.html` | Form tambah 1 kamera RTSP secara instan |
-| **Live MQTT Health Log** | `https://<IP_SERVER>/log_display.html` | Live log stream, statistik kamera, dan tutorial MQTT |
 | **Wall Dashboard (Pilih Kamera)** | `https://<IP_SERVER>/wall` | Pilih seluruh kamera atau sebagian group (multi-group) |
 | **Wall Dashboard (Grid Live)** | `https://<IP_SERVER>/wall/view?mode=all` | Grid live stream kamera, atur kolom/rasio/resolusi/FPS |
 | **ZoneMinder Direct Port** | `http://<IP_SERVER>:8082/zm/` | Port langsung (fallback tanpa HTTPS) |
@@ -226,7 +223,7 @@ Catatan:
 - Mengaktifkan/mematikan kamera **tidak menghapus** rekaman atau event yang sudah ada.
 
 ### 4. Mengontrol CCTV Health Checker
-Pada halaman `zoneminder.html` maupun `log_display.html` tersedia widget kendali checker:
+Pada halaman `zoneminder.html` tersedia widget kendali checker:
 - **Tombol ⏸ Jeda / ▶ Aktifkan:** Menjeda atau melanjutkan loop pengecekan kesehatan kamera tanpa mematikan kontainer.
 - **Delay Interval Pengecekan:** Ubah angka detik (minimal 5 detik) lalu klik **Simpan Delay**. Nilai default adalah **600 detik (10 menit)**.
 - **Tombol ⚡ Cek Semua Kamera Sekarang:** Memeriksa status konektivitas seluruh kamera RTSP saat itu juga tanpa menunggu interval waktu.
@@ -280,47 +277,6 @@ https://<IP_SERVER>/wall/view?mode=ids&ids=8,10,21
 
 ---
 
-## 📱 Panduan Notifikasi MQTT di HP (Android / iOS)
-
-Anda dapat menerima notifikasi popup suara/getar seketika saat ada kamera CCTV yang mati atau hidup kembali:
-
-### 1. Parameter Koneksi Broker
-- **Broker Host / IP**: Masukkan alamat IP LAN komputer server Anda (contoh: `192.168.1.50`).
-- **Port**: **`1883`** (TCP Native MQTT).
-- **Username & Password**: **WAJIB DIISI** — sama dengan `MQTT_USER` dan
-  `MQTT_PASS` di file `.env` Anda (default user: `cctv`).
-  > ⚠️ Broker **menolak koneksi anonim** (`allow_anonymous false` di
-  > `mosquitto.conf`). Bila aplikasi HP dihubungkan tanpa username/password,
-  > koneksi langsung gagal dengan pesan *"not authorised"*.
-- **Client ID**: Acak / Bebas.
-
-### 2. Topik Notifikasi (MQTT Topics)
-- **`cctv/events`** *(Sangat Disarankan)*: Mengirimkan peringatan setiap kali ada kamera yang beralih status:
-  ```json
-  {
-    "timestamp": "2026-11-05 10:15:00",
-    "monitor_id": "2",
-    "name": "Kamera_Gerbang_Utama",
-    "status": "OFFLINE",
-    "rtsp_url": "rtsp://admin:pass@192.168.1.100:554/stream1",
-    "message": "Kamera 'Kamera_Gerbang_Utama' TERPUTUS (OFFLINE)"
-  }
-  ```
-- **`cctv/summary`**: Mengirimkan rekapitulasi jumlah total kamera, online, dan offline secara berkala.
-- **`cctv/control/run_now`**: Kirim payload kosong ke topik ini dari HP untuk memicu pengecekan kamera jarak jauh.
-
-### 3. Langkah Pemasangan di Aplikasi HP (MQTT Dash / IoT MQTT Panel)
-1. Pasang aplikasi **MQTT Dash** (Google Play Store) atau **IoT MQTT Panel** (App Store / Play Store).
-2. Tambahkan Broker baru:
-   - Nama: `ZoneMinder CCTV Alert`
-   - Address: `<IP_SERVER>` (misal `192.168.1.50`)
-   - Port: `1883`
-3. Simpan dan hubungkan hingga status koneksi berwarna hijau (*Connected*).
-4. Buat widget baru bertipe **Text / Log** atau **Multi-State**, masukkan Topic: `cctv/events`.
-5. Aktifkan fitur **"Enable notifications on receive"**.
-
----
-
 ## 🔐 Keamanan & Berkas yang Diabaikan Git (.gitignore)
 
 Untuk memastikan kredensial pribadi dan data CCTV aman saat proyek disimpan di GitHub, berkas `.gitignore` telah dikonfigurasi untuk **tidak pernah mengunggah berkas sensitif berikut**:
@@ -328,7 +284,7 @@ Untuk memastikan kredensial pribadi dan data CCTV aman saat proyek disimpan di G
 | Kategori Berkas | Pola .gitignore | Alasan Keamanan |
 | :--- | :--- | :--- |
 | **Kunci Privat SSL** | `caddy/certs/*.key`, `*.pem` | Melindungi sertifikat dan *private key* TLS server Anda dari akses publik. |
-| **Log Runtime Kamera** | `data/*.json`, `data/*.log` | Log event MQTT menyimpan URL stream RTSP yang sering kali mengandung username & password kamera (`rtsp://admin:password@...`). |
+| **Log Runtime Kamera** | `data/*.json`, `data/*.log` | Konfigurasi checker & cache monitor menyimpan URL stream RTSP yang sering kali mengandung username & password kamera (`rtsp://admin:password@...`). |
 | **Environment / Secrets** | `.env`, `*.env` | Melindungi variabel rahasia atau token API internal. |
 | **Cache Python & IDE** | `__pycache__/`, `.vscode/`, `.continue/` | Mencegah file biner dan cache lokal mengotori repository. |
 
@@ -362,8 +318,7 @@ Skrip tersebut otomatis meregenerasi pasangan kunci `cert.pem` & `key.pem` denga
 ```text
 zoneminder_cc/
 ├── .gitignore                 # Konfigurasi proteksi berkas sensitif & kredensial
-├── docker-compose.yml         # Konfigurasi orkestrasi 5 layanan Docker
-├── mosquitto.conf             # Konfigurasi broker MQTT Mosquitto
+├── docker-compose.yml         # Konfigurasi orkestrasi 4 layanan Docker
 ├── README.md                  # Dokumentasi teknis & panduan lengkap
 ├── .env.example               # Template konfigurasi (kredensial, interval, port)
 ├── .env                       # Konfigurasi aktual — DIABAIKAN GIT
@@ -374,7 +329,7 @@ zoneminder_cc/
 │       └── openssl.cnf        # Konfigurasi minimal OpenSSL
 ├── cctv_checker/
 │   ├── Dockerfile             # Dockerfile service CCTV Health Checker
-│   └── main.py                # Core Python penguji RTSP & MQTT publisher
+│   └── main.py                # Core Python penguji RTSP & auto-switch fungsi ZM
 ├── data/
 │   └── .gitkeep               # Direktori runtime (log json & config diabaikan git)
 ├── html_dashboard/
@@ -384,7 +339,6 @@ zoneminder_cc/
 │   ├── zoneminder.html        # CRUD Camera Manager, kontrol massal & checker controls
 │   ├── add_camera.html        # Form pendaftaran kamera tunggal
 │   ├── burst.html             # Pendaftaran massal via Quick Paste RTSP & Excel
-│   ├── log_display.html       # Live stream MQTT log & panduan notifikasi
 │   ├── wall.html              # Wall Dashboard: pemilihan kamera / multi-group
 │   ├── wall_view.html         # Wall Dashboard: grid live kamera (grid, rasio, FPS)
 │   ├── requirements.txt       # Dependencies Python (Flask, Waitress)
@@ -487,7 +441,6 @@ Lalu sesuaikan isinya:
 | `ZM_PASS` | `P@ssw0rd` | Password ZoneMinder untuk API & login |
 | `CHECK_INTERVAL` | `600` | Interval pengecekan RTSP (detik) |
 | `RTSP_TIMEOUT` | `3.0` | Timeout koneksi TCP ke kamera (detik) |
-| `RETENTION_DAYS` | `10` | Umur simpan log MQTT (hari) |
 | `CHECKER_ENABLED` | `false` | Status awal checker saat pertama dinyalakan |
 | `WSGI_THREADS` | `64` | Thread waitress untuk stream MJPEG |
 
@@ -502,8 +455,7 @@ Lalu sesuaikan isinya:
 ### Akun
 
 - **ZoneMinder Admin**: `admin` / `P@ssw0rd` *(ubah segera setelah instalasi)*
-- **Mosquitto MQTT Auth**: **Wajib login** — pakai `MQTT_USER` / `MQTT_PASS`
-  dari file `.env` (default user: `cctv`). Koneksi anonim ditolak.
+- **Dashboard**: akun dikelola di halaman Pengaturan (`data/dashboard_users.json`)
 
 ### Troubleshooting:
 1. **Peringatan SSL di Browser (*Your connection is not private*):**

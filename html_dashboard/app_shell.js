@@ -26,7 +26,6 @@
         { href: '/zoneminder.html',  label: 'Kelola Kamera', icon: '&#128737;&#65039;' },
         { href: '/add_camera.html',  label: 'Tambah Kamera', icon: '&#10133;' },
         { href: '/burst.html',       label: 'Burst Add',     icon: '&#128640;' },
-        { href: '/log_display.html', label: 'Log MQTT',      icon: '&#128225;' },
         { href: '/settings',         label: 'Pengaturan',    icon: '&#9881;&#65039;' }
     ];
 

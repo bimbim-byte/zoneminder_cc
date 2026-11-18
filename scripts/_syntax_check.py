@@ -29,7 +29,6 @@ PAGES = [
     "zoneminder.html",
     "add_camera.html",
     "burst.html",
-    "log_display.html",
     "settings.html",
     "login.html",
 ]

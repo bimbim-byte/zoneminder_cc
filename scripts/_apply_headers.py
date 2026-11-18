@@ -3,7 +3,7 @@
 Jalankan dari root repo:
     python3 scripts/_apply_headers.py
 
-Yang dilakukan pada add_camera.html, burst.html, dan log_display.html:
+Yang dilakukan pada add_camera.html dan burst.html:
   * blok <header> lama diganti placeholder <header id="dashHeader"></header>;
   * aksi penting (tombol "Daftarkan Semua", Refresh, Pause) dipindah ke toolbar
     halaman sendiri agar tidak hilang;
@@ -32,18 +32,6 @@ PLAN = {
     <span class="toolbar-info" id="summaryCounter">Total: 0 Kamera</span>
     <button id="btnSubmitAll" class="btn btn-success" disabled onclick="executeBurstAdd()">
       &#9889; Daftarkan Semua ke ZoneMinder
-    </button>
-  </div>
-""",
-    "log_display.html": """  <!-- Header navigasi bersama: tautan ZoneMinder ditonjolkan + tombol logout -->
-  <header id="dashHeader"></header>
-  <div class="page-toolbar">
-    <span class="toolbar-info" id="logCountHeader">0 Entri Log</span>
-    <button id="toggleRefreshBtn" class="btn btn-outline btn-small" onclick="toggleAutoRefresh()">
-      &#9208; Pause Auto-Refresh
-    </button>
-    <button class="btn btn-primary btn-small" onclick="fetchLogsFromFile()">
-      &#128260; Refresh
     </button>
   </div>
 """,
