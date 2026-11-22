@@ -26,6 +26,53 @@ VALID_RECORDING = ("None", "OnMotion", "Always")
 # (lihat skins/classic/views/monitor.php pada blok $decoders).
 # Kunci memakai huruf kecil karena itulah nilai yang disimpan ZM; 'auto'
 # berarti tanpa akselerasi eksplisit.
+# ------------------------------------------------------------------------------
+# Konfigurasi event & analisis (Monitor ZM 1.38.6)
+# ------------------------------------------------------------------------------
+# Nilai di bawah HARUS sama dengan yang diterima ZoneMinder. Sumber kebenaran
+# adalah skema database (MariaDB) dan form native:
+#
+#   Muncul di /usr/share/zoneminder/www/skins/classic/views/monitor.php:
+#     SectionLength, MinSectionLength, EventCloseMode, FrameSkip,
+#     AnalysisUpdateDelay, FPSReportInterval, Importance, StartupDelay
+#
+#   Tipe kolom di tabel Monitors (SHOW COLUMNS FROM Monitors):
+#     SectionLength        int(10) unsigned      default 600
+#     MinSectionLength     int(10) unsigned      default 10
+#     FrameSkip            smallint(5) unsigned  default 0
+#     AnalysisUpdateDelay  smallint(5) unsigned  default 0
+#     FPSReportInterval    smallint(5) unsigned  default 250
+#     StartupDelay         int(11)               default 0
+#     EventCloseMode       enum('system','time','duration','idle','alarm')
+#     Importance           enum('Normal','Less','Not')
+#
+# PENTING: nilai enum ENUM di MySQL bersifat case-sensitive. ZM menyimpan
+# 'system' (huruf kecil) dan 'Normal' (huruf besar). Mengirim 'System' pada
+# EventCloseMode akan ditolak/di-kosongkan, karena itu normalize_event_close_mode()
+# memetakan label UI ('System', 'Time', ...) ke nilai kanonik.
+EVENT_CLOSE_MODES = ("system", "time", "duration", "idle", "alarm")
+EVENT_CLOSE_MODE_LABELS = {
+    "system": "System",
+    "time": "Time",
+    "duration": "Duration",
+    "idle": "Idle",
+    "alarm": "Alarm",
+}
+
+IMPORTANCE_VALUES = ("Normal", "Less", "Not")
+
+# Batas atas mengikuti tipe kolom di atas. smallint(5) unsigned = 65535.
+# Nilai di atas batas akan ditolak MariaDB dengan error "Out of range value",
+# sehingga dipotong di sini dan tidak dibiarkan menggagalkan seluruh simpan.
+_FIELD_LIMITS = {
+    "SectionLength": (0, 4294967295),
+    "MinSectionLength": (0, 4294967295),
+    "FrameSkip": (0, 65535),
+    "AnalysisUpdateDelay": (0, 65535),
+    "FPSReportInterval": (0, 65535),
+    "StartupDelay": (-2147483648, 2147483647),
+}
+
 VALID_DECODERS = (
     "auto",
     "h264",
@@ -198,6 +245,52 @@ def normalize_recording(val, default="None"):
     return default
 
 
+def normalize_event_close_mode(val, default="system"):
+    """Normalisasi EventCloseMode ZM 1.38: system|time|duration|idle|alarm.
+
+    Nilai enum MySQL bersifat case-sensitive — harus huruf kecil. Label UI
+    seperti 'System' atau 'Duration' yang dikirim browser dipetakan ke bentuk
+    kanonik. Input tidak dikenal jatuh ke `default`.
+    """
+    v = str(val or "").strip().lower()
+    return v if v in EVENT_CLOSE_MODES else default
+
+
+def normalize_importance(val, default="Normal"):
+    """Normalisasi Importance ZM 1.38: Normal|Less|Not.
+
+    Enum MySQL case-sensitive dengan huruf pertama kapital. Label UI seperti
+    'normal' atau 'NOT IMPORTANCE' dipetakan ke bentuk kanonik. Input tidak
+    dikenal jatuh ke `default`.
+    """
+    v = str(val or "").strip().capitalize()
+    if v in IMPORTANCE_VALUES:
+        return v
+    lv = v.lower()
+    if lv in ("not", "not important", "none"):
+        return "Not"
+    if lv in ("less", "less important"):
+        return "Less"
+    return default
+
+
+def normalize_int_field(val, key, default=0):
+    """Normalisasi field numerik integer monitor ZM.
+
+    Konversi string dari form/Excel -> int, potong ke batas kolom MySQL
+    (lihat _FIELD_LIMITS), dan jatuh ke `default` bila kosong/tidak valid.
+    Mengembalikan nilai bertipe int (bukan str) supaya payload JSON yang
+    dikirim ke ZM API berisi angka, bukan string — konsisten dengan tipe
+    kolom di tabel Monitors.
+    """
+    lo, hi = _FIELD_LIMITS.get(key, (0, 2147483647))
+    try:
+        n = int(float(str(val).strip()))
+    except (ValueError, TypeError):
+        return int(default)
+    return max(lo, min(hi, n))
+
+
 def normalize_decoder(val, default="auto"):
     """Normalisasi pilihan decoder FFmpeg ke nilai kanonik ZoneMinder 1.38.6.
 
@@ -322,6 +415,14 @@ def build_zm138_full_payload(
     enabled="1",
     function=None,
     overrides=None,
+    section_length=300,
+    min_section_length=60,
+    event_close_mode="system",
+    frame_skip=0,
+    analysis_update_delay=0,
+    fps_report_interval=250,
+    importance="Normal",
+    startup_delay=0,
 ):
     """
     Membangun dictionary payload POST ke ZM API v1.38.6 ('Monitor[Key]': Value)
@@ -350,6 +451,20 @@ def build_zm138_full_payload(
     except (ValueError, TypeError):
         analysis_fps_val = "8.00"
 
+    # Normalisasi field event & analisis. Nilai di sini WAJIB berupa angka
+    # (bukan string) agar payload JSON sesuai tipe kolom di tabel Monitors
+    # dan tidak ditolak MariaDB saat ZM menyimpan monitor.
+    event_fields = {
+        "SectionLength": normalize_int_field(section_length, "SectionLength", 300),
+        "MinSectionLength": normalize_int_field(min_section_length, "MinSectionLength", 60),
+        "FrameSkip": normalize_int_field(frame_skip, "FrameSkip", 0),
+        "AnalysisUpdateDelay": normalize_int_field(analysis_update_delay, "AnalysisUpdateDelay", 0),
+        "FPSReportInterval": normalize_int_field(fps_report_interval, "FPSReportInterval", 250),
+        "StartupDelay": normalize_int_field(startup_delay, "StartupDelay", 0),
+        "EventCloseMode": normalize_event_close_mode(event_close_mode),
+        "Importance": normalize_importance(importance),
+    }
+
     # Salin default dasar
     monitor_fields = dict(ZM138_BASE_DEFAULTS)
 
@@ -371,6 +486,11 @@ def build_zm138_full_payload(
         "AnalysisFPSLimit": analysis_fps_val,
         "Decoder": dec_val,
     })
+
+    # Field event & analisis (SectionLength, EventCloseMode, FrameSkip, ...).
+    # Diterapkan setelah field utama, sebelum overrides, sehingga nilai dari
+    # form selalu menang atas default ZM138_BASE_DEFAULTS.
+    monitor_fields.update(event_fields)
 
     # Terapkan overrides jika ada
     if isinstance(overrides, dict):

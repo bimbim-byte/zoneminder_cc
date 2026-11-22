@@ -758,6 +758,26 @@ def proxy_zm(subpath):
 # ==============================================================================
 # 3. API PENDAFTARAN KAMERA TUNGGAL (DIRECT RTSP KE ZONEMINDER)
 # ==============================================================================
+def _pick(data, *keys, default=None):
+    """Ambil nilai pertama yang BENAR-BENAR ADA dari dict.
+
+    Berbeda dari pola `data.get(a) or data.get(b)`, nilai 0 dan "" tetap
+    dianggap nilai sah. Ini penting untuk field konfigurasi event di mana
+    angka 0 bermakna (FrameSkip=0, AnalysisUpdateDelay=0, StartupDelay=0):
+    dengan pola `or`, nilai 0 akan tergeser ke default dan input operator
+    diam-diam hilang.
+    """
+    for key in keys:
+        if key in data:
+            val = data[key]
+            if val is None:
+                continue
+            if isinstance(val, str) and not val.strip():
+                continue
+            return val
+    return default
+
+
 @app.route("/api/zoneminder/add-camera", methods=["POST"])
 def add_single_camera():
     """Mendaftarkan kamera langsung dengan RTSP URL ke ZoneMinder (Triad ZM 1.38.6)."""
@@ -798,6 +818,15 @@ def add_single_camera():
         decoder=data.get("decoder") or "Auto",
         enabled=data.get("enabled", "1"),
         function=zm_function,
+        # Konfigurasi event & analisis (default: 300 / 60 / system / 0 / 0 / 250 / Normal / 0)
+        section_length=_pick(data, "sectionLength", "section_length", "SectionLength", default=300),
+        min_section_length=_pick(data, "minSectionLength", "min_section_length", "MinSectionLength", default=60),
+        event_close_mode=_pick(data, "eventCloseMode", "event_close_mode", "EventCloseMode", default="system"),
+        frame_skip=_pick(data, "frameSkip", "frame_skip", "FrameSkip", default=0),
+        analysis_update_delay=_pick(data, "analysisUpdateDelay", "analysis_update_delay", "AnalysisUpdateDelay", default=0),
+        fps_report_interval=_pick(data, "fpsReportInterval", "fps_report_interval", "FPSReportInterval", default=250),
+        importance=_pick(data, "importance", "Importance", default="Normal"),
+        startup_delay=_pick(data, "startupDelay", "startup_delay", "StartupDelay", default=0),
     )
 
     try:
@@ -966,6 +995,16 @@ def burst_add_monitors():
             decoder=monitor_data.get("Decoder") or monitor_data.get("decoder") or "Auto",
             enabled=monitor_data.get("Enabled", "1"),
             function=monitor_data.get("Function") or monitor_data.get("zmFunction"),
+            # Konfigurasi event & analisis per baris (dari Excel) — nilai 0
+            # dihormati lewat _pick, tidak tergeser ke default.
+            section_length=_pick(monitor_data, "SectionLength", "sectionLength", "section_length", "Section Length", default=300),
+            min_section_length=_pick(monitor_data, "MinSectionLength", "minSectionLength", "min_section_length", "Minimum Section Length", default=60),
+            event_close_mode=_pick(monitor_data, "EventCloseMode", "eventCloseMode", "event_close_mode", "Event Close Mode", default="system"),
+            frame_skip=_pick(monitor_data, "FrameSkip", "frameSkip", "frame_skip", "Frame Skip", default=0),
+            analysis_update_delay=_pick(monitor_data, "AnalysisUpdateDelay", "analysisUpdateDelay", "analysis_update_delay", "Analysis Update Delay", default=0),
+            fps_report_interval=_pick(monitor_data, "FPSReportInterval", "fpsReportInterval", "fps_report_interval", "FPS report interval", "FPS Report Interval", default=250),
+            importance=_pick(monitor_data, "Importance", "importance", default="Normal"),
+            startup_delay=_pick(monitor_data, "StartupDelay", "startupDelay", "startup_delay", "Startup Delay", default=0),
         )
 
         try:
@@ -2483,6 +2522,15 @@ def api_save_camera_with_zone():
         decoder=body.get("decoder") or "Auto",
         enabled=body.get("enabled", "1"),
         function=str(body.get("function") or "Monitor"),
+        # Konfigurasi event & analisis (default 1.38.6: 300/60/system/0/0/250/Normal/0).
+        section_length=_pick(body, "sectionLength", "section_length", "SectionLength", default=300),
+        min_section_length=_pick(body, "minSectionLength", "min_section_length", "MinSectionLength", default=60),
+        event_close_mode=_pick(body, "eventCloseMode", "event_close_mode", "EventCloseMode", default="system"),
+        frame_skip=_pick(body, "frameSkip", "frame_skip", "FrameSkip", default=0),
+        analysis_update_delay=_pick(body, "analysisUpdateDelay", "analysis_update_delay", "AnalysisUpdateDelay", default=0),
+        fps_report_interval=_pick(body, "fpsReportInterval", "fps_report_interval", "FPSReportInterval", default=250),
+        importance=_pick(body, "importance", "Importance", default="Normal"),
+        startup_delay=_pick(body, "startupDelay", "startup_delay", "StartupDelay", default=0),
     )
 
     # ID kustom hanya dipakai saat membuat kamera baru. Saat mengedit, ID
@@ -2490,6 +2538,25 @@ def api_save_camera_with_zone():
     custom_id = str(body.get("customId", "") or "").strip()
     if not edit_id and custom_id.isdigit():
         payload["Monitor[Id]"] = custom_id
+
+    # Saat MENGEDIT dari modal yang tidak menampilkan field event/analisis,
+    # nilai default dari build_zm138_full_payload TIDAK boleh menimpa nilai
+    # kustom yang sudah tersimpan di ZM. Hapus 8 field itu dari payload bila
+    # request tidak mengirimkannya secara eksplisit.
+    if edit_id:
+        _EVENT_PAYLOAD_KEYS = (
+            "Monitor[SectionLength]", "Monitor[MinSectionLength]",
+            "Monitor[EventCloseMode]", "Monitor[FrameSkip]",
+            "Monitor[AnalysisUpdateDelay]", "Monitor[FPSReportInterval]",
+            "Monitor[Importance]", "Monitor[StartupDelay]",
+        )
+        _EVENT_BODY_KEYS = (
+            "sectionLength", "minSectionLength", "eventCloseMode", "frameSkip",
+            "analysisUpdateDelay", "fpsReportInterval", "importance", "startupDelay",
+        )
+        if not any(k in body for k in _EVENT_BODY_KEYS):
+            for k in _EVENT_PAYLOAD_KEYS:
+                payload.pop(k, None)
 
     if edit_id:
         target = f"monitors/{edit_id}.json"

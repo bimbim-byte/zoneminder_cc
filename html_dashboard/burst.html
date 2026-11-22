@@ -137,7 +137,9 @@
             </div>
             <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="form-control" onchange="handleExcelUpload(event)">
             <div class="form-hint" style="margin-top: 8px;">
-              Kolom wajib: <code>Name</code>, <code>Source Path</code>, <code>Capturing</code>, <code>Analysing</code>, <code>Recording</code>, <code>Width</code>, <code>Height</code>, <code>Max FPS</code>, <code>Analysis FPS</code>, <code>Decoder</code>, <code>Zone</code>.
+              Kolom wajib: <code>Name</code>, <code>Source Path</code>, <code>Capturing</code>, <code>Analysing</code>, <code>Recording</code>, <code>Width</code>, <code>Height</code>, <code>Max FPS</code>, <code>Analysis FPS</code>, <code>Decoder</code>, <code>Zone</code>.<br>
+              Kolom opsional (konfigurasi event, terisi default bila kosong):
+              <code>Section Length</code> (300), <code>Minimum Section Length</code> (60), <code>Event Close Mode</code> (System), <code>Frame Skip</code> (0), <code>Analysis Update Delay</code> (0), <code>FPS Report Interval</code> (250), <code>Importance</code> (Normal), <code>Startup Delay</code> (0).
             </div>
           </div>
         </div>
@@ -210,8 +212,57 @@
             </div>
           </div>
 
+          <!-- Konfigurasi Event & Analisis (default untuk semua kamera baru) -->
+          <div class="grid grid-4" style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px;">
+            <div class="form-group">
+              <label class="form-label text-xs" for="defaultSectionLength">Section length (detik)</label>
+              <input type="number" id="defaultSectionLength" class="form-control text-xs" value="300" min="0" step="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label text-xs" for="defaultMinSectionLength">Min. section length (detik)</label>
+              <input type="number" id="defaultMinSectionLength" class="form-control text-xs" value="60" min="0" step="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label text-xs" for="defaultEventCloseMode">Event Close Mode</label>
+              <select id="defaultEventCloseMode" class="form-select text-xs">
+                <option value="system" selected>System</option>
+                <option value="time">Time</option>
+                <option value="duration">Duration</option>
+                <option value="idle">Idle</option>
+                <option value="alarm">Alarm</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label text-xs" for="defaultImportance">Importance</label>
+              <select id="defaultImportance" class="form-select text-xs">
+                <option value="Normal" selected>Normal</option>
+                <option value="Less">Less</option>
+                <option value="Not">Not</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-4" style="margin-top: -4px;">
+            <div class="form-group">
+              <label class="form-label text-xs" for="defaultFrameSkip">Frame Skip (frames)</label>
+              <input type="number" id="defaultFrameSkip" class="form-control text-xs" value="0" min="0" step="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label text-xs" for="defaultAnalysisUpdateDelay">Analysis Update Delay (detik)</label>
+              <input type="number" id="defaultAnalysisUpdateDelay" class="form-control text-xs" value="0" min="0" step="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label text-xs" for="defaultFpsReportInterval">FPS report interval (frames)</label>
+              <input type="number" id="defaultFpsReportInterval" class="form-control text-xs" value="250" min="0" step="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label text-xs" for="defaultStartupDelay">Startup Delay (detik)</label>
+              <input type="number" id="defaultStartupDelay" class="form-control text-xs" value="0" min="0" step="1">
+            </div>
+          </div>
+
           <!-- Kredensial Default & Zone -->
-          <div class="grid grid-2" style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: -6px;">
+          <div class="grid grid-2" style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px;">
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label text-xs">Default User / Password (opsional)</label>
               <div class="flex gap-2">
@@ -272,6 +323,7 @@
                 <th style="width: 65px;">MaxFPS</th>
                 <th style="width: 65px;">AnaFPS</th>
                 <th style="width: 95px;">Decoder</th>
+                <th style="width: 130px;" title="SectionLength / MinSectionLength / EventCloseMode">Event</th>
                 <th style="width: 120px;">Mode Zone</th>
                 <th style="width: 90px;">Status</th>
                 <th style="width: 40px; text-align: center;">Aksi</th>
@@ -279,7 +331,7 @@
             </thead>
             <tbody id="cameraTableBody">
               <tr>
-                <td colspan="15" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                <td colspan="16" style="text-align: center; color: var(--text-muted); padding: 40px;">
                   Belum ada data kamera. Silakan paste URL RTSP atau unggah file Excel di atas.
                 </td>
               </tr>
@@ -298,6 +350,90 @@
   <script>
     let cameraList = [];
     let ZONE_MODES = [];
+
+    // Nilai default konfigurasi Event & Analisis ZoneMinder 1.38.6.
+    // Sumber yang sama dipakai saat halaman dimuat, saat reset, dan saat
+    // baris Excel tidak menyertakan kolomnya.
+    const EVENT_DEFAULTS = {
+      SectionLength: '300',
+      MinSectionLength: '60',
+      EventCloseMode: 'system',
+      FrameSkip: '0',
+      AnalysisUpdateDelay: '0',
+      FPSReportInterval: '250',
+      Importance: 'Normal',
+      StartupDelay: '0'
+    };
+
+    // id kontrol di panel default -> nama field pada objek kamera
+    const EVENT_FIELD_MAP = {
+      defaultSectionLength: 'SectionLength',
+      defaultMinSectionLength: 'MinSectionLength',
+      defaultEventCloseMode: 'EventCloseMode',
+      defaultFrameSkip: 'FrameSkip',
+      defaultAnalysisUpdateDelay: 'AnalysisUpdateDelay',
+      defaultFpsReportInterval: 'FPSReportInterval',
+      defaultImportance: 'Importance',
+      defaultStartupDelay: 'StartupDelay'
+    };
+
+    function applyEventDefaults() {
+      Object.keys(EVENT_FIELD_MAP).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = EVENT_DEFAULTS[EVENT_FIELD_MAP[id]];
+      });
+    }
+
+    function readEventDefaults() {
+      const out = {};
+      Object.keys(EVENT_FIELD_MAP).forEach(id => {
+        const el = document.getElementById(id);
+        const field = EVENT_FIELD_MAP[id];
+        out[field] = el ? el.value : EVENT_DEFAULTS[field];
+      });
+      return out;
+    }
+
+    // Normalisasi sel Excel -> nilai konfigurasi event yang sah.
+    // Sel kosong / tidak valid jatuh ke default, sehingga berkas Excel lama
+    // (tanpa kolom event sama sekali) tetap berperilaku persis seperti dulu.
+    function toIntOrDefault(value, fallback) {
+      if (value === undefined || value === null || String(value).trim() === '') return String(fallback);
+      const n = parseInt(String(value).trim(), 10);
+      return Number.isFinite(n) && n >= 0 ? String(n) : String(fallback);
+    }
+
+    // EventCloseMode: enum ZM 1.38 = system|time|duration|idle|alarm (huruf kecil).
+    function toCloseModeOrDefault(value) {
+      const v = String(value ?? '').trim().toLowerCase();
+      return ['system', 'time', 'duration', 'idle', 'alarm'].includes(v) ? v : EVENT_DEFAULTS.EventCloseMode;
+    }
+
+    // Importance: enum ZM 1.38 = Normal|Less|Not (huruf awal kapital).
+    function toImportanceOrDefault(value) {
+      const v = String(value ?? '').trim().toLowerCase();
+      if (v === 'normal') return 'Normal';
+      if (v === 'less' || v === 'less important') return 'Less';
+      if (v === 'not' || v === 'not important') return 'Not';
+      return EVENT_DEFAULTS.Importance;
+    }
+
+    function eventSummary(cam) {
+      const sl = cam.SectionLength ?? EVENT_DEFAULTS.SectionLength;
+      const min = cam.MinSectionLength ?? EVENT_DEFAULTS.MinSectionLength;
+      const mode = cam.EventCloseMode ?? EVENT_DEFAULTS.EventCloseMode;
+      const detail = [
+        `SectionLength=${sl}s`,
+        `MinSectionLength=${min}s`,
+        `EventCloseMode=${mode}`,
+        `FrameSkip=${cam.FrameSkip ?? EVENT_DEFAULTS.FrameSkip}`,
+        `AnalysisUpdateDelay=${cam.AnalysisUpdateDelay ?? EVENT_DEFAULTS.AnalysisUpdateDelay}s`,
+        `FPSReportInterval=${cam.FPSReportInterval ?? EVENT_DEFAULTS.FPSReportInterval}`,
+        `Importance=${cam.Importance ?? EVENT_DEFAULTS.Importance}`,
+        `StartupDelay=${cam.StartupDelay ?? EVENT_DEFAULTS.StartupDelay}s`
+      ].join(' | ');
+      return `<span class="mono text-xs" title="${detail}">${sl}/${min}/${mode}</span>`;
+    }
 
     const DECODER_OPTIONS = [
       'Auto', 'h264', 'h264_cuvid', 'h264_vaapi', 'h264_qsv',
@@ -319,6 +455,7 @@
     }
 
     loadZoneModes();
+    applyEventDefaults();
 
     function switchTab(tab) {
       document.getElementById('tabQuick').classList.toggle('active', tab === 'quick');
@@ -333,7 +470,7 @@
       const summary = document.getElementById('summaryCounter');
 
       if (cameraList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: var(--text-muted); padding: 40px;">Belum ada data kamera. Silakan paste URL RTSP atau unggah Excel di atas.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="16" style="text-align: center; color: var(--text-muted); padding: 40px;">Belum ada data kamera. Silakan paste URL RTSP atau unggah Excel di atas.</td></tr>`;
         submitBtn.disabled = true;
         summary.innerText = "Total: 0 Kamera";
         return;
@@ -394,6 +531,7 @@
                 ${decoderOpts}
               </select>
             </td>
+            <td>${eventSummary(cam)}</td>
             <td>
               <select class="form-select text-xs" style="min-width:110px;" onchange="updateCamField(${idx}, 'ZoneMode', this.value)">
                 <option value="" ${inherited ? 'selected' : ''}>↳ Global (${globalLabel})</option>
@@ -443,6 +581,7 @@
       const decoder = document.getElementById('defaultDecoder').value;
       const defUser = document.getElementById('defaultUser').value.trim();
       const defPass = document.getElementById('defaultPass').value;
+      const eventDefaults = readEventDefaults();
 
       const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       lines.forEach((url, i) => {
@@ -461,7 +600,15 @@
           MaxFPS: maxFps,
           AnalysisFPS: analysisFps,
           Decoder: decoder,
-          Colours: '4'
+          Colours: '4',
+          SectionLength: eventDefaults.SectionLength,
+          MinSectionLength: eventDefaults.MinSectionLength,
+          EventCloseMode: eventDefaults.EventCloseMode,
+          FrameSkip: eventDefaults.FrameSkip,
+          AnalysisUpdateDelay: eventDefaults.AnalysisUpdateDelay,
+          FPSReportInterval: eventDefaults.FPSReportInterval,
+          Importance: eventDefaults.Importance,
+          StartupDelay: eventDefaults.StartupDelay
         });
       });
 
@@ -485,7 +632,15 @@
           "Max FPS": 10.00,
           "Analysis FPS": 8.00,
           "Decoder": "Auto",
-          "Zone": "medium"
+          "Zone": "medium",
+          "Section Length": 300,
+          "Minimum Section Length": 60,
+          "Event Close Mode": "System",
+          "Frame Skip": 0,
+          "Analysis Update Delay": 0,
+          "FPS Report Interval": 250,
+          "Importance": "Normal",
+          "Startup Delay": 0
         },
         {
           "Name": "CAM_PARKIR_02",
@@ -500,7 +655,15 @@
           "Max FPS": 10.00,
           "Analysis FPS": 8.00,
           "Decoder": "h264",
-          "Zone": "light"
+          "Zone": "light",
+          "Section Length": 600,
+          "Minimum Section Length": 60,
+          "Event Close Mode": "Duration",
+          "Frame Skip": 0,
+          "Analysis Update Delay": 0,
+          "FPS Report Interval": 250,
+          "Importance": "Less",
+          "Startup Delay": 5
         },
         {
           "Name": "CAM_GUDANG_03",
@@ -515,14 +678,24 @@
           "Max FPS": 10.00,
           "Analysis FPS": 8.00,
           "Decoder": "Auto",
-          "Zone": ""
+          "Zone": "",
+          "Section Length": 300,
+          "Minimum Section Length": 60,
+          "Event Close Mode": "System",
+          "Frame Skip": 0,
+          "Analysis Update Delay": 0,
+          "FPS Report Interval": 250,
+          "Importance": "Normal",
+          "Startup Delay": 0
         }
       ];
       const ws = XLSX.utils.json_to_sheet(data);
       ws['!cols'] = [
         { wch: 18 }, { wch: 32 }, { wch: 12 }, { wch: 14 },
         { wch: 12 }, { wch: 12 }, { wch: 12 },
-        { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 14 }
+        { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 14 },
+        { wch: 14 }, { wch: 20 }, { wch: 16 }, { wch: 11 },
+        { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 13 }
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Format CCTV ZM 1.38");
@@ -567,6 +740,17 @@
           const recCell = r['Recording'] ?? r['Record'] ?? r['recording'] ?? 'OnMotion';
           const decCell = r['Decoder'] ?? r['decoder'] ?? 'Auto';
 
+          // Konfigurasi event & analisis per baris. Nama kolom Excel yang
+          // diterima beberapa variasi; nilai kosong jatuh ke default 1.38.6.
+          const sectionLenCell = r['Section Length'] ?? r['SectionLength'] ?? r['section_length'];
+          const minSectionLenCell = r['Minimum Section Length'] ?? r['MinSectionLength'] ?? r['min_section_length'];
+          const closeModeCell = r['Event Close Mode'] ?? r['EventCloseMode'] ?? r['event_close_mode'];
+          const frameSkipCell = r['Frame Skip'] ?? r['FrameSkip'] ?? r['frame_skip'];
+          const anaUpdateDelayCell = r['Analysis Update Delay'] ?? r['AnalysisUpdateDelay'] ?? r['analysis_update_delay'];
+          const fpsReportCell = r['FPS Report Interval'] ?? r['FPSReportInterval'] ?? r['fps_report_interval'];
+          const importanceCell = r['Importance'] ?? r['importance'];
+          const startupDelayCell = r['Startup Delay'] ?? r['StartupDelay'] ?? r['startup_delay'];
+
           cameraList.push({
             Name: r['Name'] || `CCTV_${cameraList.length + 1}`,
             Type: 'Ffmpeg',
@@ -582,7 +766,15 @@
             AnalysisFPS: String(anaFpsCell).trim() || '8.00',
             Decoder: String(decCell).trim() || 'Auto',
             Colours: '4',
-            ZoneMode: zone
+            ZoneMode: zone,
+            SectionLength: toIntOrDefault(sectionLenCell, EVENT_DEFAULTS.SectionLength),
+            MinSectionLength: toIntOrDefault(minSectionLenCell, EVENT_DEFAULTS.MinSectionLength),
+            EventCloseMode: toCloseModeOrDefault(closeModeCell),
+            FrameSkip: toIntOrDefault(frameSkipCell, EVENT_DEFAULTS.FrameSkip),
+            AnalysisUpdateDelay: toIntOrDefault(anaUpdateDelayCell, EVENT_DEFAULTS.AnalysisUpdateDelay),
+            FPSReportInterval: toIntOrDefault(fpsReportCell, EVENT_DEFAULTS.FPSReportInterval),
+            Importance: toImportanceOrDefault(importanceCell),
+            StartupDelay: toIntOrDefault(startupDelayCell, EVENT_DEFAULTS.StartupDelay)
           });
         });
 
@@ -625,7 +817,15 @@
             AnalysisFPS: c.AnalysisFPS || '8.00',
             Decoder: c.Decoder || 'Auto',
             Colours: '4',
-            ZoneMode: c.ZoneMode || ''
+            ZoneMode: c.ZoneMode || '',
+            SectionLength: c.SectionLength ?? EVENT_DEFAULTS.SectionLength,
+            MinSectionLength: c.MinSectionLength ?? EVENT_DEFAULTS.MinSectionLength,
+            EventCloseMode: c.EventCloseMode ?? EVENT_DEFAULTS.EventCloseMode,
+            FrameSkip: c.FrameSkip ?? EVENT_DEFAULTS.FrameSkip,
+            AnalysisUpdateDelay: c.AnalysisUpdateDelay ?? EVENT_DEFAULTS.AnalysisUpdateDelay,
+            FPSReportInterval: c.FPSReportInterval ?? EVENT_DEFAULTS.FPSReportInterval,
+            Importance: c.Importance ?? EVENT_DEFAULTS.Importance,
+            StartupDelay: c.StartupDelay ?? EVENT_DEFAULTS.StartupDelay
           }
         }));
 

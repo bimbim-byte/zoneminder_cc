@@ -173,8 +173,79 @@
               </div>
             </div>
 
+            <!-- Konfigurasi Event & Analisis ZM 1.38.6 -->
+            <div class="triad-card" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px;">
+              <div class="text-xs font-bold text-primary" style="margin-bottom: 12px;">
+                &#128337; Konfigurasi Event &amp; Analisis ZoneMinder v1.38.6
+              </div>
+
+              <div class="grid grid-3">
+                <div class="form-group">
+                  <label class="form-label" for="sectionLength">Section length</label>
+                  <input type="number" id="sectionLength" class="form-control" value="300" min="0" step="1">
+                  <div class="form-hint">Panjang satu berkas event (detik). Default 300.</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="minSectionLength">Minimum section length</label>
+                  <input type="number" id="minSectionLength" class="form-control" value="60" min="0" step="1">
+                  <div class="form-hint">Batas bawah sebelum event boleh ditutup (detik). Default 60.</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="eventCloseMode">Event Close Mode</label>
+                  <select id="eventCloseMode" class="form-select">
+                    <option value="system" selected>System</option>
+                    <option value="time">Time</option>
+                    <option value="duration">Duration</option>
+                    <option value="idle">Idle</option>
+                    <option value="alarm">Alarm</option>
+                  </select>
+                  <div class="form-hint">Cara ZoneMinder menutup event kontinu. Default System.</div>
+                </div>
+              </div>
+
+              <div class="grid grid-3" style="margin-top: -4px;">
+                <div class="form-group">
+                  <label class="form-label" for="frameSkip">Frame Skip</label>
+                  <input type="number" id="frameSkip" class="form-control" value="0" min="0" step="1">
+                  <div class="form-hint">Jumlah frame dilewati saat capture (frames). Default 0.</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="analysisUpdateDelay">Analysis Update Delay</label>
+                  <input type="number" id="analysisUpdateDelay" class="form-control" value="0" min="0" step="1">
+                  <div class="form-hint">Jeda pembaruan analisa (detik). Default 0.</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="fpsReportInterval">FPS report interval</label>
+                  <input type="number" id="fpsReportInterval" class="form-control" value="250" min="0" step="1">
+                  <div class="form-hint">Interval laporan FPS ke log (frames). Default 250.</div>
+                </div>
+              </div>
+
+              <div class="grid grid-2" style="margin-top: -4px;">
+                <div class="form-group">
+                  <label class="form-label" for="importance">Importance</label>
+                  <select id="importance" class="form-select">
+                    <option value="Normal" selected>Normal</option>
+                    <option value="Less">Less</option>
+                    <option value="Not">Not</option>
+                  </select>
+                  <div class="form-hint">Prioritas monitor saat sumber daya terbatas. Default Normal.</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="startupDelay">Startup Delay</label>
+                  <input type="number" id="startupDelay" class="form-control" value="0" min="0" step="1">
+                  <div class="form-hint">Jeda sebelum monitor mulai capture (detik). Default 0.</div>
+                </div>
+              </div>
+            </div>
+
             <!-- Zone Deteksi Otomatis -->
-            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 6px;">
+            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px;">
               <label class="form-label" for="zoneMode">Mode Zone Deteksi Otomatis</label>
               <select id="zoneMode" class="form-select"></select>
               <div class="form-hint" id="zoneModeHint" style="margin-top: 5px;">Memuat konfigurasi mode zone...</div>
@@ -222,6 +293,40 @@
   <script src="app_shell.js"></script>
   <script>
     let ZONE_MODES = [];
+
+    // Nilai default konfigurasi Event & Analisis ZoneMinder 1.38.6.
+    // Dipakai untuk mengisi form saat halaman dimuat DAN saat form di-reset,
+    // supaya <input value="..."> di HTML dan nilai aktual selalu sinkron.
+    const EVENT_DEFAULTS = {
+      sectionLength: '300',
+      minSectionLength: '60',
+      eventCloseMode: 'system',
+      frameSkip: '0',
+      analysisUpdateDelay: '0',
+      fpsReportInterval: '250',
+      importance: 'Normal',
+      startupDelay: '0'
+    };
+
+    function applyEventDefaults() {
+      Object.keys(EVENT_DEFAULTS).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = EVENT_DEFAULTS[id];
+      });
+    }
+
+    function readEventFields() {
+      return {
+        sectionLength: document.getElementById('sectionLength').value,
+        minSectionLength: document.getElementById('minSectionLength').value,
+        eventCloseMode: document.getElementById('eventCloseMode').value,
+        frameSkip: document.getElementById('frameSkip').value,
+        analysisUpdateDelay: document.getElementById('analysisUpdateDelay').value,
+        fpsReportInterval: document.getElementById('fpsReportInterval').value,
+        importance: document.getElementById('importance').value,
+        startupDelay: document.getElementById('startupDelay').value
+      };
+    }
 
     async function loadZoneModes() {
       const select = document.getElementById('zoneMode');
@@ -281,6 +386,7 @@
 
     loadZoneModes();
     updateTriadPreview();
+    applyEventDefaults();
 
     function addLog(msg, type = 'info') {
       const box = document.getElementById('logBox');
@@ -311,6 +417,7 @@
       const maxFps = document.getElementById('maxFps').value.trim() || '10.00';
       const analysisFps = document.getElementById('analysisFps').value.trim() || '8.00';
       const decoder = document.getElementById('camDecoder').value;
+      const eventFields = readEventFields();
 
       if (!source.toLowerCase().startsWith('rtsp://')) {
         addLog('URL harus diawali dengan rtsp://', 'err');
@@ -339,6 +446,14 @@
             maxFps: maxFps,
             analysisFps: analysisFps,
             decoder: decoder,
+            sectionLength: eventFields.sectionLength,
+            minSectionLength: eventFields.minSectionLength,
+            eventCloseMode: eventFields.eventCloseMode,
+            frameSkip: eventFields.frameSkip,
+            analysisUpdateDelay: eventFields.analysisUpdateDelay,
+            fpsReportInterval: eventFields.fpsReportInterval,
+            importance: eventFields.importance,
+            startupDelay: eventFields.startupDelay,
             zoneMode: document.getElementById('zoneMode').value,
             createZone: document.getElementById('createZone').checked,
             overwriteZone: document.getElementById('overwriteZone').checked
@@ -354,6 +469,7 @@
             data.path_warnings.forEach(w => addLog(`[PATH] ${w}`, 'warn'));
           }
           addLog(`[CONFIG] Cap=${capturing} | Ana=${analysing} | Rec=${recording} | Decoder=${decoder} | MaxFPS=${maxFps} | AnalysisFPS=${analysisFps}`, 'info');
+          addLog(`[EVENT] SectionLength=${eventFields.sectionLength}s | MinSectionLength=${eventFields.minSectionLength}s | CloseMode=${eventFields.eventCloseMode} | FrameSkip=${eventFields.frameSkip} | AnalysisUpdateDelay=${eventFields.analysisUpdateDelay}s | FPSReportInterval=${eventFields.fpsReportInterval} | Importance=${eventFields.importance} | StartupDelay=${eventFields.startupDelay}s`, 'info');
 
           const zone = data.zone || {};
           if (zone.created) {
@@ -373,6 +489,7 @@
           document.getElementById('camAnalysing').value = 'Always';
           document.getElementById('camRecording').value = 'OnMotion';
           document.getElementById('createZone').checked = true;
+          applyEventDefaults();
           updateTriadPreview();
         } else {
           addLog(`[ERROR] ${data.message || 'Gagal mendaftarkan kamera'}`, 'err');
