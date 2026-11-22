@@ -61,6 +61,16 @@ ehthumbs.db
 .continue/
 
 # ==============================================================================
+# 5c. Secret & Dump Migrasi ZoneMinder (JANGAN di-commit)
+# ==============================================================================
+# Password database (ZM_DB_PASS / MARIADB_ROOT_PASSWORD) dibaca via
+# docker secret file — lihat docker-compose.yml (services db & zoneminder).
+secrets/
+# Dump database pra-migrasi + salinan konfigurasi lama untuk rollback.
+# Berisi hash password admin ZM dan URL RTSP kamera (berisi kredensial).
+backups/
+
+# ==============================================================================
 # 6. File Backup & Temporary Files
 # ==============================================================================
 *.bak

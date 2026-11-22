@@ -1,11 +1,142 @@
+# ============================================================================
+# ZoneMinder production stack — arsitektur image RESMI (ZM 1.38.6)
+#
+# PERUBAHAN BESAR vs versi sebelumnya (ZM 1.36.32 turunan pppasantos/zoneminder):
+#   1. Database TIDAK lagi berada di dalam container ZoneMinder. Image resmi
+#      zoneminder/zoneminder tidak membawa mysqld; DB dipisah ke service "db"
+#      (mariadb:11.8). Tuning MySQL lama (zm-conf/db-tuning.cnf) ikut pindah.
+#   2. Path volume ZoneMinder mengikuti image resmi:
+#        /var/cache/zoneminder  (event + image + cache)  <- dulu /var/lib/zoneminder
+#        /var/log/zm            (log)                    <- dulu volume anonim
+#        /config                (go2rtc + sertifikat)
+#   3. Entrypoint resmi memakai s6-overlay, sehingga /run WAJIB tmpfs ber-exec.
+#   4. Kredensial DB diberikan sebagai docker secret (file), bukan .env:
+#        secrets/zm_db_pass.txt           -> ZM_DB_PASS_FILE
+#        secrets/mariadb_root_pass.txt    -> MARIADB_ROOT_PASSWORD_FILE
+#      Kedua file di-gitignore (lihat .gitignore bagian 5c).
+#
+# ROLLBACK (skema 1.38 tidak bisa diturunkan oleh kode 1.36):
+#   backup sudah tersedia di backups/ : zm_pre_138.sql, docker-compose-1.36.yml,
+#   Dockerfile-1.36, mysql-tuning-1.36.cnf, image tag zoneminder_tuned:rollback-13632.
+#   Volume lama (zoneminder_mysql) sengaja TETAP dideklarasikan di bawah supaya
+#   tidak terhapus; JANGAN menjalankan "docker compose down -v" selama rollback
+#   masih mungkin dibutuhkan.
+# ============================================================================
+
 services:
 
-  # Konfigurasi dibaca dari file .env (lihat .env.example).
-  # Nilai setelah ":?error" WAJIB ada; compose berhenti dengan pesan jelas
-  # bila variabel belum diisi, alih-alih diam-diam memakai password default.
+  # --------------------------------------------------------
+  # 1. Database (MariaDB) — WAJIB untuk image resmi
+  # --------------------------------------------------------
+  db:
+    image: mariadb:11.8
+    container_name: zm_db
+    restart: always
+    # Tiga flag ini sama dengan docker-compose resmi ZoneMinder. Nilai tuning
+    # lainnya ada di zm-conf/db-tuning.cnf (dimount read-only di bawah) supaya
+    # tidak duplikat antara flag dan file.
+    command:
+      - --transaction-isolation=READ-COMMITTED
+      - --skip-log-bin
+      # Nilai 2G = 25% RAM server 32 GB. Bila ingin diubah, ubah di sini DAN di
+      # .env.example (scripts/_syntax_check.py memverifikasi bahwa setiap
+      # variabel ${...} di compose terdokumentasi di .env.example).
+      - --innodb-buffer-pool-size=2G
+    environment:
+      - TZ=Asia/Jakarta
+      - MARIADB_DATABASE=zm
+      - MARIADB_USER=zmuser
+      - MARIADB_PASSWORD_FILE=/run/secrets/zm_db_pass
+      - MARIADB_ROOT_PASSWORD_FILE=/run/secrets/mariadb_root_pass
+    volumes:
+      - zm_db_data:/var/lib/mysql
+      # Tuning di file terpisah: bila ada salah ketik, container DB gagal start
+      # dengan pesan jelas dan data lama tidak tersentuh.
+      - ./zm-conf/db-tuning.cnf:/etc/mysql/conf.d/zz-zm-tuning.cnf:ro
+    secrets:
+      - zm_db_pass
+      - mariadb_root_pass
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+    networks:
+      - cctv_net
+    # Port DB TIDAK dipublikasikan: hanya bisa diakses dari network cctv_net.
 
   # --------------------------------------------------------
-  # 1. Reverse Proxy & Auto-SSL (Caddy)
+  # 2. ZoneMinder (NVR Core) — image resmi 1.38.6
+  # --------------------------------------------------------
+  zoneminder:
+    # Image turunan tipis: hanya menambahkan tuning Apache. Tuning MySQL sudah
+    # tidak relevan di sini karena mysqld tidak ada di image resmi.
+    # Lihat zm-conf/Dockerfile.
+    build:
+      context: ./zm-conf
+      dockerfile: Dockerfile
+    image: zoneminder_tuned:1.38.6
+    container_name: zoneminder
+    restart: always
+    # Harus sehat dulu: entrypoint menunggu DB sampai ZM_DB_WAIT_TIMEOUT (180s),
+    # tapi depends_on healthy membuat urutannya eksplisit.
+    depends_on:
+      db:
+        condition: service_healthy
+    stop_grace_period: 60s
+
+    # Shared memory untuk buffer frame tiap kamera (~9 MB per monitor @720p).
+    # 8 GB memberi ruang lega untuk 100+ kamera dan lonjakan saat motion terdeteksi.
+    # Entrypoint memberi peringatan bila /dev/shm < 256 MB.
+    shm_size: "4g"
+
+    # ZoneMinder membuka banyak file descriptor (monitor + event + shared memory).
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+    # PENTING: port ZM TIDAK dipublikasikan ke host.
+    # Semua akses ZM lewat Caddy: https://<server>/  (publik)
+    # dan https://<server>:9443/zm/ (dari dashboard).
+    # Untuk debugging internal: "docker exec zoneminder curl -s localhost/zm/".
+    expose:
+      - "80"
+
+    environment:
+      - TZ=Asia/Jakarta
+      # Kredensial DB: image resmi membaca ZM_DB_PASS_FILE (lihat
+      # /etc/s6-overlay/scripts/common.sh). Password tidak pernah muncul di
+      # environment container maupun di command line.
+      - ZM_DB_HOST=db
+      - ZM_DB_NAME=zm
+      - ZM_DB_USER=zmuser
+      - ZM_DB_PASS_FILE=/run/secrets/zm_db_pass
+      # ZM_PUBLIC_URL sengaja TIDAK diisi: instance ini diakses lewat Caddy
+      # (https), dan mengisinya membuat entrypoint mewajibkan GO2RTC_API_ALLOW
+      # serta mengubah /etc/hosts + Listen Apache. Live view tetap memakai MJPEG
+      # (/zm/cgi-bin/nph-zms) yang sudah terbukti jalan untuk wall dashboard.
+
+    volumes:
+      # Path mengikuti image resmi (bukan /var/lib/zoneminder seperti versi 1.36).
+      - zm_cache:/var/cache/zoneminder
+      - zm_logs:/var/log/zm
+      - zm_config:/config
+
+    # s6-overlay menjalankan service dari /run, jadi /run harus mengizinkan exec.
+    tmpfs:
+      - /run:exec,mode=0755
+      - /tmp
+
+    secrets:
+      - zm_db_pass
+
+    networks:
+      - cctv_net
+
+  # --------------------------------------------------------
+  # 3. Reverse Proxy & Auto-SSL (Caddy)
   # --------------------------------------------------------
   caddy-proxy:
     image: caddy:2-alpine
@@ -34,51 +165,7 @@ services:
       - ui-interface
 
   # --------------------------------------------------------
-  # 2. ZoneMinder (NVR Core)
-  # --------------------------------------------------------
-  zoneminder:
-    # Image turunan yang menyalin tuning MySQL & Apache ke dalam image.
-    # Lihat zm-conf/Dockerfile untuk alasan tidak memakai bind mount.
-    build:
-      context: ./zm-conf
-      dockerfile: Dockerfile
-    image: zoneminder_tuned:latest
-    container_name: zoneminder
-    restart: always
-
-    # Shared memory untuk buffer frame tiap kamera (~9 MB per monitor @720p).
-    # 8 GB memberi ruang lega untuk 100+ kamera dan lonjakan saat motion terdeteksi.
-    shm_size: "8g"
-
-    # ZoneMinder membuka banyak file descriptor (monitor + event + shared memory).
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-
-    # PENTING: port ZM TIDAK lagi dipublikasikan ke host.
-    # Sebelumnya "${ZONEMINDER_PORT:-8082}:80" mengikat 0.0.0.0:8082 dan
-    # memberi jalur bypass langsung ke ZoneMinder (melewati HTTPS + login).
-    # Semua akses ZM sekarang lewat Caddy: https://<server>/  (publik)
-    # dan https://<server>:9443/zm/ (dari dashboard).
-    # Untuk debugging internal: "docker exec zoneminder curl -s localhost/zm/".
-    expose:
-      - "80"
-
-    environment:
-      - TZ=Asia/Jakarta
-      - PHP_TIMEZONE=Asia/Jakarta
-
-    volumes:
-      - zoneminder_events:/var/lib/zoneminder/events
-      - zoneminder_images:/var/lib/zoneminder/images
-      - zoneminder_mysql:/var/lib/mysql
-
-    networks:
-      - cctv_net
-
-  # --------------------------------------------------------
-  # 3. Camera Management Dashboard (UI Interface)
+  # 4. Camera Management Dashboard (UI Interface)
   # --------------------------------------------------------
   ui-interface:
     build:
@@ -88,10 +175,7 @@ services:
     restart: always
 
     # PENTING: port dashboard TIDAK dipublikasikan ke host.
-    # Sebelumnya "${DASHBOARD_PORT:-8080}:8080" mengikat 0.0.0.0:8080 dan
-    # menjadi jalur bypass yang melewati HTTPS + login (semua endpoint API,
-    # termasuk pembaca konfigurasi, bisa dipanggil langsung).
-    # Dashboard kini HANYA dapat dijangkau lewat Caddy pada port 9443.
+    # Semua endpoint API hanya dapat dijangkau lewat Caddy pada port 9443.
     # Gunakan "docker exec camera-dashboard ..." untuk debugging internal.
     expose:
       - "8080"
@@ -130,7 +214,7 @@ services:
       - zoneminder
 
   # --------------------------------------------------------
-  # 4. Camera Health Checker Service
+  # 5. Camera Health Checker Service
   #
   # Menguji konektivitas TCP RTSP tiap kamera secara berkala dan mengubah
   # fungsi monitor di ZoneMinder (`None` saat kamera mati, kembali ke fungsi
@@ -165,6 +249,15 @@ services:
       - zoneminder
 
 # --------------------------------------------------------
+# Secrets (file-based, di luar .env)
+# --------------------------------------------------------
+secrets:
+  zm_db_pass:
+    file: ./secrets/zm_db_pass.txt
+  mariadb_root_pass:
+    file: ./secrets/mariadb_root_pass.txt
+
+# --------------------------------------------------------
 # Networks & Volumes
 # --------------------------------------------------------
 networks:
@@ -172,8 +265,24 @@ networks:
     driver: bridge
 
 volumes:
+  # Volume baru untuk arsitektur 1.38.
+  zm_db_data:
+  zm_cache:
+  zm_logs:
+  zm_config:
+
+  # ------------------------------------------------------------------------
+  # Volume LAMA (ZM 1.36). Sengaja dipertahankan agar tidak terhapus dan agar
+  # rollback bisa memakai datanya apa adanya. Tidak dipakai service mana pun
+  # di atas. Setelah migrasi dinyatakan final dan backup terverifikasi, blok
+  # ini boleh dihapus lalu dibersihkan manual:
+  #   docker volume rm zoneminder_cc_zoneminder_mysql
+  #   docker volume rm zoneminder_cc_zoneminder_events
+  #   docker volume rm zoneminder_cc_zoneminder_images
+  # ------------------------------------------------------------------------
+  zoneminder_mysql:
   zoneminder_events:
   zoneminder_images:
-  zoneminder_mysql:
+
   caddy_data:
   caddy_config:

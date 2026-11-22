@@ -1,0 +1,70 @@
+; ============================================================================
+; ZoneMinder - Tuning MariaDB (service "db", image mariadb:11.8)
+;
+; Di-mount ke /etc/mysql/conf.d/zz-zm-tuning.cnf (read-only).
+; Prefix "zz-" agar dibaca PALING AKHIR dan menimpa nilai default.
+;
+; CATATAN ARSITEKTUR (sejak migrasi ke image resmi zoneminder/zoneminder):
+;   Database TIDAK lagi berada di dalam container ZoneMinder. File ini dulu
+;   bernama mysql-tuning.cnf dan dicopy ke /etc/mysql/mysql.conf.d/ di dalam
+;   image ZoneMinder (lihat backups/mysql-tuning-1.36.cnf). Sejak ZM 1.38
+;   image resmi tidak membawa mysqld, jadi tuning ini pindah ke container DB.
+;
+;   Yang TIDAK diatur di sini (karena sudah diberikan sebagai flag di
+;   docker-compose.yml, supaya tidak duplikat):
+;     - transaction-isolation = READ-COMMITTED
+;     - skip-log-bin
+;     - innodb-buffer-pool-size (env DB_BUFFER_POOL, default 2G)
+;
+;   Nilai innodb_buffer_pool_instances di bawah HARUS membagi
+;   innodb_buffer_pool_size secara habis (2G / 4 = 512M per instance).
+;
+; Manual menjalankan ulang: docker compose up -d --force-recreate db
+; ============================================================================
+
+[mysqld]
+
+; --- Pool instance ---------------------------------------------------------
+; Server 32 core: buffer pool dipecah 4 instance untuk mengurangi contention.
+; innodb_buffer_pool_instances DIHAPUS: sudah tidak ada di MariaDB 11.x
+; (server hanya menulis warning "was removed. It does nothing now").
+
+; --- Log & flush ----------------------------------------------------------
+; 2 = flush sekali per detik (bukan tiap commit). Jauh lebih cepat saat
+; banyak event masuk, tetap aman untuk data CCTV.
+innodb_flush_log_at_trx_commit = 2
+; innodb_flush_method DIBUANG: sudah deprecated di MariaDB 11.x (server hanya
+; menulis warning "--innodb-flush-method is deprecated"). MariaDB di Linux
+; sudah memakai O_DIRECT secara default.
+
+; --- Kapasitas koneksi ----------------------------------------------------
+; Default 151 terlalu kecil: checker + wall dashboard + API ZM + proses zms
+; membuka koneksi masing-masing. max_connections di sini menimpa default dan
+; flag --max-connections (bila ditambahkan) agar konsisten.
+max_connections = 500
+
+; --- Table cache ----------------------------------------------------------
+table_open_cache = 4000
+table_definition_cache = 2000
+
+; --- Per-query buffer -----------------------------------------------------
+; Dialokasikan per koneksi aktif, jadi jangan berlebihan.
+read_buffer_size = 1M
+read_rnd_buffer_size = 2M
+sort_buffer_size = 2M
+join_buffer_size = 2M
+tmp_table_size = 64M
+max_heap_table_size = 64M
+
+; --- InnoDB log -----------------------------------------------------------
+innodb_log_file_size = 256M
+innodb_log_buffer_size = 32M
+
+; --- Lain-lain ------------------------------------------------------------
+; Semua koneksi via IP internal docker network, jadi DNS lookup tidak perlu.
+skip-name-resolve = 1
+
+; Zona waktu: container DB wajib sama dengan TZ ZoneMinder (Asia/Jakarta).
+default_time_zone = '+07:00'
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci

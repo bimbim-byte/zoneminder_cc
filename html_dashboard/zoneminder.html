@@ -3,1317 +3,752 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZoneMinder - Camera Registration & Management</title>
+  <title>Kelola Kamera - ZoneMinder</title>
+  <link rel="stylesheet" href="app_ui.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --success: #16a34a;
-      --danger: #dc2626;
-      --warning: #d97706;
-      --bg: #f8fafc;
-      --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #1e293b;
-      --muted: #64748b;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-    header {
-      background: linear-gradient(135deg, #0f172a, #1e293b);
-      color: white;
-      padding: 14px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      flex-shrink: 0;
-    }
-    header h1 {
-      font-size: 18px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .btn-back {
-      color: white;
-      text-decoration: none;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.25);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 500;
-      transition: .2s;
-    }
-    .btn-back:hover { background: rgba(255,255,255,0.22); }
-
-    /* Baris status koneksi ZoneMinder di bawah header bersama. */
-    .conn-strip {
-      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-      padding: 8px 24px; background: #fff; border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .conn-note { font-size: 11.5px; color: var(--muted); }
-    .conn-note a { color: var(--primary); text-decoration: none; }
-    .conn-note a:hover { text-decoration: underline; }
-
-    .main-layout {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      padding: 16px 24px;
-      gap: 14px;
-      overflow: hidden;
-    }
-
-    /* Top Grid */
-    .top-panel {
-      display: grid;
-      grid-template-columns: 460px 1fr;
-      gap: 14px;
-      flex-shrink: 0;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 16px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .card h3 {
-      font-size: 14px;
-      color: var(--primary);
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      font-weight: 600;
-    }
-
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-    }
-    .form-group.full-width { grid-column: 1 / -1; }
-    .form-group label {
-      font-size: 11.5px;
-      font-weight: 600;
-      margin-bottom: 4px;
-      color: var(--text);
-    }
-
-    .form-control {
-      width: 100%;
-      height: 34px;
-      padding: 0 8px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 12px;
-      background: #fff;
-      color: var(--text);
-      outline: none;
-      transition: border-color .2s;
-    }
-    .form-control:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
-    }
-    .form-control[readonly] {
-      background: #f8fafc;
-      color: var(--muted);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 12.5px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: .2s;
-      height: 34px;
-    }
-    .btn:disabled { opacity: .6; cursor: not-allowed; }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-primary:hover { background: var(--primary-dark); }
-    .btn-success { background: var(--success); color: white; }
-    .btn-success:hover { background: #15803d; }
-    .btn-warning { background: var(--warning); color: white; }
-    .btn-warning:hover { background: #b45309; }
-    .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
-    .btn-outline:hover { background: #f1f5f9; }
-    .btn-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-    .btn-danger:hover { background: #fca5a5; }
-
-    .btn-small {
-      height: 26px;
-      padding: 0 8px;
-      font-size: 11px;
-      border-radius: 4px;
-    }
-
-    .form-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    /* Checker Box */
-    .checker-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      background: #f8fafc;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-
-    /* Table Section */
-    .table-section {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      min-height: 0;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-    }
-    .table-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      flex-shrink: 0;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .table-wrapper {
-      flex: 1;
+    .cam-table-wrapper {
+      max-height: calc(100vh - 250px);
       overflow-y: auto;
-      overflow-x: auto;
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    th, td {
-      padding: 7px 10px;
-      border: 1px solid var(--border);
-      text-align: left;
-      vertical-align: middle;
-    }
-    th {
+    .cam-table th {
       position: sticky;
       top: 0;
-      background: #0f172a;
-      color: white;
-      font-weight: 600;
-      z-index: 5;
-      white-space: nowrap;
+      z-index: 10;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-    tr:nth-child(even) { background: #f8fafc; }
-    tr.cam-disabled { background-color: #f8fafc; color: #94a3b8; }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .badge-ok { background: #dcfce7; color: #166534; }
-    .badge-err { background: #fee2e2; color: #991b1b; }
-    .badge-running { background: #dcfce7; color: #15803d; }
-    .badge-paused { background: #fef3c7; color: #b45309; }
-
-    .rtsp-path {
-      max-width: 270px;
+    .rtsp-text {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      max-width: 320px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      font-family: Consolas, Monaco, monospace;
-      font-size: 11px;
-      color: var(--muted);
+      display: inline-block;
+      vertical-align: middle;
     }
-
-    .quick-controls, .action-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-wrap: wrap;
-    }
-    .quick-controls select {
-      height: 26px;
-      font-size: 11px;
-      padding: 0 4px;
+    .copy-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 2px 4px;
       border-radius: 4px;
-      border: 1px solid var(--border);
-      background: #fff;
+      transition: var(--transition);
     }
-
-    /* Baris kontrol massal seluruh kamera */
+    .copy-btn:hover {
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
     .bulk-bar {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 18px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
       flex-wrap: wrap;
-      padding: 9px 14px;
-      background: #f8fafc;
-      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
     }
-    .bulk-label {
-      font-size: 11.5px;
-      font-weight: 700;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-    .bulk-select {
-      height: 28px;
-      font-size: 11.5px;
-      padding: 0 6px;
-      border-radius: 5px;
-      border: 1px solid var(--border);
-      background: #fff;
-      color: var(--text, #1e293b);
-    }
-    .bulk-status {
-      font-size: 11px;
-      color: var(--muted);
-      margin-left: auto;
-      white-space: nowrap;
-    }
-    .bulk-status.busy { color: var(--primary, #2563eb); font-weight: 600; }
-    .bulk-status.ok { color: #16a34a; font-weight: 600; }
-    .bulk-status.err { color: #dc2626; font-weight: 600; }
-
-    @media (max-width: 900px) {
-      body { height: auto; overflow: auto; }
-      .top-panel { grid-template-columns: 1fr; }
-      .main-layout { overflow: visible; }
-      .table-wrapper { height: 400px; }
+    .row-disabled {
+      opacity: 0.68;
+      background-color: #fafbfc;
     }
   </style>
 </head>
 <body>
-
-  <!-- Header navigasi bersama: tautan ZoneMinder ditonjolkan + tombol logout.
-       Status koneksi ZoneMinder ditampilkan tepat di bawah header. -->
+  <!-- Header Navigasi Bersama -->
   <header id="dashHeader"></header>
-  <div class="conn-strip">
-    <span id="authStatusHeader" class="badge badge-ok">Memeriksa API ZoneMinder...</span>
-    <span class="conn-note">
-      Kredensial ZM dikelola di <a href="/settings">Pengaturan</a> dan tersimpan terenkripsi.
-    </span>
-  </div>
 
-  <div class="main-layout">
-    <!-- Top Grid Panels -->
-    <div class="top-panel">
-      
-      <!-- Panel 1: Form Tambah & Edit Kamera -->
-      <div class="card" id="cameraFormCard">
-        <h3 id="formTitle">
-          <span>➕ Pendaftaran & Edit Kamera RTSP</span>
-          <span id="editModeNotice" style="font-size: 11px; color: var(--warning); display: none;">Mode Edit Aktif</span>
-        </h3>
-        <input type="hidden" id="originalId" value="">
-
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="camId">ID Kamera (Custom/Auto)</label>
-            <input type="number" id="camId" class="form-control" placeholder="Kosongkan utk Auto">
-          </div>
-          <div class="form-group">
-            <label for="camName">Nama Kamera</label>
-            <input type="text" id="camName" class="form-control" placeholder="Kamera_Depan">
-          </div>
-          <div class="form-group full-width">
-            <label for="camPath">RTSP Path URL</label>
-            <input type="text" id="camPath" class="form-control" placeholder="rtsp://admin:pass@192.168.1.100:554/stream1">
-          </div>
-          <div class="form-group">
-            <label for="camFunction">Fungsi Default</label>
-            <select id="camFunction" class="form-control">
-              <option value="None">None</option>
-              <option value="Monitor" selected>Monitor</option>
-              <option value="Modect">Modect</option>
-              <option value="Record">Record</option>
-              <option value="Mocord">Mocord</option>
-              <option value="Nodect">Nodect</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="camResolution">Resolusi</label>
-            <select id="camResolution" class="form-control">
-              <option value="1280x720">1280 x 720 (720p)</option>
-              <option value="1920x1080" selected>1920 x 1080 (1080p)</option>
-            </select>
-          </div>
-          <div class="form-group full-width">
-            <label for="camZoneMode">Mode Zone Deteksi Otomatis</label>
-            <select id="camZoneMode" class="form-control"></select>
-            <div id="camZoneModeHint" class="form-hint" style="font-size:11px; color:var(--muted); margin-top:4px;"></div>
-            <div style="display:flex; gap:14px; margin-top:6px; font-size:11.5px;">
-              <label style="display:flex; align-items:center; gap:5px; font-weight:600;">
-                <input type="checkbox" id="camCreateZone" checked> Buat zone otomatis
-              </label>
-              <label style="display:flex; align-items:center; gap:5px; font-weight:600;">
-                <input type="checkbox" id="camOverwriteZone"> Timpa zone dashboard
-              </label>
-            </div>
-          </div>
-          <input type="hidden" id="camColorspace" value="4">
+  <div class="container-fluid">
+    <!-- Action Bar & Page Header -->
+    <div class="flex items-center justify-between flex-wrap gap-3" style="margin-bottom: 18px;">
+      <div class="flex items-center gap-3">
+        <div>
+          <h1 style="font-size: 20px;">Kelola Kamera ZoneMinder</h1>
+          <p class="text-xs text-secondary" style="margin-top: 2px;">
+            Daftar monitor, fungsi operasional, normalisasi RTSP, dan konfigurasi zone deteksi gerakan.
+          </p>
         </div>
-
-        <div class="form-actions">
-          <button class="btn btn-outline" id="btnCancel" style="display:none;" onclick="resetForm()">Batal</button>
-          <button class="btn btn-primary" id="btnSave" onclick="saveCamera()">☁ Simpan Kamera</button>
-        </div>
+        <span id="camTotalBadge" class="badge badge-primary">Memuat...</span>
       </div>
 
-      <!-- Panel 2: CCTV Checker Controller & Server Health -->
-      <div class="card">
-        <h3>
-          <span>⚙️ Kontrol CCTV Health Checker & Status Server</span>
-          <span id="checkerStatusBadge" class="badge badge-running">Memuat Checker...</span>
-        </h3>
-
-        <div class="checker-grid">
-          <!-- Toggle & Trigger -->
-          <div>
-            <label style="font-size:11px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Status Checker Service</label>
-            <button id="btnToggleChecker" class="btn btn-warning" style="width:100%;" onclick="toggleCheckerActive()">
-              ⏸ Jeda (Pause) Checker
-            </button>
-          </div>
-
-          <!-- Trigger Sekarang -->
-          <div>
-            <label style="font-size:11px; font-weight:600; display:block; margin-bottom:5px; color:var(--muted);">Pemeriksaan Manual</label>
-            <button id="btnRunNow" class="btn btn-success" style="width:100%;" onclick="triggerRunNow()">
-              ⚡ Cek Semua Sekarang
-            </button>
-          </div>
-
-          <!-- Setting Interval -->
-          <div>
-            <label for="checkerIntervalInput" style="font-size:11px; font-weight:600; display:block; margin-bottom:4px; color:var(--muted);">Delay Interval Pengecekan</label>
-            <div style="display:flex; gap:6px;">
-              <input type="number" id="checkerIntervalInput" class="form-control" min="5" max="3600" value="600" style="width:75px;">
-              <button class="btn btn-primary" style="flex:1;" onclick="updateCheckerInterval()">💾 Set Detik</button>
-            </div>
-          </div>
-
-          <!-- CPU Load Info -->
-          <div>
-            <label style="font-size:11px; font-weight:600; display:block; margin-bottom:4px; color:var(--muted);">ZoneMinder Server Load</label>
-            <div style="display:flex; gap:6px;">
-              <input type="text" id="cpuLoadText" class="form-control" readonly value="Belum dicek" style="font-size:11px; font-family:monospace;">
-              <button class="btn btn-outline" onclick="checkCpuLoad()">📊 Cek</button>
-            </div>
-          </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <div style="position: relative;">
+          <input type="text" id="searchCameraInput" class="form-control text-sm" placeholder="🔍 Cari nama/ID/RTSP..." style="width: 220px; height: 34px;" oninput="filterCameraTable()">
         </div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--muted);">
-          <span id="checkerLastRunText">Terakhir diperiksa: -</span>
-          <span>Pemeriksaan RTSP berkala &bull; auto-switch fungsi monitor</span>
-        </div>
+        <button class="btn btn-outline btn-sm" onclick="loadCameras()" id="btnRefresh" title="Muat ulang daftar kamera">
+          &#8635; Refresh
+        </button>
+        <a href="add_camera.html" class="btn btn-primary btn-sm">
+          ➕ Tambah Kamera
+        </a>
       </div>
-
     </div>
 
-    <!-- Bottom Section: Daftar Kamera (Takes remaining screen height) -->
-    <div class="table-section">
-      <div class="table-header">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <h3 style="font-size:14px; color:var(--text); margin-bottom:0;">📋 Daftar Kamera Terdaftar di ZoneMinder</h3>
-          <span id="camCountBadge" class="badge badge-ok">0 Kamera</span>
-        </div>
-        
-        <div style="display:flex; gap:8px; align-items:center;">
-          <input type="text" id="searchCameraInput" class="form-control" placeholder="🔍 Cari nama/ID..." style="width:180px; height:28px; font-size:11.5px;" oninput="filterCameraTable()">
-          <button class="btn btn-outline btn-small" onclick="loadCameras()">↻ Refresh List</button>
-        </div>
-      </div>
+    <!-- Toolbar Kontrol Massal (Bulk Control) -->
+    <div class="bulk-bar">
+      <span class="text-xs font-bold text-secondary" style="text-transform: uppercase; letter-spacing: 0.04em;">
+        ⚡ Kontrol Seluruh Kamera:
+      </span>
 
-      <!-- Kontrol massal seluruh kamera -->
-      <div class="bulk-bar">
-        <span class="bulk-label">⚡ Kontrol Seluruh Kamera:</span>
-
-        <select id="bulkFunctionSelect" class="bulk-select" title="Mode fungsi yang dipakai saat mengaktifkan semua kamera">
-          <option value="Monitor">Monitor (pantau saja)</option>
-          <option value="Modect">Modect (rekam saat gerak)</option>
-          <option value="Record">Record (rekam terus)</option>
-          <option value="Mocord">Mocord (rekam + gerak)</option>
-          <option value="Nodect">Nodect (deteksi saja)</option>
+      <div class="flex items-center gap-2 flex-wrap">
+        <select id="bulkCapturing" class="form-select text-xs" style="width: auto; height: 32px; padding: 0 10px;" title="Capturing (zmc)">
+          <option value="Always" selected>Cap: Always</option>
+          <option value="Ondemand">Cap: Ondemand</option>
+          <option value="None">Cap: None</option>
         </select>
-
-        <button id="btnBulkOn" class="btn btn-success btn-small" onclick="bulkSetAll('custom')">
-          ▶ Aktifkan Semua
+        <select id="bulkAnalysing" class="form-select text-xs" style="width: auto; height: 32px; padding: 0 10px;" title="Analysing (motion)">
+          <option value="Always" selected>Ana: Always</option>
+          <option value="None">Ana: None</option>
+        </select>
+        <select id="bulkRecording" class="form-select text-xs" style="width: auto; height: 32px; padding: 0 10px;" title="Recording (storage)">
+          <option value="OnMotion" selected>Rec: OnMotion</option>
+          <option value="Always">Rec: Always</option>
+          <option value="None">Rec: None</option>
+        </select>
+        <button id="btnBulkOn" class="btn btn-success btn-sm" onclick="bulkSetAll('triad')">
+          ▶ Terapkan ke Semua
         </button>
-        <button id="btnBulkRestore" class="btn btn-primary btn-small" onclick="bulkSetAll('on')" title="Kembalikan ke fungsi terakhir yang tersimpan tiap kamera">
-          ↺ Pulihkan Fungsi Asli
+        <button id="btnBulkRestore" class="btn btn-secondary btn-sm" onclick="bulkSetAll('restore')" title="Kembalikan tiap kamera ke triad terakhir yang tersimpan">
+          ↺ Pulihkan Triad Asli
         </button>
-        <button id="btnBulkOff" class="btn btn-danger btn-small" onclick="bulkSetAll('off')">
+        <button id="btnBulkOff" class="btn btn-danger btn-sm" onclick="bulkSetAll('off')">
           ⏹ Matikan Semua
         </button>
+      </div>
 
-        <span style="border-left:1px solid var(--border); height:20px; margin:0 4px;"></span>
+      <span style="border-left: 1px solid var(--border); height: 22px; margin: 0 4px;"></span>
 
-        <select id="bulkZoneModeSelect" class="bulk-select" title="Mode zone deteksi yang diterapkan ke seluruh kamera">
-          <option value="lightest">🎯 Zone: Paling Ringan (CPU paling hemat)</option>
+      <div class="flex items-center gap-2 flex-wrap">
+        <select id="bulkZoneModeSelect" class="form-select text-xs" style="width: auto; height: 32px; padding: 0 10px;">
+          <option value="lightest">🎯 Zone: Paling Ringan</option>
           <option value="light" selected>🎯 Zone: Ringan</option>
           <option value="medium">🎯 Zone: Sedang</option>
           <option value="heavy">🎯 Zone: Berat</option>
           <option value="heaviest">🎯 Zone: Paling Berat</option>
         </select>
-        <button id="btnBulkZone" class="btn btn-warning btn-small" onclick="bulkSetZoneMode()">
+        <button id="btnBulkZone" class="btn btn-warning btn-sm" onclick="bulkSetZoneMode()">
           🎯 Buat Zone Semua
         </button>
-
-        <span id="bulkStatusText" class="bulk-status"></span>
       </div>
 
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 45px;">ID</th>
-              <th style="width: 180px;">Nama & Status</th>
-              <th style="width: 170px;">Shortcut Fungsi</th>
-              <th>RTSP Stream Path</th>
-              <th style="width: 110px;">Resolusi</th>
-              <th style="width: 110px;">Aksi</th>
-            </tr>
-          </thead>
-          <tbody id="cameraTableBody">
-            <tr>
-              <td colspan="6" style="text-align: center; color: var(--muted); padding: 30px;">
-                Memuat data kamera dari ZoneMinder...
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="flex-1 text-xs font-semibold" id="bulkStatusText" style="text-align: right; color: var(--text-secondary);"></div>
+    </div>
+
+    <!-- Tabel Kamera Terdaftar -->
+    <div class="cam-table-wrapper">
+      <table class="table cam-table">
+        <thead>
+          <tr>
+            <th style="width: 50px;">ID</th>
+            <th style="width: 220px;">Nama Kamera &amp; Status</th>
+            <th style="width: 190px;">Fungsi Cepat</th>
+            <th>RTSP Stream Path</th>
+            <th style="width: 130px;">Resolusi &amp; FPS</th>
+            <th style="width: 140px; text-align: right;">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="cameraTableBody">
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              Memuat data kamera dari ZoneMinder...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT / KONFIGURASI KAMERA -->
+  <div class="modal-backdrop" id="editModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title font-bold text-sm" id="modalTitle">✏️ Edit Kamera</div>
+          <div class="text-xs text-muted" id="modalSub">Sesuaikan nama, parameter RTSP, resolusi, dan zone</div>
+        </div>
+        <button class="toast-close" onclick="closeEditModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="editCameraForm" onsubmit="saveCameraFromModal(event)">
+          <input type="hidden" id="editOriginalId">
+          <input type="hidden" id="editColorspace" value="4">
+
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label class="form-label" for="editCamId">ID Monitor</label>
+              <input type="text" id="editCamId" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editCamName">Nama Kamera</label>
+              <input type="text" id="editCamName" class="form-control" placeholder="CAM_LOBBY_01" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="editCamPath">URL Stream RTSP</label>
+            <input type="text" id="editCamPath" class="form-control mono text-xs" placeholder="rtsp://admin:pass@192.168.1.50:554/ch1" required>
+            <div class="form-hint">
+              Password berkarakter <b>@</b> dinormalisasi otomatis menjadi %40 sehingga host tetap terbaca oleh FFmpeg.
+            </div>
+          </div>
+
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label class="form-label" for="editCamUser">Username (opsional)</label>
+              <input type="text" id="editCamUser" class="form-control" placeholder="operator">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editCamPass">Password (opsional)</label>
+              <input type="password" id="editCamPass" class="form-control" placeholder="Sandi baru" autocomplete="new-password">
+            </div>
+          </div>
+
+          <div class="grid grid-3">
+            <div class="form-group">
+              <label class="form-label" for="editCamCapturing">Capturing (zmc)</label>
+              <select id="editCamCapturing" class="form-select" onchange="onModalTriadChange()">
+                <option value="Always">Always</option>
+                <option value="Ondemand">Ondemand</option>
+                <option value="None">None</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editCamAnalysing">Analysing (Motion)</label>
+              <select id="editCamAnalysing" class="form-select" onchange="onModalTriadChange()">
+                <option value="Always">Always</option>
+                <option value="None">None</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editCamRecording">Recording (Storage)</label>
+              <select id="editCamRecording" class="form-select" onchange="onModalTriadChange()">
+                <option value="None">None</option>
+                <option value="OnMotion">OnMotion</option>
+                <option value="Always">Always</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="editCamTriadHint" class="form-hint" style="margin-top: -6px;"></div>
+
+          <div class="grid grid-4" style="margin-top: 6px;">
+            <div class="form-group">
+              <label class="form-label" for="editCamResolution">Resolusi</label>
+              <select id="editCamResolution" class="form-select">
+                <option value="1280x720">1280 x 720 (HD)</option>
+                <option value="1920x1080">1920 x 1080 (FHD)</option>
+                <option value="2560x1440">2560 x 1440 (2K)</option>
+                <option value="3840x2160">3840 x 2160 (4K)</option>
+                <option value="640x480">640 x 480 (VGA)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editCamMaxFps">Max FPS</label>
+              <input type="number" id="editCamMaxFps" class="form-control" min="1" max="60" step="0.5" value="10.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editCamAnalysisFps">Analysis FPS</label>
+              <input type="number" id="editCamAnalysisFps" class="form-control" min="1" max="30" step="0.5" value="8.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editCamDecoder">Decoder</label>
+              <select id="editCamDecoder" class="form-select">
+                <option value="Auto">Auto</option>
+                <option value="h264">h264</option>
+                <option value="h264_cuvid">h264_cuvid</option>
+                <option value="h264_vaapi">h264_vaapi</option>
+                <option value="h264_qsv">h264_qsv</option>
+                <option value="hevc">hevc</option>
+                <option value="hevc_cuvid">hevc_cuvid</option>
+                <option value="hevc_vaapi">hevc_vaapi</option>
+                <option value="hevc_qsv">hevc_qsv</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 6px;">
+            <label class="form-label" for="editCamZoneMode">Mode Zone Deteksi Otomatis</label>
+            <select id="editCamZoneMode" class="form-select"></select>
+            <div class="flex items-center gap-4 flex-wrap" style="margin-top: 10px;">
+              <label class="checkbox-label text-xs">
+                <input type="checkbox" id="editCamCreateZone" checked> Buat zone otomatis
+              </label>
+              <label class="checkbox-label text-xs">
+                <input type="checkbox" id="editCamOverwriteZone"> Timpa zone dashboard
+              </label>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Batal</button>
+        <button type="button" class="btn btn-primary" id="btnModalSave" onclick="document.getElementById('editCameraForm').requestSubmit()">
+          💾 Simpan Perubahan
+        </button>
       </div>
     </div>
   </div>
 
+  <footer class="page-footer">
+    ZoneMinder Central CCTV Management &mdash; Manajemen &amp; Konfigurasi Monitor
+  </footer>
+
+  <script src="app_shell.js"></script>
   <script>
-    // =========================================================================
-    // KONFIGURASI AKSES ZONEMINDER
-    // =========================================================================
-    // ZM WEB UI ada di ALAMAT UTAMA server (https://<host>/zm/). URL itu
-    // dibuka lewat tab terpisah, bukan untuk panggilan fetch dari halaman ini.
-    //
-    // PENTING: panggilan API TIDAK boleh memakai '/zm/api'. Di port dashboard,
-    // Caddy punya aturan `handle /zm*` yang meneruskan permintaan LANGSUNG ke
-    // ZoneMinder, sehingga permintaan seperti itu melewati backend Flask —
-    // tidak ada autentikasi, tidak ada penyuntikan kredensial, dan ZM
-    // mengembalikan daftar kosong. Semua panggilan API karena itu diarahkan
-    // ke '/api/zm' (proxy backend) yang menangani login + session cookie ZM.
     const ZM_API = '/api/zm';
-    const ZM_WEB = window.location.protocol + '//' + window.location.hostname + '/zm/';
-
-    let existingIds = [];
-    let cameraDataStore = {};
     let allMonitorsCache = [];
-    let checkerConfig = { enabled: false, interval: 600 };
-
-    // =========================================================================
-    // 1. STATUS KONEKSI ZONEMINDER
-    // =========================================================================
-    // Endpoint /api/zm/health.json diproksi backend: dia yang login ke ZM
-    // memakai kredensial tersimpan, lalu melaporkan hasilnya tanpa pernah
-    // mengekspos username/password ke browser.
-    async function checkZmConnection() {
-        const badge = document.getElementById('authStatusHeader');
-        if (badge) {
-            badge.className = 'badge badge-paused';
-            badge.innerText = 'Memeriksa koneksi ZoneMinder...';
-        }
-
-        try {
-            const res = await fetch(`${ZM_API}/health.json`, { credentials: 'include' });
-
-            if (res.status === 401) {
-                if (badge) {
-                    badge.className = 'badge badge-err';
-                    badge.innerText = 'Sesi dashboard berakhir';
-                }
-                return false;
-            }
-
-            // 403 = password default belum diganti. Tanpa penanganan khusus,
-            // res.json() tetap jalan tetapi payloadnya bukan data kesehatan ZM,
-            // sehingga badge menampilkan pesan yang menyesatkan.
-            if (res.status === 403) {
-                if (badge) {
-                    badge.className = 'badge badge-err';
-                    badge.innerText = 'Ganti password dashboard terlebih dahulu';
-                }
-                return false;
-            }
-
-            if (!res.ok) {
-                if (badge) {
-                    badge.className = 'badge badge-err';
-                    badge.innerText = 'Backend mengembalikan HTTP ' + res.status;
-                }
-                return false;
-            }
-
-            // Bila Caddy/backend membalas HTML (mis. halaman error), res.json()
-            // melempar. Diperlakukan sebagai kegagalan koneksi, bukan crash.
-            const data = await res.json().catch(() => null);
-            if (!data) {
-                if (badge) {
-                    badge.className = 'badge badge-err';
-                    badge.innerText = 'Respons backend tidak dikenali';
-                }
-                return false;
-            }
-
-            if (data.connected) {
-                if (badge) {
-                    badge.className = 'badge badge-ok';
-                    badge.innerText = 'Terhubung ke ZoneMinder v' + (data.version || '1.36');
-                }
-                return true;
-            }
-
-            if (badge) {
-                badge.className = 'badge badge-err';
-                badge.innerText = data.message || 'Gagal terhubung ke ZoneMinder';
-            }
-            return false;
-        } catch (err) {
-            console.error('Gagal memeriksa koneksi ZM:', err);
-            if (badge) {
-                badge.className = 'badge badge-err';
-                badge.innerText = 'Kesalahan jaringan';
-            }
-            return false;
-        }
-    }
-
-    // Semua permintaan ke ZM lewat proxy backend (relatif terhadap origin).
-    // Backend menangani autentikasi & cookie sesi ZM.
-    async function fetchWithAutoAuth(url, options = {}) {
-        options.credentials = 'include';
-        const response = await fetch(url, options);
-
-        if (response.status === 401) {
-            // Sesi dashboard kedaluwarsa -> kembali ke halaman login.
-            window.location.href = '/login';
-            throw new Error('Sesi dashboard berakhir. Silakan login ulang.');
-        }
-
-        // 403 = password default belum diganti; backend memblokir seluruh API.
-        if (response.status === 403) {
-            window.location.href = '/settings?force=1';
-            throw new Error('Password default masih dipakai. Ganti password terlebih dahulu.');
-        }
-
-        return response;
-    }
-
-    // Baca JSON dengan aman: bila backend/Caddy membalas HTML (halaman error),
-    // jangan biarkan res.json() melempar "Unexpected token <" yang membingungkan.
-    async function readJson(response, fallbackMessage) {
-        const text = await response.text();
-        try {
-            return JSON.parse(text);
-        } catch (err) {
-            throw new Error(fallbackMessage + ' (HTTP ' + response.status + ')');
-        }
-    }
-
-    // =========================================================================
-    // 1b. MODE ZONE DETEKSI (5 MODE)
-    // =========================================================================
+    let cameraDataStore = {};
+    let existingIds = [];
     let ZONE_MODES = [];
 
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     async function loadZoneModes() {
-        const formSelect = document.getElementById('camZoneMode');
-        try {
-            const res = await fetch('/api/zones/modes');
-            const data = await res.json();
-            ZONE_MODES = data.modes || [];
-            window.ZONE_DEFAULT_MODE = data.default_mode;
-            if (formSelect) {
-                formSelect.innerHTML = ZONE_MODES
-                    .map(m => `<option value="${m.key}" ${m.key === data.default_mode ? 'selected' : ''}>${m.label}</option>`)
-                    .join('');
-            }
-            renderZoneModeHint();
-        } catch (err) {
-            console.error('Gagal memuat daftar mode zone:', err);
-            if (formSelect) {
-                formSelect.innerHTML = '<option value="light">2. Ringan</option>';
-            }
+      try {
+        const res = await fetch('/api/zones/modes');
+        const data = await res.json();
+        ZONE_MODES = data.modes || [];
+        const select = document.getElementById('editCamZoneMode');
+        if (select) {
+          select.innerHTML = ZONE_MODES
+            .map(m => `<option value="${m.key}" ${m.key === data.default_mode ? 'selected' : ''}>${m.label}</option>`)
+            .join('');
         }
+      } catch (e) {
+        console.error('Gagal memuat zone modes:', e);
+      }
     }
 
-    function renderZoneModeHint() {
-        const el = document.getElementById('camZoneModeHint');
-        const key = document.getElementById('camZoneMode')?.value;
-        const mode = ZONE_MODES.find(m => m.key === key);
-        if (!el) return;
-        el.innerHTML = mode
-            ? `${mode.description}<br><b>Efektif:</b> CheckMethod=${mode.check_method}, `
-              + `MinPixelThreshold=${mode.min_pixel_threshold} (angka kecil = lebih sensitif), Units=${mode.units}.`
-            : '';
-    }
-
-    async function setZoneForCamera(id, name) {
-        const mode = document.getElementById('bulkZoneModeSelect')?.value || window.ZONE_DEFAULT_MODE || 'light';
-        const overwrite = confirm(
-            `Buat/perbarui zone deteksi untuk kamera "${name || id}" dengan mode ini?\n\n` +
-            `Mode: ${mode}\n\n` +
-            `OK  = timpa zone buatan dashboard ("All") bila sudah ada.\n` +
-            `Cancel = batalkan.`
-        );
-        if (!overwrite && !confirm('Lanjutkan tanpa menimpa zone yang sudah ada? (zone yang ada akan dilewati)')) {
-            return;
-        }
-
-        try {
-            const res = await fetchWithAutoAuth(`/api/zones/${id}/set-mode`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: mode, overwrite: overwrite })
-            });
-            const data = await res.json();
-            const zd = data.data || {};
-            if (data.status === 'success') {
-                alert(`✅ ${data.message}\nKoordinat: ${zd.coords || '-'} @ ${zd.width}x${zd.height}`);
-            } else if (data.status === 'skipped') {
-                alert(`⏭ Zone dilewati.\n\n${data.message}\n\nKamera ini sudah punya zone sendiri — ` +
-                      `konfigurasi manual tidak dihapus. Centang "Timpa zone dashboard" lalu ulangi bila memang ingin menggantinya.`);
-            } else {
-                alert(`❌ ${data.message}`);
-            }
-        } catch (err) {
-            alert(`Error: ${err.message}`);
-        }
-        await loadCameras();
-    }
-
-    async function bulkSetZoneMode() {
-        const mode = document.getElementById('bulkZoneModeSelect')?.value || 'light';
-        const label = document.getElementById('bulkZoneModeSelect')?.selectedOptions[0]?.textContent || mode;
-        const overwrite = confirm(
-            `Terapkan zone deteksi ke SELURUH kamera?\n\nMode: ${label}\n\n` +
-            `OK  = timpa zone buatan dashboard ("All").\n` +
-            `Cancel = lewati kamera yang sudah punya zone apa pun.`
-        );
-
-        const statusEl = document.getElementById('bulkStatusText');
-        const btn = document.getElementById('btnBulkZone');
-        if (btn) btn.disabled = true;
-        if (statusEl) statusEl.innerText = 'Menerapkan mode zone ke semua kamera...';
-
-        try {
-            const res = await fetchWithAutoAuth('/api/zones/bulk-set-mode', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: mode, overwrite: overwrite })
-            });
-            const data = await res.json();
-            if (data.status === 'completed') {
-                if (statusEl) {
-                    statusEl.innerText = `Zone ${data.mode_label}: ${data.created_count} dibuat, `
-                        + `${data.skipped_count} dilewati, ${data.fail_count} gagal dari ${data.total} kamera.`;
-                }
-                let msg = `Mode zone: ${data.mode_label}\n`;
-                msg += `✅ Dibuat: ${data.created_count}\n`;
-                msg += `⏭ Dilewati: ${data.skipped_count}\n`;
-                msg += `⚠️ Gagal: ${data.fail_count}`;
-                if (data.fail_count > 0) {
-                    msg += `\n\nKamera tanpa zone TIDAK akan mendeteksi gerakan meski Function-nya Modect.`;
-                }
-                alert(msg);
-            } else {
-                if (statusEl) statusEl.innerText = `Gagal: ${data.message}`;
-                alert(`❌ ${data.message}`);
-            }
-        } catch (err) {
-            if (statusEl) statusEl.innerText = `Error: ${err.message}`;
-            alert(`Error: ${err.message}`);
-        } finally {
-            if (btn) btn.disabled = false;
-        }
-    }
-
-    // =========================================================================
-    // 2. LOAD CAMERAS
-    // =========================================================================
     async function loadCameras() {
-        const tbody = document.getElementById('cameraTableBody');
-        const countBadge = document.getElementById('camCountBadge');
-        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--primary);">Memuat data kamera...</td></tr>';
+      const tbody = document.getElementById('cameraTableBody');
+      const countBadge = document.getElementById('camTotalBadge');
+      const btnRefresh = document.getElementById('btnRefresh');
 
-        try {
-            const res = await fetchWithAutoAuth(`${ZM_API}/monitors.json`);
-            if (!res.ok) {
-                throw new Error('Backend mengembalikan HTTP ' + res.status);
-            }
-            const data = await readJson(res, 'Respons backend tidak dikenali');
+      if (btnRefresh) btnRefresh.disabled = true;
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:35px; color:var(--text-muted);"><span class="status-dot online pulse"></span> Memuat daftar kamera...</td></tr>';
 
-            existingIds = [];
-            cameraDataStore = {};
-            allMonitorsCache = [];
+      try {
+        const res = await fetch(`${ZM_API}/monitors.json`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
 
-            if (!data.monitors || data.monitors.length === 0) {
-                if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--muted);">Belum ada kamera terdaftar di ZoneMinder.</td></tr>';
-                if (countBadge) countBadge.innerText = "0 Kamera";
-                return;
-            }
+        existingIds = [];
+        cameraDataStore = {};
+        allMonitorsCache = (data.monitors || []).filter(item => {
+          const mon = item.Monitor || item;
+          return !(mon && (mon.Deleted == 1 || mon.Deleted == '1' || mon.Deleted === true));
+        });
 
-            allMonitorsCache = data.monitors;
-            if (countBadge) countBadge.innerText = `${allMonitorsCache.length} Kamera`;
+        // Hitung kamera ON memakai triad native ZM 1.38.6 (Capturing !== None),
+        // bukan kolom Function legacy yang sudah tidak dipakai UI.
+        let onlineCount = 0;
+        allMonitorsCache.forEach(item => {
+          const mon = item.Monitor;
+          if (mon && (mon.Capturing || 'None') !== 'None') onlineCount++;
+        });
 
-            renderCameraRows(allMonitorsCache);
-        } catch (err) {
-            console.error('Gagal memuat kamera ZM:', err);
-            if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:25px; color:#dc2626;">Gagal memuat data: ${err.message}</td></tr>`;
-            }
-        }
+        countBadge.textContent = `${allMonitorsCache.length} Kamera (${onlineCount} ON)`;
+        renderCameraRows(allMonitorsCache);
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:35px; color:var(--danger);">&#9888;&#65039; Gagal memuat kamera: ${err.message}</td></tr>`;
+        countBadge.textContent = 'Error';
+      } finally {
+        if (btnRefresh) btnRefresh.disabled = false;
+      }
     }
 
     function renderCameraRows(monitors) {
-        const tbody = document.getElementById('cameraTableBody');
-        if (!tbody) return;
-        tbody.innerHTML = '';
+      const tbody = document.getElementById('cameraTableBody');
+      tbody.innerHTML = '';
 
-        if (!monitors || monitors.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--muted);">Tidak ada kamera yang cocok dengan pencarian.</td></tr>';
-            return;
-        }
+      if (!monitors || monitors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:35px; color:var(--text-muted);">Belum ada kamera yang cocok atau terdaftar di ZoneMinder.</td></tr>';
+        return;
+      }
 
-        monitors.forEach(item => {
-            const mon = item.Monitor;
-            existingIds.push(mon.Id.toString());
-            cameraDataStore[mon.Id] = mon;
+      monitors.forEach(item => {
+        const mon = item.Monitor;
+        existingIds.push(String(mon.Id));
+        cameraDataStore[mon.Id] = mon;
 
-            const isEnabled = (mon.Enabled == '1' || mon.Enabled == 1) && mon.Function !== 'None';
-            const rowClass = isEnabled ? '' : 'cam-disabled';
-            const badgeHtml = isEnabled ? '<span class="badge badge-ok">ON</span>' : '<span class="badge badge-err">OFF</span>';
+        const cap = mon.Capturing || 'None';
+        const ana = mon.Analysing || 'None';
+        const rec = mon.Recording || 'None';
+        const isEnabled = (mon.Enabled == 1 || mon.Enabled == '1') && cap !== 'None';
 
-            tbody.innerHTML += `
-                <tr class="${rowClass}">
-                    <td><b>${mon.Id}</b></td>
-                    <td>${badgeHtml} <b>${escapeHtml(mon.Name)}</b></td>
-                    <td>
-                        <div class="quick-controls">
-                            <select id="fnSelect_${mon.Id}">
-                                <option value="None" ${mon.Function == 'None' ? 'selected':''}>None</option>
-                                <option value="Monitor" ${mon.Function == 'Monitor' ? 'selected':''}>Monitor</option>
-                                <option value="Modect" ${mon.Function == 'Modect' ? 'selected':''}>Modect</option>
-                                <option value="Record" ${mon.Function == 'Record' ? 'selected':''}>Record</option>
-                                <option value="Mocord" ${mon.Function == 'Mocord' ? 'selected':''}>Mocord</option>
-                                <option value="Nodect" ${mon.Function == 'Nodect' ? 'selected':''}>Nodect</option>
-                            </select>
-                            <button class="btn btn-primary btn-small" onclick="quickSetFunction('${mon.Id}')">Set</button>
-                            <button class="btn btn-outline btn-small" onclick="quickTurnOff('${mon.Id}')">OFF</button>
-                        </div>
-                    </td>
-                    <td><div class="rtsp-path" title="${escapeHtml(mon.Path || '-')}">${escapeHtml(mon.Path || '-')}</div></td>
-                    <td>${mon.Width}x${mon.Height}</td>
-                    <td>
-                        <div class="action-group">
-                            <button class="btn btn-warning btn-small" onclick="editCamera('${mon.Id}')">✏️ Edit</button>
-                            <button class="btn btn-primary btn-small" onclick="setZoneForCamera('${mon.Id}', '${escapeHtml(mon.Name)}')" title="Buat/perbarui zone deteksi sesuai mode yang dipilih di Kontrol Massal">🎯 Zone</button>
-                            <button class="btn btn-danger btn-small" onclick="deleteCamera('${mon.Id}')">🗑️ Hapus</button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
+        const capBadge = cap === 'Always'
+          ? `<span class="badge badge-success" title="Capturing: Always" style="font-size: 10px; padding: 1px 5px;">Cap: ON</span>`
+          : `<span class="badge badge-neutral" title="Capturing: None" style="font-size: 10px; padding: 1px 5px;">Cap: OFF</span>`;
+
+        const anaBadge = ana === 'Always'
+          ? `<span class="badge badge-info" title="Analysing: Always" style="font-size: 10px; padding: 1px 5px;">Ana: ON</span>`
+          : `<span class="badge badge-neutral" title="Analysing: None" style="font-size: 10px; padding: 1px 5px;">Ana: OFF</span>`;
+
+        const recBadge = rec === 'Always'
+          ? `<span class="badge badge-primary" title="Recording: Always" style="font-size: 10px; padding: 1px 5px;">Rec: ALL</span>`
+          : (rec === 'OnMotion'
+              ? `<span class="badge badge-warning" title="Recording: OnMotion" style="font-size: 10px; padding: 1px 5px;">Rec: MOT</span>`
+              : `<span class="badge badge-neutral" title="Recording: None" style="font-size: 10px; padding: 1px 5px;">Rec: OFF</span>`);
+
+        const statusBadge = isEnabled
+          ? `<span class="badge badge-success"><span class="status-dot online"></span> Aktif</span>`
+          : `<span class="badge badge-neutral"><span class="status-dot offline"></span> Nonaktif</span>`;
+
+        const rowCls = isEnabled ? '' : 'row-disabled';
+
+        const tr = document.createElement('tr');
+        tr.className = rowCls;
+        tr.innerHTML = `
+          <td><b class="mono">${mon.Id}</b></td>
+          <td>
+            <div class="flex items-center gap-2">
+              <span class="font-semibold">${escapeHtml(mon.Name)}</span>
+              ${statusBadge}
+            </div>
+            <div class="flex items-center gap-1 flex-wrap" style="margin-top: 4px;">
+              ${capBadge} ${anaBadge} ${recBadge}
+              <span class="badge badge-neutral mono" style="font-size: 10px; padding: 1px 5px;" title="Decoder: ${escapeHtml(mon.Decoder || 'Auto')}">${escapeHtml(mon.Decoder || 'Auto')}</span>
+            </div>
+          </td>
+          <td>
+            <div class="flex items-center gap-1">
+              <select id="capSelect_${mon.Id}" class="form-select text-xs" style="width: auto; height: 28px; padding: 0 6px;" title="Capturing">
+                ${['Always', 'Ondemand', 'None'].map(v =>
+                  `<option value="${v}" ${(mon.Capturing || 'None') === v ? 'selected' : ''}>Cap: ${v}</option>`).join('')}
+              </select>
+              <select id="anaSelect_${mon.Id}" class="form-select text-xs" style="width: auto; height: 28px; padding: 0 6px;" title="Analysing">
+                ${['Always', 'None'].map(v =>
+                  `<option value="${v}" ${(mon.Analysing || 'None') === v ? 'selected' : ''}>Ana: ${v}</option>`).join('')}
+              </select>
+              <select id="recSelect_${mon.Id}" class="form-select text-xs" style="width: auto; height: 28px; padding: 0 6px;" title="Recording">
+                ${['OnMotion', 'Always', 'None'].map(v =>
+                  `<option value="${v}" ${(mon.Recording || 'None') === v ? 'selected' : ''}>Rec: ${v}</option>`).join('')}
+              </select>
+              <button class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 11px;" onclick="quickSetFunction('${mon.Id}')">Set</button>
+              <button class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size: 11px;" onclick="quickTurnOff('${mon.Id}')">OFF</button>
+            </div>
+          </td>
+          <td>
+            <div class="flex items-center gap-1">
+              <span class="rtsp-text" title="${escapeHtml(mon.Path || '-')}">${escapeHtml(mon.Path || '-')}</span>
+              <button class="copy-btn" onclick="copyRtsp('${escapeHtml(mon.Path || '')}')" title="Salin URL RTSP">&#128203;</button>
+            </div>
+          </td>
+          <td>
+            <div class="text-xs font-semibold mono">${mon.Width || '-'}x${mon.Height || '-'}</div>
+            <div class="text-xs text-muted mono" style="font-size: 10px;">Max: ${mon.MaxFPS || '10'} | Ana: ${mon.AnalysisFPSLimit || '8'} fps</div>
+          </td>
+          <td style="text-align: right;">
+            <div class="flex items-center justify-end gap-1">
+              <button class="btn btn-outline btn-sm" onclick="openEditModal('${mon.Id}')" title="Edit konfigurasi kamera">✏️ Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteCamera('${mon.Id}', '${escapeHtml(mon.Name)}')" title="Hapus kamera">&#128465;</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
     }
 
     function filterCameraTable() {
-        const query = (document.getElementById('searchCameraInput').value || '').toLowerCase().trim();
-        if (!query) {
-            renderCameraRows(allMonitorsCache);
-            return;
-        }
+      const q = (document.getElementById('searchCameraInput').value || '').toLowerCase().trim();
+      if (!q) {
+        renderCameraRows(allMonitorsCache);
+        return;
+      }
+      const filtered = allMonitorsCache.filter(item => {
+        const mon = item.Monitor;
+        const name = (mon.Name || '').toLowerCase();
+        const id = String(mon.Id || '');
+        const path = (mon.Path || '').toLowerCase();
+        return name.includes(q) || id.includes(q) || path.includes(q);
+      });
+      renderCameraRows(filtered);
+    }
 
-        const filtered = allMonitorsCache.filter(item => {
-            const mon = item.Monitor;
-            const name = (mon.Name || '').toLowerCase();
-            const id = (mon.Id || '').toString();
-            const path = (mon.Path || '').toLowerCase();
-            return name.includes(query) || id.includes(query) || path.includes(query);
-        });
-
-        renderCameraRows(filtered);
+    function copyRtsp(url) {
+      if (!url) return;
+      navigator.clipboard.writeText(url).then(() => {
+        window.showToast('URL RTSP disalin ke clipboard.', 'info');
+      });
     }
 
     async function quickSetFunction(id) {
-        const selectedFn = document.getElementById(`fnSelect_${id}`).value;
-        const params = new URLSearchParams();
-        params.append('Monitor[Function]', selectedFn);
-        params.append('Monitor[Enabled]', selectedFn === 'None' ? '0' : '1');
-
-        const res = await fetchWithAutoAuth(`${ZM_API}/monitors/${id}.json`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
+      // Triad native ZM 1.38.6: kirim Capturing/Analysing/Recording, bukan
+      // Function legacy. Backend bulk-function hanya menerima action triad.
+      const triad = {
+        capturing: document.getElementById(`capSelect_${id}`).value,
+        analysing: document.getElementById(`anaSelect_${id}`).value,
+        recording: document.getElementById(`recSelect_${id}`).value,
+      };
+      try {
+        const res = await fetch('/api/cameras/bulk-function', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'triad', triad: triad, ids: [id] })
         });
-
-        if (res.ok) loadCameras();
+        const data = await res.json();
+        if (res.ok && data.status !== 'error' && data.success_count > 0) {
+          window.showToast(`Kamera ID ${id}: Cap=${triad.capturing} Ana=${triad.analysing} Rec=${triad.recording}`, 'success');
+          loadCameras();
+        } else {
+          throw new Error(data.message || 'Gagal mengubah fungsi');
+        }
+      } catch (err) {
+        window.showToast(err.message, 'error', 'Gagal Mengubah Fungsi');
+      }
     }
 
     async function quickTurnOff(id) {
-        const params = new URLSearchParams();
-        params.append('Monitor[Function]', 'None');
-        params.append('Monitor[Enabled]', '0');
+      try {
+        const res = await fetch('/api/cameras/bulk-function', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'off', ids: [id] })
+        });
+        const data = await res.json();
+        if (res.ok && data.status !== 'error' && data.success_count > 0) {
+          window.showToast(`Kamera ID ${id} dinonaktifkan (OFF).`, 'info');
+          loadCameras();
+        } else {
+          throw new Error(data.message || 'Gagal mematikan kamera');
+        }
+      } catch (err) {
+        window.showToast(err.message, 'error', 'Gagal Mematikan');
+      }
+    }
 
-        const res = await fetchWithAutoAuth(`${ZM_API}/monitors/${id}.json`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
+    async function bulkSetAll(action) {
+      const statusEl = document.getElementById('bulkStatusText');
+      const buttons = ['btnBulkOn', 'btnBulkRestore', 'btnBulkOff'].map(id => document.getElementById(id));
+
+      let body = { action: action };
+      if (action === 'off') {
+        if (!confirm('Matikan SEMUA kamera? Perekaman dan deteksi gerak seluruh kamera akan berhenti.')) return;
+      } else if (action === 'triad') {
+        body.triad = {
+          capturing: document.getElementById('bulkCapturing').value,
+          analysing: document.getElementById('bulkAnalysing').value,
+          recording: document.getElementById('bulkRecording').value,
+        };
+        if (!confirm(`Terapkan Cap=${body.triad.capturing} Ana=${body.triad.analysing} Rec=${body.triad.recording} ke SEMUA kamera?`)) return;
+      }
+
+      buttons.forEach(b => { if (b) b.disabled = true; });
+      statusEl.textContent = 'Menjalankan kontrol massal...';
+
+      try {
+        const res = await fetch('/api/cameras/bulk-function', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (res.ok && data.status !== 'error') {
+          statusEl.textContent = `Selesai: ${data.success_count} berhasil, ${data.fail_count} gagal (dari ${data.total} kamera).`;
+          window.showToast(`Kontrol massal selesai (${data.success_count}/${data.total} berhasil).`, 'success');
+          loadCameras();
+        } else {
+          throw new Error(data.message || 'Gagal kontrol massal');
+        }
+      } catch (err) {
+        statusEl.textContent = `Gagal: ${err.message}`;
+        window.showToast(err.message, 'error', 'Gagal Kontrol Massal');
+      } finally {
+        buttons.forEach(b => { if (b) b.disabled = false; });
+      }
+    }
+
+    async function bulkSetZoneMode() {
+      const mode = document.getElementById('bulkZoneModeSelect').value;
+      if (!confirm(`Terapkan mode zone "${mode}" ke SELURUH kamera terdaftar?`)) return;
+
+      const btn = document.getElementById('btnBulkZone');
+      btn.disabled = true;
+      btn.textContent = 'Membuat...';
+
+      try {
+        const res = await fetch('/api/zones/bulk-set-mode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: mode, overwrite: true })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          window.showToast(`Zone berhasil diterapkan pada ${data.success_count} kamera.`, 'success', 'Zone Massal');
+        } else {
+          throw new Error(data.message || 'Gagal');
+        }
+      } catch (err) {
+        window.showToast(err.message, 'error', 'Gagal Buat Zone');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🎯 Buat Zone Semua';
+      }
+    }
+
+    /* Modal Edit — ringkasan triad ZM 1.38.6.
+       ZM 1.38.6 tidak lagi memakai Function di UI, jadi modal hanya
+       menampilkan triad yang sedang dipilih dan tidak menyinkronkan dropdown
+       Function apa pun (elemen itu sudah dihapus dari form). */
+    function onModalTriadChange() {
+      const cap = document.getElementById('editCamCapturing').value;
+      const ana = document.getElementById('editCamAnalysing').value;
+      const rec = document.getElementById('editCamRecording').value;
+      const hint = document.getElementById('editCamTriadHint');
+      if (!hint) return;
+
+      let label;
+      if (cap === 'None') {
+        label = 'Capture mati — kamera tidak mengambil frame sama sekali.';
+      } else if (ana === 'Always' && rec === 'Always') {
+        label = 'Capture + analisa gerak + rekam terus-menerus.';
+      } else if (ana === 'Always' && rec === 'OnMotion') {
+        label = 'Capture + analisa gerak, rekam hanya saat ada gerakan.';
+      } else if (ana === 'None' && rec === 'Always') {
+        label = 'Capture + rekam terus-menerus tanpa analisa gerak.';
+      } else if (ana === 'None' && rec === 'OnMotion') {
+        label = 'Capture + rekam saat gerakan, tanpa analisa zone.';
+      } else {
+        label = 'Capture saja — tanpa analisa dan tanpa rekaman.';
+      }
+      hint.textContent = label;
+    }
+
+    function openEditModal(id) {
+      const mon = cameraDataStore[id];
+      if (!mon) return;
+
+      document.getElementById('editOriginalId').value = id;
+      document.getElementById('editCamId').value = id;
+      document.getElementById('editCamName').value = mon.Name || '';
+      document.getElementById('editCamPath').value = mon.Path || '';
+      
+      document.getElementById('editCamCapturing').value = mon.Capturing || 'Always';
+      document.getElementById('editCamAnalysing').value = mon.Analysing || 'None';
+      document.getElementById('editCamRecording').value = mon.Recording || 'None';
+      onModalTriadChange();
+
+      const maxFpsVal = parseFloat(mon.MaxFPS);
+      document.getElementById('editCamMaxFps').value = (isFinite(maxFpsVal) && maxFpsVal > 0) ? maxFpsVal.toFixed(2) : '10.00';
+
+      const fpsVal = parseFloat(mon.AnalysisFPSLimit);
+      document.getElementById('editCamAnalysisFps').value = (isFinite(fpsVal) && fpsVal > 0) ? fpsVal.toFixed(2) : '8.00';
+
+      document.getElementById('editCamDecoder').value = mon.Decoder || 'Auto';
+      document.getElementById('editCamUser').value = mon.User || '';
+      document.getElementById('editCamPass').value = '';
+
+      const resVal = `${mon.Width}x${mon.Height}`;
+      const resSelect = document.getElementById('editCamResolution');
+      let found = false;
+      for (let i = 0; i < resSelect.options.length; i++) {
+        if (resSelect.options[i].value === resVal) { found = true; break; }
+      }
+      if (!found && mon.Width && mon.Height) {
+        const opt = document.createElement('option');
+        opt.value = resVal;
+        opt.text = `${resVal} (Custom)`;
+        resSelect.add(opt);
+      }
+      resSelect.value = resVal;
+
+      document.getElementById('modalTitle').textContent = `✏️ Edit Kamera: ${mon.Name} (ID: ${id})`;
+      document.getElementById('editModal').classList.add('active');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('active');
+    }
+
+    async function saveCameraFromModal(e) {
+      e.preventDefault();
+      const id = document.getElementById('editOriginalId').value;
+      const name = document.getElementById('editCamName').value.trim();
+      const path = document.getElementById('editCamPath').value.trim();
+      const [w, h] = document.getElementById('editCamResolution').value.split('x');
+
+      const btnSave = document.getElementById('btnModalSave');
+      btnSave.disabled = true;
+      btnSave.textContent = 'Menyimpan...';
+
+      try {
+        const res = await fetch('/api/zones/save-camera', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: id,
+            name: name,
+            path: path,
+            username: document.getElementById('editCamUser').value.trim(),
+            password: document.getElementById('editCamPass').value,
+            capturing: document.getElementById('editCamCapturing').value,
+            analysing: document.getElementById('editCamAnalysing').value,
+            recording: document.getElementById('editCamRecording').value,
+            maxFps: document.getElementById('editCamMaxFps').value || '10.00',
+            analysisFps: document.getElementById('editCamAnalysisFps').value || '8.00',
+            decoder: document.getElementById('editCamDecoder').value || 'Auto',
+            width: w || '1280',
+            height: h || '720',
+            colorspace: document.getElementById('editColorspace').value || '4',
+            zoneMode: document.getElementById('editCamZoneMode').value,
+            createZone: document.getElementById('editCamCreateZone').checked,
+            overwriteZone: document.getElementById('editCamOverwriteZone').checked
+          })
         });
 
-        if (res.ok) loadCameras();
-    }
-
-    // =========================================================================
-    // KONTROL MASSAL SELURUH KAMERA
-    // =========================================================================
-    async function bulkSetAll(action) {
-        const statusEl = document.getElementById('bulkStatusText');
-        const buttons = ['btnBulkOn', 'btnBulkRestore', 'btnBulkOff'].map(id => document.getElementById(id));
-
-        let body = { action: action };
-        let label = '';
-
-        if (action === 'off') {
-            if (!confirm('Matikan SEMUA kamera? Seluruh perekaman dan deteksi gerak akan berhenti.')) return;
-            label = 'Mematikan semua kamera...';
-        } else if (action === 'custom') {
-            const fn = document.getElementById('bulkFunctionSelect').value;
-            body.function = fn;
-            label = `Mengaktifkan semua kamera sebagai ${fn}...`;
-            if (!confirm(`Aktifkan SEMUA kamera dengan fungsi "${fn}"?`)) return;
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          closeEditModal();
+          window.showToast(`Kamera '${name}' (ID: ${data.monitor_id}) berhasil diperbarui!`, 'success');
+          loadCameras();
         } else {
-            label = 'Memulihkan fungsi asli tiap kamera...';
+          throw new Error(data.message || 'Gagal menyimpan');
         }
-
-        buttons.forEach(b => { if (b) b.disabled = true; });
-        if (statusEl) {
-            statusEl.className = 'bulk-status busy';
-            statusEl.innerText = label;
-        }
-
-        try {
-            const res = await fetch('/api/cameras/bulk-function', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            const data = await res.json().catch(() => ({}));
-
-            if (!res.ok || data.status === 'error') {
-                throw new Error(data.message || `HTTP ${res.status}`);
-            }
-
-            if (statusEl) {
-                statusEl.className = data.fail_count > 0 ? 'bulk-status err' : 'bulk-status ok';
-                statusEl.innerText = `Selesai: ${data.success_count} berhasil, ${data.fail_count} gagal (dari ${data.total} kamera)`;
-            }
-            await loadCameras();
-        } catch (e) {
-            if (statusEl) {
-                statusEl.className = 'bulk-status err';
-                statusEl.innerText = `Gagal: ${e.message}`;
-            }
-        } finally {
-            buttons.forEach(b => { if (b) b.disabled = false; });
-        }
+      } catch (err) {
+        window.showToast(err.message, 'error', 'Gagal Menyimpan');
+      } finally {
+        btnSave.disabled = false;
+        btnSave.textContent = '💾 Simpan Perubahan';
+      }
     }
 
-    // =========================================================================
-    // 3. EDIT & SAVE CAMERA
-    // =========================================================================
-    function editCamera(id) {
-        const mon = cameraDataStore[id];
-        if (!mon) return alert('Data kamera tidak ditemukan!');
+    async function deleteCamera(id, name) {
+      if (!confirm(`Hapus kamera "${name}" (ID: ${id}) dari ZoneMinder?`)) return;
 
-        const formTitle = document.getElementById('formTitle');
-        if (formTitle) formTitle.innerText = `✏️ Edit Kamera: ${mon.Name} (ID: ${id})`;
-
-        const notice = document.getElementById('editModeNotice');
-        if (notice) notice.style.display = "inline";
-
-        document.getElementById('originalId').value = id;
-        
-        const camIdInput = document.getElementById('camId');
-        if (camIdInput) {
-            camIdInput.value = id;
-            camIdInput.readOnly = true;
-        }
-
-        document.getElementById('camName').value = mon.Name || '';
-        document.getElementById('camPath').value = mon.Path || '';
-        document.getElementById('camFunction').value = mon.Function || 'Monitor';
-
-        const resVal = `${mon.Width}x${mon.Height}`;
-        const resSelect = document.getElementById('camResolution');
-        if (resSelect) {
-            let exists = false;
-            for (let i = 0; i < resSelect.options.length; i++) {
-                if (resSelect.options[i].value === resVal) { exists = true; break; }
-            }
-            if (!exists && mon.Width && mon.Height) {
-                const opt = document.createElement('option');
-                opt.value = resVal;
-                opt.text = `${resVal} (Custom)`;
-                resSelect.add(opt);
-            }
-            resSelect.value = resVal;
-        }
-
-        const btnSave = document.getElementById('btnSave');
-        if (btnSave) {
-            btnSave.innerText = "💾 Perbarui Kamera";
-            btnSave.className = "btn btn-warning";
-        }
-
-        const btnCancel = document.getElementById('btnCancel');
-        if (btnCancel) btnCancel.style.display = "inline-flex";
-    }
-
-    function resetForm() {
-        const formTitle = document.getElementById('formTitle');
-        if (formTitle) formTitle.innerText = "➕ Pendaftaran & Edit Kamera RTSP";
-
-        const notice = document.getElementById('editModeNotice');
-        if (notice) notice.style.display = "none";
-
-        document.getElementById('originalId').value = "";
-        
-        const camIdInput = document.getElementById('camId');
-        if (camIdInput) {
-            camIdInput.value = "";
-            camIdInput.readOnly = false;
-        }
-
-        document.getElementById('camName').value = "";
-        document.getElementById('camPath').value = "";
-        document.getElementById('camFunction').value = "Monitor";
-
-        const btnSave = document.getElementById('btnSave');
-        if (btnSave) {
-            btnSave.innerText = "☁ Simpan Kamera";
-            btnSave.className = "btn btn-primary";
-        }
-
-        const btnCancel = document.getElementById('btnCancel');
-        if (btnCancel) btnCancel.style.display = "none";
-    }
-
-    async function saveCamera() {
-        const originalId = document.getElementById('originalId').value.trim();
-        const inputId = document.getElementById('camId').value.trim();
-
-        if (!originalId && inputId && existingIds.includes(inputId)) {
-            return alert(`Error: ID ${inputId} sudah digunakan oleh kamera lain!`);
-        }
-
-        const camName = document.getElementById('camName').value.trim();
-        const camPath = document.getElementById('camPath').value.trim();
-        if (!camName || !camPath) return alert('Nama kamera dan RTSP Path Wajib diisi!');
-
-        const [width, height] = (document.getElementById('camResolution').value || '1920x1080').split('x');
-
-        const saveBtn = document.getElementById('btnSave');
-        const origText = saveBtn ? saveBtn.innerText : '';
-        if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.innerText = "Menyimpan...";
-        }
-
-        try {
-            // Penyimpanan dilakukan di backend, bukan langsung dari browser.
-            // Alasannya: ZoneMinder membalas {"message":"Saved"} tanpa Id,
-            // sehingga browser tidak mungkin tahu ID kamera baru — dan zone
-            // tidak bisa dibuat tanpa ID itu. Backend mencari ID berdasarkan
-            // nama setelah menyimpan, lalu langsung membuat zone-nya.
-            const res = await fetchWithAutoAuth('/api/zones/save-camera', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: originalId || '',
-                    customId: originalId ? '' : inputId,
-                    name: camName,
-                    path: camPath,
-                    function: document.getElementById('camFunction').value,
-                    width: width || '1920',
-                    height: height || '1080',
-                    colorspace: document.getElementById('camColorspace')?.value || '4',
-                    zoneMode: document.getElementById('camZoneMode')?.value,
-                    createZone: document.getElementById('camCreateZone')?.checked ?? true,
-                    overwriteZone: document.getElementById('camOverwriteZone')?.checked ?? false
-                })
-            });
-
-            const data = await res.json().catch(() => ({}));
-
-            if (res.ok && data.status === 'success') {
-                const zr = data.zone || {};
-                let zoneNote = '';
-
-                if (zr.created) {
-                    zoneNote = `\n\n🎯 Zone deteksi dibuat: ${zr.label || zr.mode}`
-                             + ` (${zr.width}x${zr.height})`;
-                } else if (zr.skipped) {
-                    zoneNote = `\n\n⏭ Zone dilewati: ${zr.reason || '-'}`;
-                } else if (zr.reason) {
-                    zoneNote = `\n\n⚠️ Zone TIDAK dibuat: ${zr.reason}`
-                             + `\nTanpa zone, kamera ini tidak akan mendeteksi gerakan meski memakai Modect.`;
-                }
-
-                const head = data.editing
-                    ? `Kamera '${data.name}' (ID: ${data.monitor_id}) berhasil diperbarui!`
-                    : `Kamera '${data.name}' berhasil didaftarkan (ID: ${data.monitor_id})!`;
-
-                alert(head + zoneNote);
-                resetForm();
-                await loadCameras();
-            } else {
-                alert('Gagal menyimpan kamera: ' + (data.message || res.statusText));
-            }
-        } catch (err) {
-            alert('Terjadi kesalahan jaringan: ' + err.message);
-        } finally {
-            if (saveBtn) {
-                saveBtn.disabled = false;
-                saveBtn.innerText = origText;
-            }
-        }
-    }
-
-    async function deleteCamera(id) {
-        if (!confirm(`Apakah Anda yakin ingin menghapus kamera ID ${id}?`)) return;
-        try {
-            const res = await fetchWithAutoAuth(`${ZM_API}/monitors/${id}.json`, { method: 'DELETE' });
-            if (res.ok) {
-                alert(`Kamera ID ${id} berhasil dihapus.`);
-                loadCameras();
-            } else {
-                alert(`Gagal menghapus kamera ID ${id}.`);
-            }
-        } catch (err) {
-            alert(`Error: ${err.message}`);
-        }
-    }
-
-    async function checkCpuLoad() {
-        const textEl = document.getElementById('cpuLoadText');
-        try {
-            const res = await fetchWithAutoAuth(`${ZM_API}/host/getLoad.json`);
-            if (!res.ok) {
-                throw new Error('HTTP ' + res.status);
-            }
-            const data = await readJson(res, 'Respons load tidak dikenali');
-            if (textEl && data.load) {
-                textEl.value = `1m: ${data.load[0]} | 5m: ${data.load[1]}`;
-            }
-        } catch (err) {
-            if (textEl) textEl.value = "Gagal membaca load";
-        }
-    }
-
-    // =========================================================================
-    // 4. CCTV HEALTH CHECKER CONTROLLER
-    // =========================================================================
-    async function loadCheckerConfig() {
-        try {
-            const res = await fetch('/api/checker/config');
-            if (res.ok) {
-                checkerConfig = await res.json();
-                renderCheckerStatus();
-            }
-        } catch (e) {
-            console.error('Error fetching checker config:', e);
-        }
-    }
-
-    function renderCheckerStatus() {
-        const badge = document.getElementById('checkerStatusBadge');
-        const btnToggle = document.getElementById('btnToggleChecker');
-        const intervalInput = document.getElementById('checkerIntervalInput');
-        const lastRunText = document.getElementById('checkerLastRunText');
-
-        if (intervalInput && checkerConfig.interval) {
-            intervalInput.value = checkerConfig.interval;
-        }
-
-        if (lastRunText) {
-            lastRunText.innerText = checkerConfig.last_check 
-                ? `Terakhir diperiksa: ${checkerConfig.last_check}`
-                : "Terakhir diperiksa: -";
-        }
-
-        if (checkerConfig.enabled) {
-            if (badge) {
-                badge.className = "badge badge-running";
-                badge.innerText = "🟢 Berjalan (Active)";
-            }
-            if (btnToggle) {
-                btnToggle.className = "btn btn-warning";
-                btnToggle.innerText = "⏸ Jeda (Pause) Checker";
-            }
+      try {
+        const res = await fetch(`${ZM_API}/monitors/${id}.json`, { method: 'DELETE' });
+        if (res.ok) {
+          window.showToast(`Kamera "${name}" berhasil dihapus.`, 'success');
+          loadCameras();
         } else {
-            if (badge) {
-                badge.className = "badge badge-paused";
-                badge.innerText = "⏸ Dinonaktifkan (Paused)";
-            }
-            if (btnToggle) {
-                btnToggle.className = "btn btn-success";
-                btnToggle.innerText = "▶ Aktifkan Checker";
-            }
+          throw new Error('HTTP ' + res.status);
         }
+      } catch (err) {
+        window.showToast(err.message, 'error', 'Gagal Menghapus Kamera');
+      }
     }
 
-    async function toggleCheckerActive() {
-        const newStatus = !checkerConfig.enabled;
-        try {
-            const res = await fetch('/api/checker/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: newStatus })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                checkerConfig = data.config || checkerConfig;
-                checkerConfig.enabled = newStatus;
-                renderCheckerStatus();
-            }
-        } catch (e) {
-            alert('Gagal mengubah status checker: ' + e.message);
-        }
-    }
-
-    async function updateCheckerInterval() {
-        const input = document.getElementById('checkerIntervalInput');
-        const val = parseInt(input.value);
-        if (isNaN(val) || val < 5) {
-            return alert('Interval minimal adalah 5 detik!');
-        }
-
-        try {
-            const res = await fetch('/api/checker/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ interval: val })
-            });
-            if (res.ok) {
-                alert(`Interval pengecekan berhasil diubah menjadi ${val} detik!`);
-                await loadCheckerConfig();
-            }
-        } catch (e) {
-            alert('Gagal menyimpan interval: ' + e.message);
-        }
-    }
-
-    async function triggerRunNow() {
-        const btn = document.getElementById('btnRunNow');
-        const origText = btn ? btn.innerText : '';
-        if (btn) {
-            btn.disabled = true;
-            btn.innerText = "Memeriksa...";
-        }
-
-        try {
-            const res = await fetch('/api/checker/run-now', { method: 'POST' });
-            if (res.ok) {
-                alert('Pemeriksaan kamera RTSP sedang berjalan!');
-                setTimeout(loadCheckerConfig, 2500);
-            }
-        } catch (e) {
-            alert('Gagal mengirim trigger: ' + e.message);
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.innerText = origText;
-            }
-        }
-    }
-
-    function escapeHtml(text) {
-        return String(text || '')
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    // =========================================================================
-    // INITIALIZATION
-    // =========================================================================
-    // Catatan: halaman ini TIDAK memanggil loadRuntimeConfig() maupun
-    // authenticate(). Kedua fungsi itu tidak pernah ada di berkas ini; sisa
-    // dari versi lama yang memakai kredensial di sisi browser. Memanggilnya
-    // melempar ReferenceError dan MENGHENTIKAN seluruh blok init, sehingga
-    // daftar kamera tidak pernah dimuat (hanya menyisakan teks "Memuat data
-    // kamera dari ZoneMinder..." di tabel).
-    document.addEventListener('DOMContentLoaded', async () => {
-        // Daftar mode zone dimuat lebih dulu: dropdown-nya dipakai baik oleh
-        // form kamera maupun oleh tombol "Zone" di tabel.
-        loadZoneModes();
-
-        const zoneSelect = document.getElementById('camZoneMode');
-        if (zoneSelect) zoneSelect.addEventListener('change', renderZoneModeHint);
-
-        await checkZmConnection();
-        await loadCameras();
-        await loadCheckerConfig();
-        checkCpuLoad();
-
-        setInterval(loadCheckerConfig, 10000);
+    document.addEventListener('DOMContentLoaded', () => {
+      loadZoneModes();
+      loadCameras();
     });
-</script>
-<script src="app_shell.js"></script>
+  </script>
 </body>
 </html>

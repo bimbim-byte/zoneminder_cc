@@ -140,7 +140,8 @@ docker compose up -d
 
 *Output yang diharapkan:*
 ```text
-[+] Running 4/4
+[+] Running 5/5
+ ✔ Container zm_db                  Started
  ✔ Container zoneminder             Started
  ✔ Container camera-dashboard       Started
  ✔ Container cctv_checker_service   Started
@@ -157,10 +158,11 @@ Ketik perintah berikut untuk melihat status kontainer:
 docker compose ps
 ```
 Pastikan pada kolom **STATUS**, semua kontainer berstatus **`Up`** (bukan *Exited*):
-- `caddy_proxy` (Port 80, 443 HTTPS)
-- `camera-dashboard` (Port 8080)
-- `zoneminder` (Port 8082)
-- `cctv_checker_service`
+- `caddy_proxy` (Port 80, 443 HTTPS, 9443 dashboard)
+- `camera-dashboard` (port internal saja — diakses lewat `:9443`)
+- `zoneminder` (port internal saja — diakses lewat `:443/zm/`)
+- `cctv_checker_service` (tanpa port)
+- `zm_db` (MariaDB untuk ZoneMinder, tanpa port — hanya network internal)
 
 ---
 

@@ -186,7 +186,10 @@ def get_all_monitors():
         res = zm_session.get(url, params=params, verify=False, timeout=10)
         if res.status_code == 200:
             data = res.json()
-            return [m["Monitor"] for m in data.get("monitors", []) if "Monitor" in m]
+            return [
+                m["Monitor"] for m in data.get("monitors", [])
+                if "Monitor" in m and str(m["Monitor"].get("Deleted", "0")).lower() not in ("1", "true")
+            ]
         elif res.status_code in [401, 403]:
             if zm_login():
                 return get_all_monitors()
@@ -195,12 +198,30 @@ def get_all_monitors():
     return []
 
 
+ZM_TRIAD_DEFAULTS = {
+    "None":    {"Capturing": "None",   "Analysing": "None",   "Recording": "None",     "Enabled": "0"},
+    "Monitor": {"Capturing": "Always", "Analysing": "None",   "Recording": "None",     "Enabled": "1"},
+    "Modect":  {"Capturing": "Always", "Analysing": "Always", "Recording": "OnMotion", "Enabled": "1"},
+    "Record":  {"Capturing": "Always", "Analysing": "None",   "Recording": "Always",   "Enabled": "1"},
+    "Mocord":  {"Capturing": "Always", "Analysing": "Always", "Recording": "Always",   "Enabled": "1"},
+    "Nodect":  {"Capturing": "Always", "Analysing": "None",   "Recording": "OnMotion", "Enabled": "1"},
+}
+
+
 def update_monitor_function(monitor_id, new_function):
-    """Mengubah fungsi monitor (None atau Monitor/Modect)."""
+    """Mengubah fungsi monitor (None atau Monitor/Modect) sesuai arsitektur triad ZM 1.38."""
     global access_token
     url = f"{ZM_HOST}/zm/api/monitors/{monitor_id}.json"
     params = {"token": access_token} if access_token else {}
-    payload = {"Monitor[Function]": new_function}
+    triad = ZM_TRIAD_DEFAULTS.get(new_function, ZM_TRIAD_DEFAULTS.get("Monitor"))
+    payload = {
+        "Monitor[Function]": new_function,
+        "Monitor[Capturing]": triad["Capturing"],
+        "Monitor[Analysing]": triad["Analysing"],
+        "Monitor[Recording]": triad["Recording"],
+        "Monitor[Enabled]": triad["Enabled"],
+        "Monitor[Device]": "",
+    }
     try:
         res = zm_session.post(url, params=params, data=payload, verify=False, timeout=8)
         if res.status_code in [401, 403]:
@@ -288,9 +309,15 @@ def perform_single_health_check(timeout_val=3.0):
                 mon_id = str(mon.get("Id", ""))
                 name = mon.get("Name", f"Cam_{mon_id}")
                 curr_func = mon.get("Function", OFFLINE_FUNCTION)
+                curr_cap = mon.get("Capturing", "None")
+                curr_en = str(mon.get("Enabled", "1"))
                 path = mon.get("Path", "")
 
-                if curr_func in ACTIVE_FUNCTIONS:
+                # Di ZM 1.38, monitor benar-benar aktif bila Capturing bukan 'None',
+                # Function aktif, dan Enabled bernilai 1.
+                is_active = (curr_cap != "None" and curr_func in ACTIVE_FUNCTIONS and curr_en != "0")
+
+                if is_active:
                     state_backup[mon_id] = curr_func
 
                 target_active_func = state_backup.get(mon_id, "Monitor")
@@ -303,12 +330,12 @@ def perform_single_health_check(timeout_val=3.0):
 
                 if is_online:
                     online_count += 1
-                    if curr_func == OFFLINE_FUNCTION:
+                    if not is_active:
                         update_monitor_function(mon_id, target_active_func)
                         changed_count += 1
                 else:
                     offline_count += 1
-                    if curr_func != OFFLINE_FUNCTION:
+                    if is_active:
                         update_monitor_function(mon_id, OFFLINE_FUNCTION)
                         changed_count += 1
 

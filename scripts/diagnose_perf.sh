@@ -31,7 +31,8 @@
 #   * COUNT(*) penuh tidak dipakai pada Events (pakai estimasi + range terindeks).
 #   * Read-only: hanya SELECT/SHOW/cat/ls/ps/top/df/du.
 #
-# TERVERIFIKASI pada ZoneMinder 1.36.32 (image pppasantos/zoneminder):
+# TERVERIFIKASI pada ZoneMinder 1.36.32 (pppasantos/zoneminder) dan diuji ulang
+# pada ZoneMinder 1.38.6 (zoneminder/zoneminder, service db = MariaDB 11.8):
 #   - kolom waktu Events = StartDateTime (BUKAN StartTime)
 #   - buffer frame = /dev/shm/zm.mmap.<id>, ukuran = Width*Height*12 + ~5.5 KB
 #     (bukan SysV shm; `ipcs -m` kosong adalah NORMAL)
@@ -65,7 +66,14 @@ incexec() {
 # Kredensial DB dari /etc/zm/zm.conf (dibaca sekali).
 # ---------------------------------------------------------------------------
 DB_USER="zmuser"; DB_PASS="zmpass"; DB_NAME="zm"
-ZMCONF="$(incexec 'cat /etc/zm/zm.conf')"
+# Database TIDAK lagi di dalam container ZoneMinder (sejak ZM 1.38 resmi):
+# semua query dijalankan di container DB terpisah, password dari docker secret.
+DB_CONTAINER="zm_db"
+DB_PASS_ENV=""
+if [ -r secrets/zm_db_pass.txt ]; then DB_PASS_ENV="$(cat secrets/zm_db_pass.txt)"; fi
+# Sejak ZM 1.38 (image resmi) kredensial DB ditulis entrypoint ke
+# /etc/zm/conf.d/03-docker.conf; zm.conf hanya menyisakan path.
+ZMCONF="$(incexec 'cat /etc/zm/zm.conf /etc/zm/conf.d/03-docker.conf 2>/dev/null')"
 if [ -n "${ZMCONF:-}" ]; then
   while IFS='=' read -r k v; do
     case "$k" in
@@ -78,14 +86,14 @@ fi
 
 dbq() {   # output tabel untuk dibaca manusia; SQL lewat stdin
   if [ "$IN_CONTAINER" = "1" ]; then
-    timeout "$QT" docker exec -i "$CONTAINER" mysql --protocol=socket -u"$DB_USER" -p"$DB_PASS" -D "$DB_NAME" -t 2>/dev/null
+    timeout "$QT" docker exec -i -e MYSQL_PWD="${DB_PASS_ENV:-$DB_PASS}" "$DB_CONTAINER" mariadb -h 127.0.0.1 -u"$DB_USER" -D "$DB_NAME" -t 2>/dev/null
   else
     timeout "$QT" mysql --protocol=socket -u"$DB_USER" -p"$DB_PASS" -D "$DB_NAME" -t 2>/dev/null
   fi
 }
 dbR() {   # output mentah tab-separated untuk di-parse
   if [ "$IN_CONTAINER" = "1" ]; then
-    timeout "$QT" docker exec -i "$CONTAINER" mysql --protocol=socket -u"$DB_USER" -p"$DB_PASS" -D "$DB_NAME" -N -B 2>/dev/null
+    timeout "$QT" docker exec -i -e MYSQL_PWD="${DB_PASS_ENV:-$DB_PASS}" "$DB_CONTAINER" mariadb -h 127.0.0.1 -u"$DB_USER" -D "$DB_NAME" -N -B 2>/dev/null
   else
     timeout "$QT" mysql --protocol=socket -u"$DB_USER" -p"$DB_PASS" -D "$DB_NAME" -N -B 2>/dev/null
   fi
@@ -292,7 +300,7 @@ printf '%s\n' "${SYSSHM:-}" | awk 'NR>1 && NF>=7 {n++; t+=$4}
 # 6. MARIADB
 # ===========================================================================
 sec "6. MARIADB"
-DBN="$(incexec 'ps -eo rss=,comm= | grep -E "mariadbd|mysqld"')"
+DBN="$(timeout "$QT" docker exec "$DB_CONTAINER" ps -eo rss=,comm= 2>/dev/null | grep -E "mariadbd|mysqld")"
 printf '%s\n' "${DBN:-}" | awk '{r+=$1; n++} END { printf "  proses DB=%d  RSS total=%.2f GB\n", n, r/1048576 }'
 
 sub "ukuran tabel (table_rows InnoDB = PERKIRAAN)"
@@ -463,8 +471,10 @@ MONN="${MONN:-0}"
 if [ "$MONN" -gt 0 ] 2>/dev/null; then
   PSC="$(incexec 'ps -eo comm=,rss= | grep -v grep')"
   sumof() { printf '%s\n' "${PSC:-}" | awk -v p="$1" 'index($1,p)==1 {s+=$2} END{printf "%.0f", s/1024}'; }
-  ZMCMB=$(sumof zmc); ZMAMB=$(sumof zma); APMB=$(sumof apache2); DBMB=$(sumof mysqld)
-  DBMB2=$(sumof mariadbd); [ "$DBMB" = "0" ] && DBMB=$DBMB2
+  ZMCMB=$(sumof zmc); ZMAMB=$(sumof zma); APMB=$(sumof apache2)
+  # DB berada di container terpisah: RSS diambil langsung dari proses mariadbd.
+  DBMB=$(timeout "$QT" docker exec "$DB_CONTAINER" ps -eo rss=,comm= 2>/dev/null \
+         | awk '{s+=$1} END {printf "%.0f", s/1024}')
   SHMMB=$(awk -v b="$SHMTOT" 'BEGIN{printf "%.0f", b/1048576}')
   awk -v m="$MONN" -v n="$PROJECT_N" -v zmc="$ZMCMB" -v zma="$ZMAMB" \
       -v ap="${APMB:-0}" -v db="${DBMB:-0}" -v shm="$SHMMB" 'BEGIN{
@@ -517,13 +527,16 @@ SELECT COUNT(*) AS events_24h FROM Events WHERE $EVCOL > NOW() - INTERVAL 1 DAY;
 SQL
 
 sub "direktori & ukuran event di disk (timeout ${QT}s)"
-EVL="$(incexec 'ls -d /var/lib/zoneminder/events 2>/dev/null')"
+# Path event ZM 1.38 = /var/cache/zoneminder/events (ZM_DIR_EVENTS di
+# /etc/zm/conf.d/01-system-paths.conf). Path lama /var/lib/zoneminder/events
+# hanya dipakai binding compose 1.36 dan tidak pernah ditulis ZoneMinder.
+EVL="$(incexec 'ls -d /var/cache/zoneminder/events 2>/dev/null')"
 if [ -n "${EVL:-}" ]; then
   echo "  direktori : $EVL"
-  echo "  top-level : $(incexec 'ls -1 /var/lib/zoneminder/events 2>/dev/null | wc -l')"
-  echo "  ukuran    : $(incexec 'du -sh /var/lib/zoneminder/events 2>/dev/null')"
+  echo "  top-level : $(incexec 'ls -1 /var/cache/zoneminder/events 2>/dev/null | wc -l')"
+  echo "  ukuran    : $(incexec 'du -sh /var/cache/zoneminder/events 2>/dev/null')"
 else
-  echo "  (/var/lib/zoneminder/events tidak ada)"
+  echo "  (/var/cache/zoneminder/events tidak ada)"
 fi
 
 sub "pola error di log ZM"

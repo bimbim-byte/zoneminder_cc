@@ -48,9 +48,10 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
 ```
 
 1. **Caddy Proxy (`caddy_proxy`)**: Reverse proxy HTTPS standar industri yang mengikat ke port universal `:443`, melayani traffic untuk domain maupun IP manapun dengan sertifikat TLS terintegrasi.
-2. **ZoneMinder (`zoneminder`)**: Core NVR (v1.36) dengan database MySQL internal untuk perekaman, streaming RTSP, event storage, dan motion detection.
-3. **Camera Dashboard (`camera-dashboard`)**: Web UI SPA berbasis HTML5, CSS3, dan Python Flask backend untuk manajemen monitor, ekspor/impor Excel, dan kontrol checker.
-4. **CCTV Health Checker (`cctv_checker_service`)**: Background service Python yang menguji konektivitas TCP RTSP setiap kamera secara berkala dan auto-switch fungsi monitor di ZoneMinder (`Monitor` <-> `None`). Hasil pemeriksaan ditulis ke log container; tidak ada perantara pesan eksternal.
+2. **ZoneMinder (`zoneminder`)**: Core NVR **v1.38.6** (image resmi `zoneminder/zoneminder`) untuk perekaman, streaming RTSP, event storage, dan motion detection. Sejak migrasi, database **tidak lagi** berada di dalam container ini.
+3. **Database (`zm_db`)**: MariaDB 11.8 khusus ZoneMinder (skema `zm`). Hanya dijangkau lewat network internal `cctv_net` — tanpa port ke host. Tuning di `zm-conf/db-tuning.cnf`, kredensial di docker secret.
+4. **Camera Dashboard (`camera-dashboard`)**: Web UI SPA berbasis HTML5, CSS3, dan Python Flask backend untuk manajemen monitor, ekspor/impor Excel, dan kontrol checker.
+5. **CCTV Health Checker (`cctv_checker_service`)**: Background service Python yang menguji konektivitas TCP RTSP setiap kamera secara berkala dan auto-switch fungsi monitor di ZoneMinder (`Monitor` <-> `None`). Hasil pemeriksaan ditulis ke log container; tidak ada perantara pesan eksternal.
 
 ---
 
@@ -61,7 +62,7 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
   - **Quick Paste RTSP**: Salin puluhan URL RTSP sekaligus, beri prefix nama otomatis, pratinjau tabel, dan daftarkan sekaligus dalam satu klik.
   - **Impor Spreadsheet Excel (.xlsx)**: Unduh template Excel bawaan, isi daftar kamera, lalu unggah untuk pendaftaran massal otomatis.
 - **🛡️ ZoneMinder Camera Manager**:
-  - Autentikasi otomatis API ZoneMinder v1.36.
+  - Autentikasi otomatis API ZoneMinder v1.38.6 (parity dengan kontrak 1.36 sudah diuji ulang).
   - Registrasi kamera tunggal dan pengeditan konfigurasi (Nama, RTSP Path, Resolusi, Fungsi) dengan proteksi primary key ID.
   - Shortcut fungsi cepat (*Quick Set Function* & *Quick OFF*).
   - **Kontrol massal seluruh kamera**: aktifkan semua dengan mode fungsi tertentu, matikan semua, atau pulihkan tiap kamera ke fungsi asli yang tersimpan.
@@ -97,8 +98,8 @@ Sistem ini dibangun menggunakan arsitektur *microservices* terisolasi dalam satu
 | **Tambah Kamera Tunggal** | `https://<IP_SERVER>/add_camera.html` | Form tambah 1 kamera RTSP secara instan |
 | **Wall Dashboard (Pilih Kamera)** | `https://<IP_SERVER>/wall` | Pilih seluruh kamera atau sebagian group (multi-group) |
 | **Wall Dashboard (Grid Live)** | `https://<IP_SERVER>/wall/view?mode=all` | Grid live stream kamera, atur kolom/rasio/resolusi/FPS |
-| **ZoneMinder Direct Port** | `http://<IP_SERVER>:8082/zm/` | Port langsung (fallback tanpa HTTPS) |
-| **Dashboard Direct Port** | `http://<IP_SERVER>:8080/` | Port langsung dashboard (fallback tanpa HTTPS) |
+| **ZoneMinder (port langsung)** | — | **Tidak tersedia.** Port ZM hanya `expose` di network internal; akses wajib lewat Caddy (`:443/zm/` atau `:9443/zm/`) |
+| **Dashboard (port langsung)** | — | **Tidak tersedia.** Dashboard hanya lewat Caddy `:9443` (login Flask) |
 
 ---
 
@@ -177,6 +178,10 @@ docker compose up -d
 ```
 Tunggu sekitar 1–2 menit saat pertama kali dijalankan agar inisialisasi database ZoneMinder selesai.
 
+> **Jangan memakai `docker compose up -d --build`.** Pada Compose v5.x perintah itu
+> gagal dengan pesan menyesatkan `error getting credentials`. Lihat
+> *Troubleshooting* nomor 2 untuk perintah build yang benar.
+
 ### 5. Buka Antarmuka di Browser
 Buka browser dan akses:
 ```text
@@ -199,8 +204,41 @@ https://<IP_SERVER>/
 ### 2. Pendaftaran Kamera Tunggal
 1. Buka menu **Tambah Kamera Tunggal** (`https://<IP_SERVER>/add_camera.html`).
 2. Masukkan nama kamera dan URL stream RTSP (contoh: `rtsp://admin:pass@192.168.1.100:554/stream1`).
-3. Pilih resolusi dan fungsi default (`Monitor`/`Modect`).
+   Bila kamera memakai password dengan karakter khusus (`@`, `:`, `/`), **tidak perlu
+   menulis `%40` manual** — lihat bagian *Penulisan URL RTSP & Password Khusus* di bawah.
+3. Pilih resolusi, **Analysis FPS** (default `8`), dan fungsi default (`Monitor`/`Modect`).
 4. Klik **Daftarkan Kamera**.
+
+#### Penulisan URL RTSP & Password Khusus
+
+Password kamera sering mengandung `@` (mis. `0p3r@t0r`, `PT@2024`). Dulu ini
+menghasilkan URL dengan dua `@` yang membuat ffmpeg membaca **host** sebagai
+`t0r@10.121.10.145` sehingga kamera tidak pernah mengirim frame. Sekarang dashboard
+menormalkannya otomatis:
+
+| Ditulis operator | Tersimpan di ZoneMinder | Catatan |
+| :--- | :--- | :--- |
+| `rtsp://operator:0p3r@t0r@10.121.10.145:554/Streaming/Channels/101` | `rtsp://operator:0p3r%40t0r@10.121.10.145:554/Streaming/Channels/101` | password utuh, host benar |
+| URL tanpa kredensial + kolom **Username**/**Password** diisi | kredensial digabung dengan encoding otomatis | karakter `@ : /` di-encode |
+| `rtsp://user:pa:ss@10.0.0.9:554/ch1` | `rtsp://user:pa%3Ass@10.0.0.9:554/ch1` | `:` di dalam password bukan port |
+
+Aturan yang dipakai: **userinfo = semua sebelum `@` terakhir yang diikuti bentuk
+`host[:port]` yang sah**; di dalam userinfo, `:` **pertama** memisahkan username dan
+password. Karena itu password yang mengandung `@` maupun `:` tetap utuh.
+
+Bila URL sudah memuat kredensial, kolom Username/Password terpisah **diabaikan**
+(dashboard memberi catatan di log form). Bila URL belum memuat kredensial, kolom itu
+yang dipakai.
+
+Semua perbaikan dilaporkan sebagai catatan (`path_warnings`) di log form dan tidak
+pernah menolak penyimpanan: kamera lama yang path-nya rusak ikut diperbaiki begitu
+operator menekan **💾 Perbarui Kamera**.
+
+Uji perilaku ini tanpa menyentuh database:
+```bash
+docker exec camera-dashboard python /app/_verify_rtsp_path.py
+docker exec camera-dashboard python /app/_e2e_rtsp_payload.py
+```
 
 ### 3. Mengelola & Mengedit Kamera di ZoneMinder
 1. Buka menu **Kelola Monitor ZoneMinder** (`https://<IP_SERVER>/zoneminder.html`).
@@ -343,12 +381,17 @@ zoneminder_cc/
 │   ├── wall_view.html         # Wall Dashboard: grid live kamera (grid, rasio, FPS)
 │   ├── requirements.txt       # Dependencies Python (Flask, Waitress)
 ├── zm-conf/
-│   ├── Dockerfile             # Image turunan ZM + tuning produksi
-│   ├── mysql-tuning.cnf       # Tuning MySQL (buffer pool, koneksi, flush)
+│   ├── Dockerfile             # Image turunan ZM 1.38.6 (base resmi) + tuning Apache
+│   ├── db-tuning.cnf          # Tuning MariaDB untuk service db (buffer pool, koneksi, flush)
 │   ├── apache-limit.conf      # Tuning Apache MPM (ServerLimit, worker, keepalive)
-│   └── zoneminder.conf        # Konfigurasi Apache ZoneMinder
+│   └── zoneminder.conf        # Referensi konfigurasi Apache ZoneMinder
+├── secrets/                   # Password DB (file-based secret, gitignored)
+│   ├── zm_db_pass.txt         # Password user `zmuser` untuk ZoneMinder
+│   └── mariadb_root_pass.txt  # Password root MariaDB (hanya untuk admin/import)
+├── backups/                   # Dump & konfigurasi pra-migrasi 1.36 (gitignored)
 └── scripts/
     ├── preflight.sh           # Cek kesiapan instalasi sebelum `docker compose up`
+    ├── fix_monitor_source_138.sh # Normalisasi sumber monitor 1.36 -> 1.38 (Method/Options)
     ├── renew_ssl.ps1          # Script auto-renew SSL untuk Windows
     └── renew_ssl.sh           # Script auto-renew SSL untuk Linux/WSL
 ```
@@ -366,11 +409,11 @@ dipilih konservatif: cukup lega untuk 100 kamera, tidak boros RAM.
 | :--- | :--- | :--- | :--- |
 | **ZoneMinder** | `shm_size` | **8 GB** | Buffer frame ~9 MB/kamera; 8 GB aman untuk 100+ kamera |
 | ZoneMinder | `ulimits.nofile` | 65536 | ZM membuka banyak file descriptor (event + shared memory) |
-| **MySQL** | `innodb_buffer_pool_size` | **2 GB** | Default hanya 128 MB → query event menyentuh disk |
-| MySQL | `innodb_buffer_pool_instances` | 4 | Hindari rebutan latch di CPU banyak |
-| MySQL | `innodb_flush_log_at_trx_commit` | 2 | Flush per detik, bukan per commit → jauh lebih cepat |
-| MySQL | `max_connections` | 500 | Default 151 terlalu kecil untuk checker + wall + API |
-| MySQL | `tmp_table_size` | 64 MB | Query event ZM butuh tabel sementara lebih besar |
+| **MariaDB** (`zm_db`) | `innodb_buffer_pool_size` | **2 GB** | Default dari image hanya 256 MB → query event menyentuh disk |
+| MariaDB | `innodb_buffer_pool_instances` | *(dihapus)* | Opsi ini tidak ada lagi di MariaDB 11.x; dibuang dari `db-tuning.cnf` agar log bersih |
+| MariaDB | `innodb_flush_log_at_trx_commit` | 2 | Flush per detik, bukan per commit → jauh lebih cepat |
+| MariaDB | `max_connections` | 500 | Default 151 terlalu kecil untuk checker + wall + API |
+| MariaDB | `tmp_table_size` | 64 MB | Query event ZM butuh tabel sementara lebih besar |
 | **Apache** | `ServerLimit` | 512 | **Wajib** — bila tidak diset, Apache memotong `MaxRequestWorkers` |
 | Apache | `MaxRequestWorkers` | 512 | Satu stream = satu worker; cukup untuk 100 kamera + web |
 | Apache | `KeepAlive` | On | Cegah buka-tutup koneksi pada streaming MJPEG |
@@ -378,7 +421,7 @@ dipilih konservatif: cukup lega untuk 100 kamera, tidak boros RAM.
 | CCTV Checker | Status awal | **Nonaktif (OFF)** | Mencegah pengecekan otomatis tanpa sepengetahuan operator |
 | **Konfigurasi** | Sumber kredensial | **`.env`** | Satu tempat untuk `ZM_USER`/`ZM_PASS`; ubah password tanpa edit kode |
 
-### Catatan penting: kenapa ZoneMinder memakai image turunan
+### Catatan penting: image turunan (Apache) vs tuning DB
 
 ZoneMinder **menolak file config yang world-writable**:
 
@@ -386,13 +429,22 @@ ZoneMinder **menolak file config yang world-writable**:
 [Warning] World-writable config file '...zz-zm-tuning.cnf' is ignored.
 ```
 
-Saat file config di-*bind mount* dari filesystem Windows (9p/drvfs), permission
+Saat file config **Apache** di-*bind mount* dari filesystem Windows (9p/drvfs), permission
 dipaksa menjadi `777` dan `chmod` gagal karena mount bersifat read-only. Akibatnya
-seluruh tuning MySQL diabaikan tanpa error yang jelas.
+seluruh tuning Apache diabaikan tanpa error yang jelas.
 
 Solusinya: [`zm-conf/Dockerfile`](zm-conf/Dockerfile) menyalin file config ke dalam
 layer image dengan permission `644`. Ini bekerja konsisten di host mana pun
 (Proxmox/ext4 maupun Windows), dan container tetap portabel.
+
+Untuk **MariaDB** tidak diperlukan image turunan: `zm-conf/db-tuning.cnf`
+di-mount read-only ke `/etc/mysql/conf.d/zz-zm-tuning.cnf` pada service `db`.
+Ini sudah diverifikasi bekerja di Windows — `docker compose logs db` bersih dari
+`world-writable ... ignored` maupun `deprecated`, dan nilai
+`innodb_buffer_pool_size` (2 GB), `max_connections` (500), serta
+`transaction_isolation` (READ-COMMITTED) benar-benar terpakai.
+Mengubah file itu cukup dengan `docker compose up -d --force-recreate db`
+(data di volume `zm_db_data` tidak terhapus).
 
 Setelah mengubah file di `zm-conf/`, wajib rebuild:
 
@@ -404,13 +456,13 @@ docker compose up -d zoneminder
 ### Cara verifikasi tuning sudah terpakai
 
 ```bash
-# MySQL — harus menampilkan 2048 MB, instances 4, maxconn 500
-docker exec zoneminder mysql -uroot -e \
+# MariaDB (service db) — harus menampilkan buffer pool 2 GB dan maxconn 500
+docker exec zm_db mariadb -uroot -p"$(cat /run/secrets/mariadb_root_pass)" -e \
   "SELECT @@innodb_buffer_pool_size/1024/1024 AS bufferpool_MB, \
-   @@innodb_buffer_pool_instances AS inst, @@max_connections AS maxconn;"
+   @@max_connections AS maxconn, @@transaction_isolation;"
 
 # Tidak boleh ada warning "world-writable"
-docker exec zoneminder tail -30 /var/log/mysql/error.log | grep -i world-writable
+docker compose logs db | grep -iE "world-writable|deprecated"
 
 # Apache — tidak boleh muncul warning "exceeds ServerLimit"
 docker exec zoneminder apache2ctl configtest
@@ -460,14 +512,266 @@ Lalu sesuaikan isinya:
 ### Troubleshooting:
 1. **Peringatan SSL di Browser (*Your connection is not private*):**
    Karena sertifikat dibuat secara mandiri (*self-signed*), klik tombol **Advanced** (Lanjutan) lalu pilih **Proceed to `<IP_SERVER>` (unsafe)**. Ini normal untuk sertifikat lokal.
-2. **Error Kredensial Saat Build Docker (*error getting credentials*):**
-   Hapus baris `"credsStore": "desktop"` dari berkas konfigurasi Docker komputer Anda (`~/.docker/config.json`), lalu jalankan `docker compose build` kembali.
+2. **Error Kredensial Saat Build Docker (*error getting credentials - err: exit status 1, out: ``*):**
+   Ini BUKAN masalah kredensial. Penyebab sebenarnya adalah **gerbang entitlement pada
+   `docker compose build`** (Compose v5.x memakai bake/buildx), yang menolak membaca Dockerfile
+   di luar konteks lalu menampilkan pesan menyesatkan:
+
+   ```
+   additional privileges requested: pass "--allow=fs.read=zm-conf\Dockerfile" to grant requested privileges
+   ```
+
+   **Jangan** mengubah `~/.docker/config.json` dan **jangan** menghapus `credsStore` —
+   keduanya tidak berhubungan dan justru merusak login registry Anda.
+
+   **Solusi yang terbukti bekerja** (buildx v0.38.1) — tambahkan `--allow=fs.read=.`:
+
+   ```bash
+   docker buildx bake --allow=fs.read=. -f docker-compose.yml \
+     --set zoneminder.tags=zoneminder_tuned:1.38.6 \
+     --set ui-interface.tags=zoneminder_cc-ui-interface:latest \
+     --set cctv-checker.tags=zoneminder_cc-cctv-checker:latest
+
+   docker compose up -d
+   ```
+
+   **Alternatif** bila bake tetap bermasalah — build per service dengan builder klasik:
+
+   ```bash
+   docker build -t zoneminder_tuned:1.38.6   -f zm-conf/Dockerfile        zm-conf
+   docker build -t zoneminder_cc-ui-interface:latest     -f html_dashboard/Dockerfile html_dashboard
+   docker build -t zoneminder_cc-cctv-checker:latest     -f cctv_checker/Dockerfile   cctv_checker
+   docker compose up -d
+   ```
+
+   > Catatan: `docker compose build` **tidak** menyediakan flag `--allow`, sehingga
+   > `docker compose up -d --build` akan selalu gagal pada versi Compose ini.
 3. **Melihat Log Kontainer Tertentu:**
    ```bash
    # Log CCTV Checker:
    docker logs -f cctv_checker_service
    # Log Caddy Proxy:
    docker logs -f caddy_proxy
-   # Log ZoneMinder:
+   # Log ZoneMinder 1.38.6:
    docker logs -f zoneminder
+   # Log Database (MariaDB):
+   docker logs -f zm_db
    ```
+4. **Log ZoneMinder penuh peringatan `Unknown method (rtsp)` / `Option rtsp_transport not recognized by ffmpeg`:**
+   Kamera masih memakai setelan sumber 1.36. Jalankan `bash scripts/fix_monitor_source_138.sh`
+   (lihat bagian *Perbaikan sumber kamera setelah migrasi* di dokumen ini).
+5. **Dashboard melaporkan "berhasil", tetapi kamera tidak pernah muncul di ZoneMinder:**
+   Ini bug API ZoneMinder 1.38 yang **sudah diperbaiki** di `html_dashboard/app.py`.
+   Dua penyebabnya, keduanya mudah terlewat:
+
+   **a. `Monitor[Device]` wajib dikirim walau kosong.**
+   Model `Monitor` di ZM 1.38 memvalidasi kolom `Device` dengan regex
+   `#^(/dev/[\w/.\-]+)?$#` dan `allowEmpty => true`. Namun `allowEmpty` hanya
+   berlaku bila **kuncinya ada** di data. Kalau `Monitor[Device]` tidak dikirim
+   sama sekali, nilai `NULL` dilewatkan ke regex dan validasi **GAGAL**, walau
+   kolomnya `NOT NULL DEFAULT ''`. Jadi selalu kirim `Monitor[Device]=` (string kosong).
+
+   **b. Sukses ditentukan oleh `message`, bukan status HTTP.**
+   `POST /monitors.json` membalas **HTTP 200 untuk dua kondisi berbeda**:
+
+   ```json
+   {"message":"Saved"}                                  <- berhasil
+   {"message":{"Device":["Invalid device path. ..."]}}  <- GAGAL validasi
+   ```
+
+   Kode yang hanya memeriksa `status_code == 200` akan melaporkan sukses palsu.
+   Karena itu semua jalur memakai `zm_post_monitor()` di `app.py`, yang membaca
+   isi respons dan meneruskan pesan asli ZoneMinder ke UI.
+
+   **Cek cepat bahwa perbaikan aktif:**
+
+   ```bash
+   docker exec camera-dashboard python /app/error_path_test.py   # jalur error
+   docker exec camera-dashboard python /app/e2e_api_test.py      # tambah/edit/hapus
+   docker exec camera-dashboard python /app/burst_api_test.py    # burst massal
+   ```
+
+   Semua harus berakhir dengan `SEMUA PEMERIKSAAN ... LULUS`.
+
+   > Setelah mengubah `app.py`, **restart** container dashboard:
+   > `docker compose restart ui-interface`. Tanpa restart, kode lama masih
+   > berjalan di memori dan bug tetap muncul.
+
+6. **Monitor yang dihapus masih terlihat di API ZoneMinder:**
+   Itu normal. ZM memakai **soft delete**: baris tidak dibuang, hanya ditandai
+   `Deleted=1`, dan daftar monitor di konsol menyembunyikannya. Untuk
+   membersihkan baris sisa monitor uji:
+
+   ```bash
+   bash scripts/dbclean.sh
+   ```
+
+7. **Kamera berjalan lebih cepat dari target (mis. 15–25 fps padahal target 10 fps):**
+   Kolom `MaxFPS` di tabel `Monitors` masih `NULL`. ZoneMinder membedakan dua
+   batas laju yang mudah tertukar:
+
+   | Kolom | Yang dibatasi | Komponen |
+   |---|---|---|
+   | `AnalysisFPSLimit` | laju **analisa motion** | `zma` |
+   | `MaxFPS` | laju **capture** | `zmc` |
+
+   Selama `MaxFPS` `NULL`, `zmc` menelan stream secepat laju asli kamera.
+   Terukur di server ini (kamera 25 fps, target 10 fps):
+
+   ```text
+   MaxFPS = NULL  ->  CaptureFPS 14.98 (CAM_SQ_01), 25.10 (CAM_SQ_02)
+   MaxFPS = 10    ->  CaptureFPS 10.00 (keduanya)
+   ```
+
+   Pembatasan dilakukan di sisi capture, jadi CPU dan I/O ikut turun — ini yang
+   membuat target 60 kamera @ 10 fps masuk akal. Dashboard sekarang mengirim
+   `MaxFPS` dan `AlarmMaxFPS` otomatis untuk setiap kamera baru
+   (`CAPTURE_FPS_DEFAULT` di `html_dashboard/rtsp_path.py`).
+
+   **Catatan penting:** komentar lama di `rtsp_path.py` menyatakan `MaxFPS`
+   sengaja tidak dikirim "karena membuat zmc membuang frame". Itu **keliru** dan
+   sudah dikoreksi. Untuk kamera yang terlanjur dibuat sebelum perbaikan:
+
+   ```bash
+   bash scripts/dbq.sh "UPDATE Monitors SET MaxFPS=10, AlarmMaxFPS=10 WHERE MaxFPS IS NULL"
+   docker exec zoneminder zmdc.pl restart zmc -m <IdMonitor>
+   ```
+
+8. **`Option timeout not recognized by ffmpeg` di log `zmc`:**
+   **Aman, kosmetik.** `zmc` 1.38 punya daftar opsi ffmpeg internal sendiri
+   (`thread_count`, `probesize`, `reorder_queue_size`, `buffer_size`,
+   `rtsp_transport`, …). `timeout` tidak ada di daftar itu sehingga `zmc`
+   memperingatkan — tetapi nilainya **tetap diteruskan** ke `av_dict` dan ffmpeg
+   7.1 memakainya sebagai timeout socket RTSP. Buktinya:
+
+   ```bash
+   docker exec zoneminder ffmpeg -hide_banner -rtsp_transport tcp \
+       -timeout 5000000 -i rtsp://10.121.10.145:554/x -t 1 -f null -
+   # -> mencoba koneksi sungguhan (kamera membalas 401), bukan "option not found"
+   ```
+
+   `scripts/verify_monitors.sh` sengaja **tidak** menghitung peringatan ini;
+   kalau dihitung, pemeriksaan akan selalu gagal untuk konfigurasi yang sehat.
+
+---
+
+## 🔄 Migrasi ZoneMinder 1.36.32 → 1.38.6 (image resmi)
+
+Dilakukan pada 2026-11-18. Ringkasnya: **bukan ganti tag**, tapi pindah
+arsitektur. Versi lama memakai image turunan `pppasantos/zoneminder` (Ubuntu
+18.04 + MySQL 5.7 **di dalam** container), versi baru memakai image resmi
+`zoneminder/zoneminder:1.38.6` (Debian) yang **mewajibkan database eksternal**.
+
+### Apa yang berubah
+
+| Hal | Sebelum (1.36.32) | Sesudah (1.38.6) |
+| :--- | :--- | :--- |
+| Image ZM | `zoneminder_tuned:latest` (turunan `pppasantos/zoneminder`) | `zoneminder_tuned:1.38.6` (turunan `zoneminder/zoneminder:1.38.6`) |
+| Database | mysqld di dalam container ZM, volume `zoneminder_mysql` | service `db` = `mariadb:11.8`, volume `zm_db_data` |
+| Path event | **efektif** `/var/cache/zoneminder/events` (volume anonim), walau compose menamai `/var/lib/zoneminder/events` | `/var/cache/zoneminder` (volume `zm_cache`) — path benar-benar cocok |
+| Log ZM | volume anonim | volume `zm_logs` (`/var/log/zm`) |
+| Entrypoint | `entrypoint.sh` (bash) | s6-overlay (butuh tmpfs `/run` dengan `exec`) |
+| Kredensial DB | tidak ada (DB lokal tanpa password aplikasi) | docker secret `secrets/zm_db_pass.txt` → `ZM_DB_PASS_FILE` |
+| Tuning MySQL | `zz-zm-tuning.cnf` di image ZM | `zm-conf/db-tuning.cnf` di service `db` |
+| `zm-root.conf` | dipakai (ZM 1.36 memancarkan URL `/zm/` dari root) | **dihapus** — image resmi sudah `RedirectMatch ^/$ /zm/` di `zm-docker.conf` |
+| go2rtc | tidak ada | ada di `/zm/go2rtc/`; **diblokir 404 di `:443`** karena API-nya tanpa login |
+| Tag | `latest` (bergerak) | **pin eksplisit** `1.38.6` (bukan `latest`, bukan `-es`) |
+
+### Langkah yang dijalankan (ringkas, bisa diulang)
+
+```bash
+# 1. Backup — WAJIB, skema 1.38 tidak bisa diturunkan oleh kode 1.36
+docker exec zoneminder mysqldump --single-transaction --routines --triggers zm > backups/zm_pre_138.sql
+docker tag zoneminder_tuned:latest zoneminder_tuned:rollback-13632
+
+# 2. Database baru + import dump
+docker compose up -d db
+docker cp scripts/_db_root.sh zm_db:/tmp/dbroot.sh
+docker exec -i zm_db sh /tmp/dbroot.sh --default-character-set=utf8mb4 zm < backups/zm_pre_138.sql
+
+# 3. ZoneMinder baru (otomatis menjalankan zmupdate.pl 1.36.32 -> 1.38.6)
+docker compose up -d
+
+# 4. Verifikasi
+docker compose logs zoneminder | grep -i "database upgrade"
+docker exec cctv_checker_service python3 /tmp/api_parity.py   # uji parity API (lihat scripts/_api_parity.py)
+```
+
+### Verifikasi yang sudah lulus
+
+| Uji | Hasil |
+| :--- | :--- |
+| Upgrade skema `zmupdate.pl` | `Database upgrade to version 1.38.6 successful` (1.36.32 → 1.37.76 … → 1.38.6) |
+| Tuning MariaDB | pool **2 GB**, `max_connections` **500**, `transaction_isolation` **READ-COMMITTED**, TZ `+07:00`, `utf8mb4` |
+| Tuning Apache | `apache-limit.conf` terpasang (644), `apache2ctl -t` → **Syntax OK**, 19 proses prefork |
+| `GET /zm/api/monitors.json` | **200**, 2 monitor, field `Function`/`Enabled` utuh |
+| `POST /zm/api/monitors/{id}.json` (`Monitor[Function]`) | **200** `{"message":"Saved"}` — auto-switch checker aman, tanpa drift state |
+| `POST /zm/api/host/login.json` | **200** + `access_token` (dipakai dashboard & checker) |
+| Capture | `Monitor_Status`: kedua monitor `Connected`, **10 fps** |
+| Dashboard `:9443` | `/login` **200**, `/zm/api/*` **401** (auth ZM tetap aktif) |
+| go2rtc publik | `https://<host>/zm/go2rtc/...` → **404 dari Caddy** (tidak sampai Apache) |
+| Jejak MQTT | tetap **nol** di config aktif (hanya tersisa di riwayat git) |
+
+### Perbaikan sumber kamera setelah migrasi (Method 1.36 → 1.38)
+
+Setelah dump 1.36 diimpor, monitor masih membawa setelan sumber versi lama.
+Gejalanya di log ZoneMinder (`zmc_mN`, level **WAR**):
+
+```
+Option rtsp_transport not recognized by ffmpeg   zm_ffmpeg_camera.cpp 574
+Unknown method (rtsp)                            zm_ffmpeg_camera.cpp 315
+```
+
+Penyebabnya: skema 1.36 menyimpan `Monitors.Method = 'rtsp'` (nilai tipe sumber
+**Remote** versi lama) dan menaruh transport di `Monitors.Options`. Di 1.38,
+untuk tipe sumber **Ffmpeg**, zmc sendiri yang menerjemahkan `Method` menjadi
+opsi transport ffmpeg — terverifikasi dari string binary `/usr/bin/zmc`:
+
+| `Monitor.Method` | Opsi ffmpeg yang dipasang zmc |
+| :--- | :--- |
+| `rtpRtsp` | `rtsp_transport=tcp` |
+| `rtpUni` | `rtsp_transport=udp` |
+| `rtpMulti` | `rtsp_transport=udp_multicast` |
+| `rtpRtspHttp` | `rtsp_transport=http` |
+| selain itu | `Unknown method (<nilai>)` — transport **tidak** disetel |
+
+Karena transport sudah diurus `Method`, sisa `rtsp_transport=...` di
+`Monitor[Options]` diteruskan apa adanya ke ffmpeg sebagai opsi level format
+(padahal itu opsi demuxer RTSP) sehingga muncul peringatan kedua.
+
+Perbaikan (idempoten, aman diulang):
+
+```bash
+DRY_RUN=1 bash scripts/fix_monitor_source_138.sh   # lihat rencana dulu
+bash scripts/fix_monitor_source_138.sh             # terapkan + restart zmc
+RESTART_ALL=1 bash scripts/fix_monitor_source_138.sh  # hanya restart proses zmc/zma
+```
+
+Skrip ini: mengganti `Method` yang tidak dikenal menjadi `rtpRtsp` (TCP), membuang
+token `rtsp_transport=...` dari `Options`, lalu me-restart `zmc`/`zma` monitor
+yang berubah. Kode dashboard/checker juga sudah tidak lagi menulis `Method=rtsp`
+(lihat `ZM_FFMPEG_METHOD` di `html_dashboard/app.py`), jadi kamera baru tidak
+akan menghasilkan peringatan ini lagi.
+
+> Catatan: `zmc` hanya membaca konfigurasi monitor saat start. Mengubah
+> database tanpa restart membuat proses lama tetap memakai `Method` lama —
+> karena itu restart adalah bagian wajib dari perbaikan.
+
+### Rollback (kalau 1.38 bermasalah)
+
+```bash
+docker compose down                       # JANGAN pakai -v
+cp backups/docker-compose-1.36.yml docker-compose.yml
+docker tag zoneminder_tuned:rollback-13632 zoneminder_tuned:latest
+cp backups/Dockerfile-1.36 zm-conf/Dockerfile          # agar build tidak memakai base 1.38
+cp backups/mysql-tuning-1.36.cnf zm-conf/mysql-tuning.cnf
+docker compose up -d --no-build           # container lama memakai DB-nya sendiri
+# Volume zoneminder_mysql TIDAK ikut dimigrasi (migrasi lewat dump), jadi
+# datanya masih skema 1.36 asli. Kalau volume itu hilang, pulihkan dari dump:
+#   docker exec -i zoneminder mysql zm < backups/zm_pre_138.sql
+```
+
+> **Penting:** begitu `zmupdate.pl` menaikkan skema ke 1.38, container 1.36
+> hanya mau jalan dengan database yang **dipulihkan dari dump** di atas.
+> Volume lama (`zoneminder_mysql`, `zoneminder_events`, `zoneminder_images`)
+> sengaja masih dideklarasikan di `docker-compose.yml` agar tidak terhapus.

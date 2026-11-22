@@ -4,196 +4,172 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - CCTV Management Dashboard</title>
+  <link rel="stylesheet" href="app_ui.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --border: #334155;
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --warning: #fbbf24;
-    }
     body {
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 20% 15%, rgba(37,99,235,.22), transparent 45%),
-        radial-gradient(circle at 80% 85%, rgba(2,132,199,.18), transparent 45%),
-        #0b1220;
+      background: radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.08), transparent 35%),
+                  radial-gradient(circle at 90% 80%, rgba(2, 132, 199, 0.06), transparent 35%),
+                  var(--bg-page);
     }
     .login-card {
       width: 100%;
-      max-width: 430px;
-      background: rgba(30, 41, 59, .92);
+      max-width: 420px;
+      background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 34px 30px 28px;
-      box-shadow: 0 24px 60px rgba(0,0,0,.45);
-      backdrop-filter: blur(6px);
+      border-radius: var(--radius-lg);
+      padding: 36px 32px 30px;
+      box-shadow: var(--shadow-lg);
     }
-    .brand { text-align: center; margin-bottom: 26px; }
-    .brand .logo {
-      width: 58px; height: 58px; margin: 0 auto 14px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 28px; border-radius: 14px;
-      background: linear-gradient(135deg, #1d4ed8, #0284c7);
-      box-shadow: 0 8px 22px rgba(29,78,216,.42);
+    .brand {
+      text-align: center;
+      margin-bottom: 28px;
     }
-    .brand h1 { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
-    .brand p { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
-    .badge-port {
-      display: inline-block; margin-top: 8px; padding: 3px 10px;
-      font-size: 11px; font-weight: 600; border-radius: 999px;
-      background: rgba(37,99,235,.18); color: #93c5fd; border: 1px solid rgba(37,99,235,.4);
+    .brand-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      border-radius: var(--radius-md);
+      background: var(--primary-soft);
+      color: var(--primary);
+      border: 1px solid var(--border);
     }
-
-    .alert {
-      padding: 11px 13px; border-radius: 9px; font-size: 12.5px;
-      margin-bottom: 16px; line-height: 1.55;
-      background: rgba(220,38,38,.14); border: 1px solid rgba(248,113,113,.4); color: #fecaca;
+    .brand h1 {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--text-primary);
     }
-
-    .field { margin-bottom: 15px; }
-    .field label {
-      display: block; font-size: 12px; font-weight: 600;
-      margin-bottom: 6px; color: #cbd5e1;
+    .brand p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.4;
     }
-    .field input {
-      width: 100%; height: 42px; padding: 0 13px;
-      font-size: 14px; color: var(--text);
-      background: rgba(15,23,42,.85);
-      border: 1px solid var(--border); border-radius: 9px;
-      outline: none; transition: border-color .18s, box-shadow .18s;
+    .pw-wrapper {
+      position: relative;
     }
-    .field input:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37,99,235,.18);
+    .pw-toggle-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
     }
-    .field input::placeholder { color: #64748b; }
-
-    .pw-wrap { position: relative; }
-    .pw-toggle {
-      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-      height: 28px; padding: 0 10px; font-size: 11.5px; font-weight: 600;
-      color: var(--muted); background: rgba(51,65,85,.65);
-      border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    .pw-toggle-btn:hover {
+      color: var(--text-primary);
     }
-    .pw-toggle:hover { color: var(--text); }
-
-    .btn-login {
-      width: 100%; height: 44px; margin-top: 6px;
-      font-size: 14px; font-weight: 700; color: #fff; cursor: pointer;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      border: none; border-radius: 9px; transition: filter .18s;
+    .hint-container {
+      margin-top: 20px;
+      padding: 14px;
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--warning);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
     }
-    .btn-login:hover { filter: brightness(1.08); }
-    .btn-login:disabled { opacity: .6; cursor: not-allowed; }
-
-    .hint-box {
-      margin-top: 18px; padding: 13px 15px;
-      background: rgba(15,23,42,.7);
-      border: 1px solid var(--border); border-left: 3px solid var(--warning);
-      border-radius: 0 9px 9px 0;
-      font-size: 12.5px; line-height: 1.65; color: #cbd5e1;
+    .hint-container h4 {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--warning-text);
+      margin-bottom: 6px;
     }
-    .hint-box h4 {
-      font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
-      color: var(--warning); margin-bottom: 7px;
+    .hint-container code {
+      font-family: var(--font-mono);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--text-primary);
     }
-    .hint-box code {
-      background: rgba(2,132,199,.2); color: #7dd3fc;
-      padding: 2px 6px; border-radius: 4px; font-size: 12px;
-    }
-    .hint-box ol { margin: 8px 0 0 17px; }
-    .hint-box li { margin-bottom: 3px; }
-
-    footer {
-      margin-top: 22px; text-align: center;
-      font-size: 11px; color: #64748b; line-height: 1.6;
-    }
-    footer a { color: #93c5fd; text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="login-card">
     <div class="brand">
-      <div class="logo">&#128737;&#65039;</div>
-      <h1>CCTV Management Dashboard</h1>
-      <p>Halaman manajemen kamera, Burst Add, dan kesehatan kamera.<br>Terpisah dari ZoneMinder yang ada di alamat utama.</p>
-      <span class="badge-port">{{ host_label }}</span>
+      <div class="brand-icon">&#128737;&#65039;</div>
+      <h1>CCTV Management</h1>
+      <p>Dashboard Terpusat ZoneMinder NVR &bull; Port :9443</p>
+      <span class="badge badge-neutral" style="margin-top: 8px;">{{ host_label }}</span>
     </div>
 
     {% if error %}
-    <div class="alert">&#9888;&#65039; {{ error }}</div>
+    <div style="background: var(--danger-soft); border: 1px solid var(--danger); color: var(--danger-text); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12.5px; margin-bottom: 16px;">
+      &#9888;&#65039; {{ error }}
+    </div>
     {% endif %}
 
     <form method="POST" action="/login{% if next_url %}?next={{ next_url | urlencode }}{% endif %}" autocomplete="on">
-      <div class="field">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" placeholder="admin"
-               autocomplete="username" autofocus required>
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <input type="text" id="username" name="username" class="form-control" placeholder="admin" autocomplete="username" autofocus required>
       </div>
 
-      <div class="field">
-        <label for="password">Password</label>
-        <div class="pw-wrap">
-          <input type="password" id="password" name="password" placeholder="********"
-                 autocomplete="current-password" required>
-          <button type="button" class="pw-toggle" id="pwToggle" onclick="togglePassword()">Lihat</button>
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="pw-wrapper">
+          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle-btn" id="pwToggle" onclick="togglePassword()">Lihat</button>
         </div>
       </div>
 
-      <button type="submit" class="btn-login" id="btnLogin">Masuk Dashboard</button>
+      <div style="margin-top: 20px;">
+        <button type="submit" class="btn btn-primary btn-lg" id="btnLogin" style="width: 100%;">
+          Masuk Dashboard &rarr;
+        </button>
+      </div>
     </form>
 
-    <div class="hint-box">
-      <h4>Petunjuk Login Pertama Kali</h4>
-      Gunakan kredensial bawaan berikut, lalu <b>segera ganti password</b>:
-      <ol>
-        <li>Username: <code>admin</code></li>
-        <li>Password: <code>admin</code></li>
-        <li>Setelah masuk, Anda langsung diarahkan ke <b>Pengaturan</b> untuk mengganti password dan mengisi kredensial ZoneMinder.</li>
-      </ol>
-      <div style="margin-top:9px; color:var(--muted);">
-        Petunjuk ini hanya berlaku selama password default belum diganti. Setelah
-        diganti, catat password baru Anda &mdash; password disimpan sebagai hash
-        dan tidak dapat dipulihkan.
+    <div class="hint-container">
+      <h4>Petunjuk Akun Bawaan</h4>
+      Gunakan akun bawaan untuk login pertama:
+      <div style="margin-top: 4px;">
+        Username: <code>admin</code> &bull; Password: <code>admin</code>
+      </div>
+      <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted);">
+        Setelah login, Anda wajib segera memperbarui password di menu Pengaturan.
       </div>
     </div>
 
-    <footer>
-      Halaman ZoneMinder: <a href="/zm/" id="zmLink">buka ZoneMinder Web</a><br>
-      Akses dashboard hanya tersedia melalui port ini.
-    </footer>
+    <div style="margin-top: 22px; text-align: center; font-size: 11.5px; color: var(--text-muted);">
+      ZoneMinder NVR: <a href="/zm/" id="zmLink" style="color: var(--primary); text-decoration: none; font-weight: 600;">buka Web Console bawaan</a>
+    </div>
   </div>
 
   <script>
-    // Tautan ZoneMinder mengikuti host yang sedang dipakai, jadi tidak ada
-    // alamat hardcoded yang perlu diubah saat IP server berubah.
     (function () {
-      var link = document.getElementById('zmLink');
+      const link = document.getElementById('zmLink');
       if (link) {
         link.href = window.location.protocol + '//' + window.location.hostname + '/zm/';
       }
     })();
 
     function togglePassword() {
-      var input = document.getElementById('password');
-      var btn = document.getElementById('pwToggle');
-      var shown = input.type === 'text';
-      input.type = shown ? 'password' : 'text';
-      btn.innerText = shown ? 'Lihat' : 'Sembunyikan';
+      const input = document.getElementById('password');
+      const btn = document.getElementById('pwToggle');
+      const isText = input.type === 'text';
+      input.type = isText ? 'password' : 'text';
+      btn.innerText = isText ? 'Lihat' : 'Sembunyikan';
     }
 
     document.querySelector('form').addEventListener('submit', function () {
-      var btn = document.getElementById('btnLogin');
+      const btn = document.getElementById('btnLogin');
       btn.disabled = true;
       btn.innerText = 'Memverifikasi...';
     });

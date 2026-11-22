@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kontrol CCTV Health Checker - ZoneMinder</title>
+  <link rel="stylesheet" href="app_ui.css">
+  
+</head>
+<body>
+  <header id="dashHeader"></header>
+
+  <div class="container">
+    <div class="flex items-center justify-between flex-wrap gap-3" style="margin-bottom: 24px;">
+      <div>
+        <h1 style="font-size: 20px;">Kontrol CCTV Health Checker</h1>
+        <p class="text-sm text-secondary" style="margin-top: 3px;">
+          Pengaturan background service penguji konektivitas RTSP kamera dan pemulihan triad otomatis.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="status.html" class="btn btn-outline btn-sm">&larr; Status Server</a>
+        <button class="btn btn-outline btn-sm" onclick="loadChecker()" id="btnRefreshChecker">
+          <span>&#8635; Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom: 24px;">
+      <div class="stat-box">
+        <div class="stat-icon stat-icon--warning">&#9881;&#65039;</div>
+        <div class="stat-content">
+          <div class="stat-label">Status Checker</div>
+          <div class="stat-value" id="valCheckerStatus" style="font-size: 18px;">-</div>
+          <div class="stat-desc" id="valCheckerDesc">Interval: -</div>
+        </div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon stat-icon--info">&#128337;</div>
+        <div class="stat-content">
+          <div class="stat-label">Terakhir Diperiksa</div>
+          <div class="stat-value mono" id="valLastCheck" style="font-size: 15px;">-</div>
+          <div class="stat-desc">Waktu siklus pemeriksaan terakhir</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">&#9881;&#65039; Kendali CCTV Health Checker</div>
+          <div class="card-subtitle">Aktifkan, jeda, atur interval, dan picu pemeriksaan seketika</div>
+        </div>
+        <span id="badgeCheckerState" class="badge badge-neutral">Memuat...</span>
+      </div>
+
+      <div class="card-body" style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="panel-soft">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <div class="font-semibold text-sm">Status Operasional Checker</div>
+              <div class="text-xs text-muted" style="margin-top: 2px;">
+                Saat aktif, checker menguji socket RTSP secara berkala dan memulihkan triad kamera.
+              </div>
+            </div>
+            <button id="btnToggleChecker" class="btn btn-primary" onclick="toggleCheckerActive()">Memuat...</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label" for="inputInterval">Interval Pengecekan Berkala (Detik)</label>
+          <div class="flex items-center gap-2 flex-wrap" style="margin-bottom: 10px;">
+            <input type="number" id="inputInterval" class="form-control" style="max-width: 160px;"
+                   min="5" max="3600" step="5" value="600">
+            <button class="btn btn-secondary" onclick="saveCheckerInterval()">&#128190; Simpan Interval</button>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs text-muted">Preset cepat:</span>
+            <button class="preset-btn" onclick="setPreset(60)">1 Menit</button>
+            <button class="preset-btn" onclick="setPreset(300)">5 Menit</button>
+            <button class="preset-btn" onclick="setPreset(600)">10 Menit</button>
+            <button class="preset-btn" onclick="setPreset(1800)">30 Menit</button>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 18px;">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <div class="font-semibold text-sm">⚡ Pemeriksaan Kamera Seketika</div>
+              <div class="text-xs text-muted" style="margin-top: 2px;">
+                Uji konektivitas RTSP seluruh kamera saat ini juga tanpa menunggu interval.
+              </div>
+            </div>
+            <button id="btnRunNow" class="btn btn-warning" onclick="triggerCheckNow()">⚡ Cek Sekarang</button>
+          </div>
+          <div id="runNowFeedback" class="text-xs" style="margin-top: 8px; display: none;"></div>
+        </div>
+
+        <div class="card-footer" style="border-radius: var(--radius-sm); border: 1px solid var(--border);">
+          <span class="text-xs font-semibold text-secondary">&#128196; Pantau log container</span>
+          <span class="text-xs text-muted mono">docker logs -f cctv_checker_service</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    ZoneMinder Central CCTV Management &mdash; Kontrol CCTV Health Checker
+  </footer>
+
+  <script src="app_shell.js"></script>
+  <script>
+    let checkerConfig = { enabled: false, interval: 600 };
+
+    async function loadChecker() {
+      const btn = document.getElementById('btnRefreshChecker');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch('/api/checker/config');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        checkerConfig = await res.json();
+        renderCheckerUI();
+      } catch (err) {
+        console.error('Gagal memuat checker:', err);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function renderCheckerUI() {
+      const isEnabled = Boolean(checkerConfig.enabled);
+      const badgeState = document.getElementById('badgeCheckerState');
+      const valStatus = document.getElementById('valCheckerStatus');
+      const valDesc = document.getElementById('valCheckerDesc');
+      const valLast = document.getElementById('valLastCheck');
+      const btnToggle = document.getElementById('btnToggleChecker');
+      const inputInterval = document.getElementById('inputInterval');
+
+      if (inputInterval && checkerConfig.interval) inputInterval.value = checkerConfig.interval;
+      if (valLast) valLast.textContent = checkerConfig.last_check || 'Belum ada catatan';
+
+      if (isEnabled) {
+        badgeState.className = 'badge badge-success';
+        badgeState.innerHTML = '<span class="status-dot online pulse"></span> Berjalan';
+        valStatus.innerHTML = '<span class="status-dot online pulse"></span> Running';
+        btnToggle.className = 'btn btn-secondary';
+        btnToggle.innerHTML = '&#9208; Jeda Checker';
+      } else {
+        badgeState.className = 'badge badge-warning';
+        badgeState.innerHTML = '<span class="status-dot offline"></span> Dijeda';
+        valStatus.innerHTML = '<span class="status-dot offline"></span> Paused';
+        btnToggle.className = 'btn btn-primary';
+        btnToggle.innerHTML = '&#9654; Aktifkan Checker';
+      }
+      valDesc.textContent = 'Interval: ' + (checkerConfig.interval || 600) + 's';
+    }
+
+    async function toggleCheckerActive() {
+      const targetState = !checkerConfig.enabled;
+      const btn = document.getElementById('btnToggleChecker');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/checker/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: targetState })
+        });
+        const data = await res.json();
+        if (data.status === 'success' || data.config) {
+          checkerConfig = data.config || checkerConfig;
+          checkerConfig.enabled = targetState;
+          renderCheckerUI();
+          window.showToast(targetState ? 'Checker diaktifkan.' : 'Checker dijeda.',
+                            targetState ? 'success' : 'info');
+        } else {
+          throw new Error(data.message || 'Gagal mengubah status');
+        }
+      } catch (err) {
+        window.showToast(err.message, 'error', 'Gagal Mengubah Status');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function setPreset(sec) {
+      document.getElementById('inputInterval').value = sec;
+      saveCheckerInterval();
+    }
+
+    async function saveCheckerInterval() {
+      const val = parseInt(document.getElementById('inputInterval').value, 10);
+      if (isNaN(val) || val < 5) {
+        window.showToast('Interval minimal adalah 5 detik.', 'warning');
+        return;
+      }
+      try {
+        const res = await fetch('/api/checker/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interval: val })
+        });
+        const data = await res.json();
+        if (data.status === 'success' || data.config) {
+          checkerConfig.interval = val;
+          renderCheckerUI();
+          window.showToast('Interval disimpan: ' + val + ' detik.', 'success');
+        } else {
+          throw new Error(data.message || 'Gagal menyimpan interval');
+        }
+      } catch (err) {
+        window.showToast(err.message, 'error', 'Gagal Menyimpan');
+      }
+    }
+
+    async function triggerCheckNow() {
+      const btn = document.getElementById('btnRunNow');
+      const feedback = document.getElementById('runNowFeedback');
+      btn.disabled = true;
+      btn.innerHTML = '&#9203; Memeriksa...';
+      feedback.style.display = 'block';
+      feedback.innerHTML = '<span class="status-dot online pulse"></span> Siklus pemeriksaan instan sedang dieksekusi...';
+      try {
+        const res = await fetch('/api/checker/run-now', { method: 'POST' });
+        const data = await res.json();
+        window.showToast(data.message || 'Pemeriksaan instan dipicu!', 'success', 'Cek Sekarang');
+        setTimeout(async () => {
+          await loadChecker();
+          feedback.innerHTML = '&#9989; Siklus pemeriksaan selesai. Hasil tercatat di log.';
+          setTimeout(() => { feedback.style.display = 'none'; }, 5000);
+        }, 3000);
+      } catch (err) {
+        window.showToast(err.message, 'error', 'Error Pemicuan');
+        feedback.style.display = 'none';
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = '⚡ Cek Sekarang';
+        }, 3000);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadChecker);
+  </script>
+</body>
+</html>

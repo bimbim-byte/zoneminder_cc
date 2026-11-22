@@ -3,221 +3,224 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tambah Kamera Tunggal - ZoneMinder</title>
+  <title>Tambah Kamera CCTV - ZoneMinder v1.38.6</title>
+  <link rel="stylesheet" href="app_ui.css">
   <style>
-    * { box-sizing: border-box; }
-    :root {
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --success: #16a34a;
-      --danger: #dc2626;
-      --bg: #f8fafc;
-      --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #1e293b;
-      --muted: #64748b;
+    .form-container {
+      max-width: 820px;
+      margin: 0 auto;
     }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    .triad-card {
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      margin-top: 8px;
     }
-    header {
-      background: linear-gradient(135deg, #0f172a, #1e293b);
-      color: white;
-      padding: 16px 28px;
-      display: flex;
-      justify-content: space-between;
+    .triad-badge-preview {
+      display: inline-flex;
       align-items: center;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    }
-    header h1 { margin: 0; font-size: 19px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    .back-btn {
-      color: white;
-      text-decoration: none;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.25);
-      padding: 7px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      transition: .2s;
-    }
-    .back-btn:hover { background: rgba(255,255,255,0.22); }
-    .container {
-      width: min(720px, calc(100% - 32px));
-      margin: 28px auto;
-    }
-    .card {
-      background: var(--card);
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      margin-bottom: 20px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.03);
-      overflow: hidden;
+      margin-top: 8px;
     }
-    .card-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-      background: #fdfdfe;
-      font-weight: 600;
-      font-size: 15px;
-    }
-    .card-body { padding: 22px 20px; }
-    .form-group { margin-bottom: 16px; }
-    .form-group label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 6px;
-      color: var(--text);
-    }
-    .form-control {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      font-size: 14px;
-      color: var(--text);
-      background: #fff;
-      transition: border-color .2s;
-    }
-    .form-control:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
-    }
-    .form-hint {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 5px;
-    }
-    .row { display: flex; gap: 14px; }
-    .col { flex: 1; }
-    .btn-submit {
-      width: 100%;
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 7px;
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      transition: background .2s;
-    }
-    .btn-submit:hover { background: var(--primary-dark); }
-    .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
-    .log-box {
-      background: #0f172a;
-      color: #38bdf8;
-      font-family: monospace;
-      font-size: 12px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      max-height: 180px;
-      overflow-y: auto;
-      line-height: 1.5;
-    }
-    .log-success { color: #4ade80; }
-    .log-err { color: #f87171; }
   </style>
 </head>
 <body>
-  <!-- Header navigasi bersama: tautan ZoneMinder ditonjolkan + tombol logout -->
+  <!-- Header Navigasi Bersama -->
   <header id="dashHeader"></header>
 
   <div class="container">
-    <div class="card">
-      <div class="card-header">Form Registrasi Kamera Langsung (RTSP)</div>
-      <div class="card-body">
-        <form id="addCamForm" onsubmit="submitCamera(event)">
-          <div class="form-group">
-            <label for="camName">Nama Kamera (Monitor Name)</label>
-            <input type="text" id="camName" class="form-control" placeholder="Contoh: CAM_LOBBY_01" required>
-            <div class="form-hint">Gunakan huruf, angka, garis bawah (_), atau strip (-).</div>
-          </div>
-
-          <div class="form-group">
-            <label for="rtspUrl">URL RTSP Kamera</label>
-            <input type="text" id="rtspUrl" class="form-control" placeholder="rtsp://admin:password@192.168.1.50:554/ch1" required>
-            <div class="form-hint">Format lengkap RTSP stream kamera langsung (tanpa melalui proxy relay).</div>
-          </div>
-
-          <div class="row">
-            <div class="col form-group">
-              <label for="zmFunction">Fungsi ZoneMinder</label>
-              <select id="zmFunction" class="form-control">
-                <option value="Monitor" selected>Monitor (Live View)</option>
-                <option value="Modect">Modect (Motion Detect)</option>
-                <option value="Record">Record (Rekam Terus)</option>
-                <option value="Mocord">Mocord (Motion + Record)</option>
-                <option value="Nodect">Nodect</option>
-              </select>
-            </div>
-            <div class="col form-group">
-              <label for="resolution">Resolusi (Width x Height)</label>
-              <select id="resolution" class="form-control">
-                <option value="1920x1080" selected>1920 x 1080 (FHD)</option>
-                <option value="1280x720">1280 x 720 (HD)</option>
-                <option value="2560x1440">2560 x 1440 (2K)</option>
-                <option value="3840x2160">3840 x 2160 (4K)</option>
-                <option value="640x480">640 x 480 (VGA)</option>
-              </select>
-            </div>
-            <div class="col form-group">
-              <label for="maxFps">Max FPS (Opsional)</label>
-              <input type="number" id="maxFps" class="form-control" placeholder="Kosong = Default (15/25)" min="1" max="60">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="zoneMode">Mode Zone Deteksi Otomatis</label>
-            <select id="zoneMode" class="form-control"></select>
-            <div class="form-hint" id="zoneModeHint">
-              Loading...
-            </div>
-            <div class="form-hint" style="margin-top:6px;">
-              Zone deteksi <b>wajib ada</b> agar Modect benar-benar menghasilkan alarm.
-              Tanpa zone, ZoneMinder hanya merekam tanpa pernah mendeteksi gerakan.
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
-              <input type="checkbox" id="createZone" checked style="width:auto;">
-              Buat zone deteksi layar penuh otomatis
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; font-weight:600; margin-top:8px;">
-              <input type="checkbox" id="overwriteZone" style="width:auto;">
-              Timpa zone dashboard yang sudah ada
-            </label>
-            <div class="form-hint">
-              Biarkan tidak dicentang bila kamera sudah punya zone buatan sendiri —
-              konfigurasi manual Anda tidak akan pernah dihapus oleh dashboard.
-            </div>
-          </div>
-
-          <button type="submit" id="btnSubmit" class="btn-submit">
-            ➕ Daftarkan Kamera ke ZoneMinder
-          </button>
-        </form>
+    <div class="form-container">
+      <!-- Breadcrumb / Header Title -->
+      <div class="flex items-center justify-between" style="margin-bottom: 20px;">
+        <div>
+          <h1 style="font-size: 20px;">Tambah Kamera CCTV (ZoneMinder v1.38.6)</h1>
+          <p class="text-xs text-secondary" style="margin-top: 3px;">
+            Konfigurasi parameter native ZM 1.38: Triad (Capturing, Analysing, Recording), RTSP, Decoder, FPS, dan Zone Deteksi.
+          </p>
+        </div>
+        <a href="zoneminder.html" class="btn btn-outline btn-sm">
+          &larr; Kembali ke Daftar Kamera
+        </a>
       </div>
-    </div>
 
-    <div class="card">
-      <div class="card-header">📋 Log Status Pendaftaran</div>
-      <div class="card-body">
-        <div id="logBox" class="log-box">
-          <div>[READY] Masukkan nama dan URL RTSP kamera di atas lalu klik daftarkan.</div>
+      <!-- Card Formulir Pendaftaran -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <div class="card-title">&#128249; Parameter Kamera &amp; RTSP Stream</div>
+          <span class="badge badge-primary">ZoneMinder v1.38.6</span>
+        </div>
+
+        <div class="card-body">
+          <form id="addCamForm" onsubmit="submitCamera(event)">
+            <!-- Identitas Kamera -->
+            <div class="form-group">
+              <label class="form-label" for="camName">Nama Kamera (Monitor Name)</label>
+              <input type="text" id="camName" class="form-control" placeholder="Contoh: CAM_LOBBY_01" required>
+              <div class="form-hint">Disarankan menggunakan format alfanumerik, garis bawah (_), atau strip (-).</div>
+            </div>
+
+            <!-- Path RTSP Source -->
+            <div class="form-group">
+              <label class="form-label" for="rtspUrl">Path Source / URL RTSP</label>
+              <input type="text" id="rtspUrl" class="form-control mono text-sm" placeholder="rtsp://10.121.8.7/video2 atau rtsp://admin:pass@10.121.8.7:554/ch1" required>
+              <div class="form-hint">
+                Dapat berupa URL langsung atau dilengkapi kredensial. Karakter khusus (@, $, dsb.) dinormalisasi otomatis.
+              </div>
+            </div>
+
+            <!-- Kredensial Kamera -->
+            <div class="grid grid-2">
+              <div class="form-group">
+                <label class="form-label" for="camUser">Username Kamera (opsional)</label>
+                <input type="text" id="camUser" class="form-control" placeholder="admin">
+                <div class="form-hint">Diisi bila URL RTSP di atas belum menyertakan user:password.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="camPass">Password Kamera (opsional)</label>
+                <input type="password" id="camPass" class="form-control" placeholder="admin" autocomplete="new-password">
+                <div class="form-hint">Kredensial disimpan ke parameter User &amp; Pass monitor ZoneMinder.</div>
+              </div>
+            </div>
+
+            <!-- Kontrol Operasi Triad ZM 1.38 -->
+            <div class="triad-card">
+              <div class="flex items-center justify-between" style="margin-bottom: 12px;">
+                <div class="text-xs font-bold text-primary">
+                  ⚡ Mode Operasi Native ZM v1.38.6 (Capturing &bull; Analysing &bull; Recording)
+                </div>
+                <div id="triadStatusPill" class="triad-badge-preview">
+                  <span>Cap: Always</span> &bull; <span>Ana: Always</span> &bull; <span>Rec: OnMotion</span>
+                </div>
+              </div>
+
+              <div class="grid grid-3">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label" for="camCapturing">Capturing (zmc)</label>
+                  <select id="camCapturing" class="form-select" onchange="updateTriadPreview()">
+                    <option value="Always" selected>Always (Aktif Capture)</option>
+                    <option value="Ondemand">Ondemand (Saat Diminta)</option>
+                    <option value="None">None (Capture Mati)</option>
+                  </select>
+                  <div class="form-hint">Mengendalikan daemon penangkap frame.</div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label" for="camAnalysing">Analysing (Motion)</label>
+                  <select id="camAnalysing" class="form-select" onchange="updateTriadPreview()">
+                    <option value="Always" selected>Always (Deteksi Gerak)</option>
+                    <option value="None">None (Tanpa Analisa)</option>
+                  </select>
+                  <div class="form-hint">Mengendalikan deteksi gerakan di zone.</div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label" for="camRecording">Recording (Storage)</label>
+                  <select id="camRecording" class="form-select" onchange="updateTriadPreview()">
+                    <option value="None">None (Live Saja / Pasif)</option>
+                    <option value="OnMotion" selected>OnMotion (Rekam Saat Gerakan)</option>
+                    <option value="Always">Always (Rekam Non-Stop)</option>
+                  </select>
+                  <div class="form-hint">Penyimpanan video rekaman ke disk.</div>
+                </div>
+              </div>
+
+              <div id="triadExplanation" class="text-xs text-muted" style="margin-top: 10px;">
+                Mode aktif: Kamera terus menangkap stream, menganalisa gerakan, dan merekam secara otomatis saat motion terdeteksi.
+              </div>
+            </div>
+
+            <!-- Resolusi & FPS -->
+            <div class="grid grid-3" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px;">
+              <div class="form-group">
+                <label class="form-label" for="resolution">Resolusi (Width x Height)</label>
+                <select id="resolution" class="form-select">
+                  <option value="1280x720" selected>1280 x 720 (HD 720p)</option>
+                  <option value="1920x1080">1920 x 1080 (FHD 1080p)</option>
+                  <option value="2560x1440">2560 x 1440 (2K QHD)</option>
+                  <option value="3840x2160">3840 x 2160 (4K UHD)</option>
+                  <option value="640x480">640 x 480 (VGA 480p)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="maxFps">Max FPS (Capture)</label>
+                <input type="number" id="maxFps" class="form-control" value="10.00" min="1" max="60" step="0.5" required>
+                <div class="form-hint">Batas laju frame capture (default 10.00).</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="analysisFps">Analysis FPS Limit</label>
+                <input type="number" id="analysisFps" class="form-control" value="8.00" min="1" max="30" step="0.5" required>
+                <div class="form-hint">Batas laju analisa motion CPU (default 8.00).</div>
+              </div>
+            </div>
+
+            <!-- Hardware Decoder Video -->
+            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 6px;">
+              <label class="form-label" for="camDecoder">Decoder Video (Hardware / Software Acceleration)</label>
+              <select id="camDecoder" class="form-select"></select>
+              <div class="form-hint">
+                Pilih akselerasi hardware yang didukung server (NVIDIA CUVID, Intel VAAPI/QSV, atau Auto).
+                Daftar mengikuti decoder native ZoneMinder 1.38.6.
+              </div>
+            </div>
+
+            <!-- Zone Deteksi Otomatis -->
+            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 6px;">
+              <label class="form-label" for="zoneMode">Mode Zone Deteksi Otomatis</label>
+              <select id="zoneMode" class="form-select"></select>
+              <div class="form-hint" id="zoneModeHint" style="margin-top: 5px;">Memuat konfigurasi mode zone...</div>
+
+              <div class="flex items-center gap-4 flex-wrap" style="margin-top: 12px;">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="createZone" checked>
+                  Buat zone deteksi gerak otomatis untuk kamera ini
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="overwriteZone">
+                  Timpa zone dashboard yang sudah ada
+                </label>
+              </div>
+            </div>
+
+            <div style="margin-top: 24px;">
+              <button type="submit" id="btnSubmit" class="btn btn-primary btn-lg" style="width: 100%;">
+                ➕ Daftarkan Kamera ke ZoneMinder
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Card Terminal Log Output -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title text-sm">&#128220; Log Pendaftaran Kamera</div>
+          <button class="btn btn-outline btn-sm" onclick="clearLog()">Bersihkan Log</button>
+        </div>
+        <div class="card-body" style="padding: 12px;">
+          <div id="logBox" class="terminal-box">
+            <div class="terminal-line muted">[READY] Isi form pendaftaran kamera di atas, lalu klik Daftarkan Kamera.</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
+  <footer class="page-footer">
+    ZoneMinder Central CCTV Management &mdash; Pendaftaran Kamera Tunggal v1.38.6
+  </footer>
+
+  <script src="app_shell.js"></script>
   <script>
-    // Daftar mode zone diambil dari server supaya angka yang ditampilkan
-    // selalu sama dengan yang benar-benar ditulis ke ZoneMinder.
     let ZONE_MODES = [];
 
     async function loadZoneModes() {
@@ -233,7 +236,7 @@
         renderZoneHint();
       } catch (err) {
         select.innerHTML = '<option value="light">2. Ringan</option>';
-        hint.innerText = 'Daftar mode tidak dapat dimuat dari server. Memakai mode default.';
+        hint.innerText = 'Gagal memuat mode dari server. Memakai mode default.';
       }
     }
 
@@ -242,21 +245,56 @@
       const hint = document.getElementById('zoneModeHint');
       const mode = ZONE_MODES.find(m => m.key === key);
       if (!mode) { hint.innerText = ''; return; }
-      hint.innerHTML = `${mode.description}<br><b>Efektif:</b> CheckMethod=${mode.check_method}, `
-        + `MinPixelThreshold=${mode.min_pixel_threshold} (angka kecil = lebih sensitif), Units=${mode.units}.`;
+      hint.innerHTML = `${mode.description} &bull; <b>Efektif:</b> CheckMethod=${mode.check_method}, MinPixelThreshold=${mode.min_pixel_threshold}, Units=${mode.units}.`;
+    }
+
+    function updateTriadPreview() {
+      const cap = document.getElementById('camCapturing').value;
+      const ana = document.getElementById('camAnalysing').value;
+      const rec = document.getElementById('camRecording').value;
+
+      const pill = document.getElementById('triadStatusPill');
+      const exp = document.getElementById('triadExplanation');
+
+      pill.innerHTML = `<span>Cap: <b>${cap}</b></span> &bull; <span>Ana: <b>${ana}</b></span> &bull; <span>Rec: <b>${rec}</b></span>`;
+
+      if (cap === 'None') {
+        exp.innerHTML = '<span style="color:var(--danger)">⚠️ <b>Kamera Nonaktif:</b> zmc tidak menangkap stream. Analisis dan perekaman tidak akan berjalan.</span>';
+      } else if (ana === 'Always' && rec === 'OnMotion') {
+        exp.innerHTML = '✨ <b>Deteksi Gerak &amp; Rekam Otomatis (Modect):</b> Menangkap stream secara konstan, mendeteksi gerakan di zone, dan merekam hanya saat ada gerakan.';
+      } else if (rec === 'Always') {
+        exp.innerHTML = '🔴 <b>Perekaman Kontinu:</b> Menangkap stream dan merekam video 24/7 non-stop ke penyimpanan storage.';
+      } else if (ana === 'None' && rec === 'None') {
+        exp.innerHTML = '👁️ <b>Live View Murni:</b> Menangkap stream untuk pantauan langsung di monitor/dashboard tanpa deteksi gerakan dan tanpa perekaman.';
+      } else {
+        exp.innerHTML = `Konfigurasi kustom: Capturing=${cap}, Analysing=${ana}, Recording=${rec}.`;
+      }
     }
 
     document.getElementById('zoneMode').addEventListener('change', renderZoneHint);
+
+    // Decoder: satu daftar bersama (app_shell.js) supaya pilihan di sini
+    // identik dengan Burst Add, impor Excel, dan form edit.
+    if (window.fillDecoderOptions) {
+      window.fillDecoderOptions(document.getElementById('camDecoder'));
+    }
+
     loadZoneModes();
+    updateTriadPreview();
 
     function addLog(msg, type = 'info') {
       const box = document.getElementById('logBox');
       const time = new Date().toLocaleTimeString();
       let cls = '';
-      if (type === 'err') cls = 'log-err';
-      if (type === 'success') cls = 'log-success';
-      box.innerHTML += `<div class="${cls}">[${time}] ${msg}</div>`;
+      if (type === 'err') cls = 'error';
+      if (type === 'success') cls = 'success';
+      if (type === 'warn') cls = 'warning';
+      box.innerHTML += `<div class="terminal-line ${cls}">[${time}] ${msg}</div>`;
       box.scrollTop = box.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('logBox').innerHTML = '<div class="terminal-line muted">[CLEARED] Log dibersihkan.</div>';
     }
 
     async function submitCamera(e) {
@@ -264,18 +302,25 @@
       const btn = document.getElementById('btnSubmit');
       const name = document.getElementById('camName').value.trim();
       const source = document.getElementById('rtspUrl').value.trim();
-      const func = document.getElementById('zmFunction').value;
+      const user = document.getElementById('camUser').value.trim();
+      const pass = document.getElementById('camPass').value;
+      const capturing = document.getElementById('camCapturing').value;
+      const analysing = document.getElementById('camAnalysing').value;
+      const recording = document.getElementById('camRecording').value;
       const [width, height] = document.getElementById('resolution').value.split('x');
-      const maxFps = document.getElementById('maxFps').value.trim();
+      const maxFps = document.getElementById('maxFps').value.trim() || '10.00';
+      const analysisFps = document.getElementById('analysisFps').value.trim() || '8.00';
+      const decoder = document.getElementById('camDecoder').value;
 
       if (!source.toLowerCase().startsWith('rtsp://')) {
         addLog('URL harus diawali dengan rtsp://', 'err');
+        window.showToast('URL harus diawali dengan rtsp://', 'warning');
         return;
       }
 
       btn.disabled = true;
-      btn.innerHTML = '⏳ Mendaftarkan ke ZoneMinder...';
-      addLog(`Mengirim data pendaftaran untuk '${name}'...`);
+      btn.innerHTML = '⏳ Mendaftarkan ke ZoneMinder v1.38.6...';
+      addLog(`Mengirim pendaftaran kamera '${name}' ke ZoneMinder...`);
 
       try {
         const res = await fetch('/api/zoneminder/add-camera', {
@@ -284,45 +329,63 @@
           body: JSON.stringify({
             name: name,
             source: source,
-            zmFunction: func,
+            username: user,
+            password: pass,
+            capturing: capturing,
+            analysing: analysing,
+            recording: recording,
             width: width,
             height: height,
             maxFps: maxFps,
+            analysisFps: analysisFps,
+            decoder: decoder,
             zoneMode: document.getElementById('zoneMode').value,
             createZone: document.getElementById('createZone').checked,
             overwriteZone: document.getElementById('overwriteZone').checked
           })
         });
+
         const data = await res.json();
         if (res.ok && data.status === 'success') {
-          addLog(`[SUCCESS] ${data.message}`, 'success');
+          addLog(`[SUCCESS] ${data.message} (ID Monitor: ${data.monitor_id})`, 'success');
+          window.showToast(`Kamera '${name}' berhasil didaftarkan (ID: ${data.monitor_id})!`, 'success');
 
-          // Status zone dilaporkan terpisah: kamera bisa berhasil didaftarkan
-          // sementara zone-nya gagal. Menyembunyikan itu membuat pengguna
-          // mengira Modect berjalan padahal tidak akan pernah alarm.
+          if (Array.isArray(data.path_warnings) && data.path_warnings.length) {
+            data.path_warnings.forEach(w => addLog(`[PATH] ${w}`, 'warn'));
+          }
+          addLog(`[CONFIG] Cap=${capturing} | Ana=${analysing} | Rec=${recording} | Decoder=${decoder} | MaxFPS=${maxFps} | AnalysisFPS=${analysisFps}`, 'info');
+
           const zone = data.zone || {};
           if (zone.created) {
-            addLog(`[ZONE] Zone "${zone.name || 'All'}" dibuat (${zone.label || zone.mode}), `
-              + `koordinat ${zone.coords || '-'} @ ${zone.width}x${zone.height}.`, 'success');
+            addLog(`[ZONE] Zone "${zone.name || 'All'}" dibuat (${zone.label || zone.mode}) @ ${zone.width}x${zone.height}.`, 'success');
           } else if (zone.skipped) {
             addLog(`[ZONE] Dilewati: ${zone.reason || '-'}`, 'info');
           } else {
-            addLog(`[ZONE-GAGAL] ${zone.reason || 'Zone tidak dibuat. Modect tidak akan mendeteksi gerakan.'}`, 'err');
+            addLog(`[ZONE-GAGAL] ${zone.reason || 'Zone tidak dibuat.'}`, 'err');
           }
 
           document.getElementById('addCamForm').reset();
+          document.getElementById('maxFps').value = '10.00';
+          document.getElementById('analysisFps').value = '8.00';
+          document.getElementById('resolution').value = '1280x720';
+          document.getElementById('camDecoder').value = 'auto';
+          document.getElementById('camCapturing').value = 'Always';
+          document.getElementById('camAnalysing').value = 'Always';
+          document.getElementById('camRecording').value = 'OnMotion';
+          document.getElementById('createZone').checked = true;
+          updateTriadPreview();
         } else {
           addLog(`[ERROR] ${data.message || 'Gagal mendaftarkan kamera'}`, 'err');
+          window.showToast(data.message || 'Gagal mendaftarkan kamera', 'error');
         }
       } catch (err) {
-        addLog(`[ERROR JARINGAN] ${err.message}`, 'err');
+        addLog(`[JARINGAN ERROR] ${err.message}`, 'err');
+        window.showToast(err.message, 'error', 'Error Jaringan');
       } finally {
         btn.disabled = false;
         btn.innerHTML = '➕ Daftarkan Kamera ke ZoneMinder';
       }
     }
   </script>
-  <script src="app_shell.js"></script>
 </body>
 </html>
-

@@ -140,13 +140,33 @@ echo "[5/5] Berkas penting"
 for F in docker-compose.yml caddy/Caddyfile \
          html_dashboard/auth.py html_dashboard/token_crypto.py \
          html_dashboard/login.html html_dashboard/settings.html \
-         html_dashboard/app_shell.js zm-conf/zm-root.conf; do
+         html_dashboard/app_shell.js zm-conf/apache-limit.conf \
+         zm-conf/db-tuning.cnf secrets/zm_db_pass.txt \
+         secrets/mariadb_root_pass.txt; do
     if [ -f "$F" ]; then
         pass "$F ada"
     else
         fail "$F tidak ditemukan"
     fi
 done
+
+# Berkas & konfigurasi migrasi ke ZoneMinder 1.38 (lihat README bagian migrasi):
+# image resmi tidak membawa mysqld, jadi service "db" wajib ada.
+if grep -qE '^  db:' docker-compose.yml 2>/dev/null; then
+    pass "service 'db' (MariaDB) ada di docker-compose.yml"
+else
+    fail "service 'db' tidak ada di docker-compose.yml — ZoneMinder 1.38 butuh DB eksternal"
+fi
+if grep -qE 'zoneminder/zoneminder:1\.38' zm-conf/Dockerfile 2>/dev/null; then
+    pass "base image ZoneMinder di-pin ke 1.38.x (bukan latest/-es)"
+else
+    warn "base image ZoneMinder tidak di-pin ke 1.38.x di zm-conf/Dockerfile"
+fi
+if grep -qxE '[[:space:]]*(secrets|backups)/[[:space:]]*' .gitignore 2>/dev/null; then
+    pass "secrets/ dan backups/ terlindungi oleh .gitignore"
+else
+    warn "secrets/ atau backups/ TIDAK ada di .gitignore — dump DB bisa ter-commit!"
+fi
 
 # grep dengan -x (baris cocok persis) dan toleransi CR agar tetap benar
 # walau .gitignore tersimpan dengan akhir baris Windows.

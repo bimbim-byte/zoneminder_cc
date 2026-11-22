@@ -1,33 +1,43 @@
 # ============================================================================
-# ZoneMinder with production tuning.
+# ZoneMinder with production tuning — image RESMI (ZM 1.38.6).
 #
-# Why a derived image instead of bind mounts?
-# ZoneMinder (MySQL) REFUSES world-writable config files
-# ("World-writable config file is ignored"). When config files are bind-mounted
-# from a Windows filesystem (9p/drvfs), permissions are forced to 777 and chmod
-# fails because the mount is read-only. With COPY into the image layer,
-# permissions are stored correctly (644) and behave identically on any host
-# (Proxmox/ext4 as well as Windows).
+# Riwayat:
+#   Sebelumnya image ini diturunkan dari pppasantos/zoneminder:latest (ZM
+#   1.36.32, Ubuntu 18.04, MySQL 5.7 di dalam container). Sejak migrasi ke
+#   arsitektur resmi, base image menjadi zoneminder/zoneminder:1.38.6 (Debian
+#   stable) dan mysqld TIDAK lagi ada di dalam container ini, sehingga:
+#     - mysql-tuning.cnf  -> pindah ke zm-conf/db-tuning.cnf (service "db")
+#     - zm-root.conf      -> DIHAPUS. Image resmi sudah menangani root URL
+#                            sendiri lewat /etc/apache2/conf-enabled/zm-docker.conf
+#                            ("RedirectMatch ^/$ /zm/"). Menyalin alias root lama
+#                            hanya menambah konflik Alias tanpa manfaat.
+#   Salinan konfigurasi 1.36 disimpan di backups/ untuk keperluan rollback.
 #
-# Updating ZoneMinder: change the tag below, then
-#     docker compose build zoneminder
-#     docker compose up -d zoneminder
+# Kenapa tetap image turunan (bukan bind mount)?
+#   Tuning Apache perlu file di /etc/apache2/conf-enabled dengan permission
+#   normal. Bind mount dari Windows (9p/drvfs) memaksa permission 777 dan
+#   chmod gagal karena mount read-only; COPY ke layer image menyimpan 644
+#   dengan benar di host mana pun (Proxmox/ext4 maupun Windows).
+#
+# Update ZoneMinder:
+#   1. ganti tag di bawah, DAN tag "image:" di docker-compose.yml.
+#   2. docker compose build zoneminder
+#   3. docker compose up -d zoneminder
+#
+# Tag yang dipakai: versi eksplisit (bukan "latest", bukan "-es").
+#   - "latest" bisa loncat ke 1.40/1.42 kapan saja -> upgrade skema tak terjadwal.
+#   - "-es" membawa zmeventnotificationNg (push, WebSocket, MQTT); stack ini
+#     sudah bersih dari MQTT, jadi varian itu tidak dipakai.
 # ============================================================================
-FROM pppasantos/zoneminder:latest
+ARG ZM_BASE_IMAGE=zoneminder/zoneminder:1.38.6
+FROM ${ZM_BASE_IMAGE}
 
-# MySQL tuning: buffer pool, connections, flush policy.
-COPY mysql-tuning.cnf /etc/mysql/mysql.conf.d/zz-zm-tuning.cnf
-
-# Apache tuning: ServerLimit, workers, keepalive.
+# Tuning Apache: ServerLimit, worker prefork, keepalive untuk streaming MJPEG
+# (wall dashboard 60+ kamera). Path ini diverifikasi ada di image 1.38.6
+# (/etc/apache2/conf-enabled, berisi zm-docker.conf + zoneminder.conf).
 COPY apache-limit.conf /etc/apache2/conf-enabled/apache-limit.conf
 
-# Serve ZoneMinder at the domain root (/) without breaking its internal /zm/
-# links. Read the header of zm-root.conf for the full rationale.
-COPY zm-root.conf /etc/apache2/conf-enabled/zm-root.conf
-
-# Apache tuning: ServerLimit, workers, keepalive.
-# Permissions 644 are mandatory for MySQL config files.
-# chmod -x also avoids the "world-writable" warning.
-RUN chmod 644 /etc/mysql/mysql.conf.d/zz-zm-tuning.cnf \
- && chmod 644 /etc/apache2/conf-enabled/apache-limit.conf \
- && chmod 644 /etc/apache2/conf-enabled/zm-root.conf
+# 644 supaya Apache tidak mengabaikan file, dan chmod eksplisit menghindari
+# warning "world-writable" bila context build berasal dari filesystem Windows.
+RUN chmod 644 /etc/apache2/conf-enabled/apache-limit.conf \
+ && apache2ctl -t 2>&1 | tail -3

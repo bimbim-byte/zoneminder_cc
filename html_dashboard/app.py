@@ -35,6 +35,34 @@ app = Flask(__name__, static_folder=".", template_folder=".")
 ZM_HOST = os.environ.get("ZM_HOST", "http://zoneminder:80")
 ZM_BASE_URL = os.environ.get("ZM_BASE_URL", f"{ZM_HOST}/zm/api")
 
+# ==============================================================================
+# JEBAKAN API ZONEMINDER 1.38 — JANGAN DIHAPUS
+# ==============================================================================
+# Dua perilaku di bawah ini tidak terlihat seperti bug, tetapi membuat SEMUA
+# pembuatan kamera gagal tanpa pesan yang jelas.
+#
+# 1) DEVICE_REQUIRED
+#    Model `Monitor` di ZM 1.38 punya aturan validasi (api/app/Model/Monitor.php):
+#        'Device' => array('validPath' => array(
+#            'rule' => array('custom', '#^(/dev/[\w/.\-]+)?$#'),
+#            'allowEmpty' => true, 'required' => false))
+#    `allowEmpty` hanya berlaku bila kolomnya HADIR di data yang dikirim. Bila
+#    kuncinya tidak ada sama sekali, CakePHP melewatkan nilai NULL ke regex dan
+#    aturan itu GAGAL — padahal kolomnya NOT NULL dengan default ''.
+#    Jadi "Monitor[Device]" WAJIB selalu dikirim, walau isinya string kosong.
+#    Bila lupa, ZM membalas HTTP 200 (bukan 4xx) dengan body:
+#        {"message":{"Device":["Invalid device path. Must be a valid /dev/ ..."]}}
+#    Inilah kenapa kamera "tidak muncul" padahal UI melaporkan sukses: kode
+#    lama hanya memeriksa status_code == 200, dan 200 juga dipakai untuk gagal.
+#
+# 2) SUKSES DITENTUKAN OLEH "message", BUKAN STATUS HTTP
+#    POST /monitors.json membalas 200 untuk DUA kondisi berbeda:
+#        sukses : {"message":"Saved"}
+#        gagal  : {"message":{...pesan validasi...}}
+#    Karena itu setiap respons WAJIB diperiksa isinya. Lihat zm_post_monitor().
+DEVICE_REQUIRED = ""
+
+
 CHECKER_CONFIG_FILE = os.environ.get("CHECKER_CONFIG_FILE", "/app/data/checker_config.json")
 
 DASH_SECRET_KEY = os.environ.get("DASH_SECRET_KEY", "")
@@ -72,6 +100,61 @@ if not token_crypto.crypto_available():
 
 # Cache token auth ZM di memori. Direset saat kredensial berubah.
 ZM_TOKEN = None
+
+# ==============================================================================
+# SUMBER RTSP UNTUK MONITOR TIPE Ffmpeg (ZONE MINDER 1.38)
+# ==============================================================================
+# Di ZM 1.38 zmc sendiri yang menerjemahkan Monitor[Method] menjadi opsi
+# transport ffmpeg (terverifikasi dari string binary /usr/bin/zmc):
+#     rtpRtsp     -> rtsp_transport=tcp
+#     rtpUni      -> rtsp_transport=udp
+#     rtpMulti    -> rtsp_transport=udp_multicast
+#     rtpRtspHttp -> rtsp_transport=http
+#     selain itu  -> "Unknown method (<nilai>)" dan transport TIDAK disetel
+#
+# Nilai "rtsp" adalah warisan ZM 1.36 (dipakai tipe sumber Remote) dan TIDAK
+# dikenali oleh 1.38. Karena itu jangan pernah mengirim "rtsp" lagi.
+#
+# Monitor[Options] TIDAK dipakai untuk transport: isinya diteruskan apa adanya
+# sebagai opsi input ffmpeg, dan "rtsp_transport" bukan opsi level format
+# sehingga muncul peringatan "Option rtsp_transport not recognized by ffmpeg".
+# Transport cukup lewat Method di atas.
+ZM_FFMPEG_METHOD = "rtpRtsp"   # RTSP over TCP
+
+from rtsp_path import (  # noqa: E402  (setelah konstanta, bukan di blok import atas)
+    ANALYSIS_FPS_DEFAULT,
+    ZM_FFMPEG_OPTIONS,
+    _monitor_fps_payload as _rtsp_fps_payload,
+    normalize_analysis_fps,
+    normalize_rtsp_path,
+)
+from zm_triad import (  # noqa: E402
+    VALID_ANALYSING,
+    VALID_CAPTURING,
+    VALID_DECODERS,
+    VALID_RECORDING,
+    build_zm138_full_payload,
+    build_zm138_triad,
+    derive_function_from_triad,
+    normalize_analysing,
+    normalize_capturing,
+    normalize_recording,
+    zm138_monitor_payload,
+)
+
+# Batas laju analisa motion + normalisasi path RTSP kini hidup di modul
+# terpisah (rtsp_path.py) supaya bisa diuji tanpa menyeret Flask. Lihat
+# _verify_rtsp_path.py untuk uji perilakunya.
+ZM_FFMPEG_TIMEOUT_US = "5000000"
+
+
+def _monitor_fps_payload(analysis_fps=None):
+    """Field FPS yang dikirim saat membuat/menyimpan monitor.
+
+    Hanya AnalysisFPSLimit yang diisi; MaxFPS sengaja tidak dikirim agar
+    capture tidak dipotong. Implementasi ada di rtsp_path.py.
+    """
+    return _rtsp_fps_payload(analysis_fps)
 
 
 # ==============================================================================
@@ -414,11 +497,28 @@ def serve_static(filename):
 
 
 # ==============================================================================
-# 1b. PENGATURAN: KREDENSIAL ZONEMINDER + AKUN DASHBOARD
+# 1b. PENGATURAN: KREDENSIAL ZONEMINDER + AKUN DASHBOARD & STATUS
 # ==============================================================================
 @app.route("/settings")
 def settings():
     return send_from_directory(".", "settings.html")
+
+
+@app.route("/status")
+@app.route("/status.html")
+def status_page():
+    return send_from_directory(".", "status.html")
+
+
+@app.route("/checker")
+@app.route("/checker.html")
+def checker_page():
+    """Halaman terpisah untuk kendali CCTV Health Checker.
+
+    Dipisah dari status.html supaya Status Server tetap murni informatif dan
+    kendali checker (toggle, interval, run-now) punya tempat sendiri.
+    """
+    return send_from_directory(".", "checker.html")
 
 
 @app.route("/api/settings/status", methods=["GET"])
@@ -616,26 +716,35 @@ def proxy_zm(subpath):
 
         # Daftar monitor memuat field Path yang berisi rtsp://user:password@host.
         # Nilai itu TIDAK boleh sampai ke browser: halaman Kelola Kamera cukup
-        # menampilkan host-nya. Payload JSON disaring di sini, bukan di sisi
-        # klien, supaya kebocoran tidak bergantung pada perilaku JavaScript.
+        # menampilkan host-nya. Saring juga monitor yang sudah di-soft-delete (Deleted=1)
+        # agar sinkron dengan konsol ZoneMinder (WHERE M.Deleted = false).
         if (
             resp.status_code == 200
+            and request.method == "GET"
             and "application/json" in resp.headers.get("Content-Type", "")
             and re.search(rb"monitors", subpath.encode() or b"")
+            and content.strip().startswith((b"{", b"["))
         ):
             try:
                 payload = json.loads(content.decode("utf-8"))
                 if isinstance(payload, dict) and isinstance(payload.get("monitors"), list):
+                    filtered_monitors = []
                     for item in payload["monitors"]:
                         target = item.get("Monitor") if isinstance(item, dict) else None
-                        if isinstance(target, dict) and target.get("Path"):
-                            target["Path"] = _redact_rtsp(target["Path"])
+                        if isinstance(target, dict):
+                            # Saring monitor soft-deleted (Deleted=1)
+                            if str(target.get("Deleted", "0")).lower() in ("1", "true"):
+                                continue
+                            if target.get("Path"):
+                                target["Path"] = _redact_rtsp(target["Path"])
+                        filtered_monitors.append(item)
+                    payload["monitors"] = filtered_monitors
                     content = json.dumps(payload).encode("utf-8")
                     resp_headers = [(k, v) for k, v in resp_headers
                                     if k.lower() != "content-type"]
                     resp_headers.append(("Content-Type", "application/json"))
             except Exception as exc:
-                log.warning("Gagal menyaring kredensial monitor: %s", exc)
+                log.warning("Gagal menyaring kredensial/status monitor: %s", exc)
 
         response = Response(content, resp.status_code, resp_headers)
         response.headers["Access-Control-Allow-Origin"] = "*"
@@ -651,16 +760,17 @@ def proxy_zm(subpath):
 # ==============================================================================
 @app.route("/api/zoneminder/add-camera", methods=["POST"])
 def add_single_camera():
-    """Mendaftarkan kamera langsung dengan RTSP URL ke ZoneMinder."""
+    """Mendaftarkan kamera langsung dengan RTSP URL ke ZoneMinder (Triad ZM 1.38.6)."""
     data = request.json or {}
 
     raw_name = data.get("name", "").strip()
-    source = data.get("source", "").strip()
-    zm_function = data.get("zmFunction", "Monitor")
-    width = str(data.get("width", "1920"))
-    height = str(data.get("height", "1080"))
-    max_fps = str(data.get("maxFps", ""))
-    colorspace = str(data.get("colorspace", "4"))
+    source = data.get("source", "") or data.get("path", "")
+    source = source.strip()
+    zm_function = data.get("zmFunction") or data.get("function")
+    width = str(data.get("width", "1280"))
+    height = str(data.get("height", "720"))
+    username = data.get("username") or data.get("user")
+    password = data.get("password") or data.get("pass")
 
     if not raw_name or not source:
         return jsonify({"status": "error", "message": "Nama kamera dan URL RTSP wajib diisi!"}), 400
@@ -668,45 +778,43 @@ def add_single_camera():
     if not source.lower().startswith("rtsp://"):
         return jsonify({"status": "error", "message": "URL kamera harus diawali dengan rtsp://"}), 400
 
+    # Kredensial boleh dikirim sebagai URL utuh ATAU sebagai field terpisah.
+    path, path_warnings = normalize_rtsp_path(source, username, password)
     clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", raw_name)
 
-    token = get_zm_token()
-    auth_param = f"?token={token}" if token else ""
-
-    zm_payload = {
-        "Monitor[Name]": clean_name,
-        "Monitor[Type]": "Ffmpeg",
-        "Monitor[Function]": zm_function,
-        "Monitor[Enabled]": "1",
-        "Monitor[Path]": source,
-        "Monitor[Method]": "rtsp",
-        "Monitor[Options]": "rtsp_transport=tcp",
-        "Monitor[Width]": width,
-        "Monitor[Height]": height,
-        "Monitor[Colours]": colorspace,
-        "Monitor[TargetColorspace]": "4",
-        "Monitor[ServerId]": "0",
-    }
-
-    # Setelan encoding otomatis (MP4/h264) - lihat MONITOR_ENCODING_DEFAULTS.
-    enc_payload, enc_warnings = build_encoding_payload(
-        read_encoding_overrides(data)
+    # Bangun payload lengkap ZM 1.38.6 (disamakan dengan struktur native API)
+    zm_payload = build_zm138_full_payload(
+        name=clean_name,
+        path=path,
+        username=username,
+        password=password,
+        capturing=data.get("capturing"),
+        analysing=data.get("analysing") or data.get("analysis"),
+        recording=data.get("recording") or data.get("record"),
+        width=width,
+        height=height,
+        max_fps=data.get("maxFps") or data.get("max_fps") or "10.00",
+        analysis_fps_limit=data.get("analysisFps") or data.get("analysis_fps_limit") or "8.00",
+        decoder=data.get("decoder") or "Auto",
+        enabled=data.get("enabled", "1"),
+        function=zm_function,
     )
-    zm_payload.update(enc_payload)
-
-    if max_fps:
-        zm_payload["Monitor[MaxFPS]"] = max_fps
 
     try:
-        res = requests.post(
-            f"{ZM_HOST}/zm/api/monitors.json{auth_param}",
-            data=zm_payload,
-            timeout=10,
-            verify=False
-        )
+        # Sukses dinilai dari isi respons, bukan status HTTP. ZM 1.38 membalas
+        # 200 untuk kegagalan validasi juga — lihat DEVICE_REQUIRED di atas.
+        ok, err_message, res_data = zm_post_monitor("monitors.json", zm_payload)
 
-        if res.status_code in [200, 201]:
-            res_data = res.json()
+        if ok:
+            # Cari ID monitor (dari respons langsung atau pencarian nama)
+            monitor_id = None
+            if isinstance(res_data, dict):
+                monitor = res_data.get("monitor", res_data) or {}
+                if isinstance(monitor, list) and monitor:
+                    monitor = monitor[0].get("Monitor", monitor[0]) if isinstance(monitor[0], dict) else monitor[0]
+                monitor_id = (monitor or {}).get("Id") or (res_data or {}).get("Id")
+            if not monitor_id:
+                monitor_id = find_monitor_id_by_name(clean_name)
 
             # Zone deteksi WAJIB ada, kalau tidak Modect tidak akan pernah
             # menghasilkan alarm (ZM hanya menilai gerakan di dalam zone).
@@ -716,18 +824,6 @@ def add_single_camera():
                            "reason": "Pembuatan zone dinonaktifkan."}
             zone_mode = normalize_zone_mode(data.get("zoneMode"))
             if data.get("createZone", True) and zone_mode:
-                # ZM 1.36 hanya membalas {"message":"Saved"} tanpa Id, jadi
-                # urutannya: coba baca Id dari respons dulu (build lain bisa
-                # menyertakannya), lalu cari berdasarkan nama.
-                monitor = {}
-                if isinstance(res_data, dict):
-                    monitor = res_data.get("monitor", res_data) or {}
-                    if isinstance(monitor, list) and monitor:
-                        monitor = monitor[0].get("Monitor", monitor[0]) if isinstance(monitor[0], dict) else monitor[0]
-                monitor_id = (monitor or {}).get("Id") or (res_data or {}).get("Id")
-                if not monitor_id:
-                    monitor_id = find_monitor_id_by_name(clean_name)
-
                 if monitor_id:
                     zone_result = ensure_zone_for_monitor(
                         monitor_id,
@@ -752,18 +848,35 @@ def add_single_camera():
             else:
                 message += f" PERINGATAN zone gagal: {zone_result.get('reason', '-')}"
 
+            if path_warnings:
+                message += " Catatan path: " + " ".join(path_warnings)
+
+            # Triad yang efektif sudah tersimpan di dalam payload; kirim balik
+            # ke UI supaya tampilan bisa memverifikasi nilai Cap/Ana/Rec.
+            effective_triad = {
+                "capturing": zm_payload.get("Monitor[Capturing]", ""),
+                "analysing": zm_payload.get("Monitor[Analysing]", ""),
+                "recording": zm_payload.get("Monitor[Recording]", ""),
+                "enabled": zm_payload.get("Monitor[Enabled]", "1"),
+            }
+
             return jsonify({
                 "status": "success",
                 "message": message,
+                "monitor_id": monitor_id,
+                "triad": effective_triad,
                 "zone": zone_result,
-                "encoding_warnings": enc_warnings,
+                "path_warnings": path_warnings,
+                "analysis_fps": zm_payload.get("Monitor[AnalysisFPSLimit]", "8.00"),
                 "data": res_data
             }), 200
         else:
+            # Pesan validasi asli diteruskan supaya operator tahu field mana
+            # yang ditolak, bukan sekadar "gagal".
             return jsonify({
                 "status": "error",
-                "message": f"ZoneMinder API Error ({res.status_code}): {res.text}"
-            }), res.status_code
+                "message": f"ZoneMinder menolak kamera: {err_message}"
+            }), 400
 
     except Exception as e:
         return jsonify({"status": "error", "message": f"Koneksi ke ZoneMinder gagal: {str(e)}"}), 500
@@ -798,11 +911,23 @@ def burst_add_monitors():
     for idx, item in enumerate(monitors):
         monitor_data = item.get("Monitor", item)
         name = monitor_data.get("Name", f"CCTV_{idx+1}")
-        clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(name).strip())
-        path = monitor_data.get("Path", "").strip()
+        clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(name or "").strip())
+        raw_path = str(monitor_data.get("Path", "") or "").strip()
 
-        # Validasi dasar
-        if not path or not path.lower().startswith("rtsp://"):
+        # Validasi dasar. Nama kosong TIDAK boleh lolos: ZoneMinder menerima
+        # monitor tanpa nama, sehingga baris rusak dari Excel akan tersimpan
+        # sebagai kamera tak bernama dan sulit dilacak operator.
+        if not clean_name:
+            fail_count += 1
+            results.append({
+                "row": idx + 1,
+                "name": "",
+                "status": "failed",
+                "error": "Nama kamera kosong",
+            })
+            continue
+
+        if not raw_path or not raw_path.lower().startswith("rtsp://"):
             fail_count += 1
             results.append({
                 "name": clean_name,
@@ -811,45 +936,53 @@ def burst_add_monitors():
             })
             continue
 
-        # Format payload ZoneMinder
-        payload = {
-            "Monitor[Name]": clean_name,
-            "Monitor[Type]": monitor_data.get("Type", "Ffmpeg"),
-            "Monitor[Function]": monitor_data.get("Function", "Monitor"),
-            "Monitor[Enabled]": "1",
-            "Monitor[Path]": path,
-            "Monitor[Method]": "rtsp",
-            "Monitor[Options]": "rtsp_transport=tcp",
-            "Monitor[Width]": str(monitor_data.get("Width", "1920")),
-            "Monitor[Height]": str(monitor_data.get("Height", "1080")),
-            "Monitor[Colours]": str(monitor_data.get("Colours", "4")),
-            "Monitor[TargetColorspace]": "4",
-            "Monitor[ServerId]": "0"
-        }
-
-        # Setelan encoding otomatis, dengan penimpaan per baris Excel.
-        enc_payload, enc_warnings = build_encoding_payload(
-            read_encoding_overrides(monitor_data)
+        u_name = (
+            monitor_data.get("User")
+            or monitor_data.get("Username")
+            or monitor_data.get("user")
+            or monitor_data.get("username")
         )
-        payload.update(enc_payload)
+        u_pass = (
+            monitor_data.get("Pass")
+            or monitor_data.get("Password")
+            or monitor_data.get("pass")
+            or monitor_data.get("password")
+        )
+        path, path_warnings = normalize_rtsp_path(raw_path, u_name, u_pass)
 
-        if monitor_data.get("MaxFPS"):
-            payload["Monitor[MaxFPS]"] = str(monitor_data.get("MaxFPS"))
+        # Bangun payload lengkap ZM 1.38.6 native
+        payload = build_zm138_full_payload(
+            name=clean_name,
+            path=path,
+            username=u_name,
+            password=u_pass,
+            capturing=monitor_data.get("Capturing") or monitor_data.get("capturing"),
+            analysing=monitor_data.get("Analysing") or monitor_data.get("Analysis") or monitor_data.get("analysing"),
+            recording=monitor_data.get("Recording") or monitor_data.get("Record") or monitor_data.get("recording"),
+            width=str(monitor_data.get("Width") or "1280"),
+            height=str(monitor_data.get("Height") or "720"),
+            max_fps=monitor_data.get("MaxFPS") or monitor_data.get("Max_FPS") or monitor_data.get("Max FPS") or "10.00",
+            analysis_fps_limit=monitor_data.get("AnalysisFPS") or monitor_data.get("AnalysisFPSLimit") or monitor_data.get("Analysis FPS") or "8.00",
+            decoder=monitor_data.get("Decoder") or monitor_data.get("decoder") or "Auto",
+            enabled=monitor_data.get("Enabled", "1"),
+            function=monitor_data.get("Function") or monitor_data.get("zmFunction"),
+        )
 
         try:
-            res = requests.post(
-                f"{ZM_HOST}/zm/api/monitors.json{auth_param}",
-                data=payload,
-                timeout=10,
-                verify=False
-            )
-            res_json = res.json() if res.headers.get("content-type", "").startswith("application/json") else {}
+            # Sukses TIDAK dinilai dari status HTTP: ZM membalas 200 untuk
+            # kegagalan validasi juga (lihat DEVICE_REQUIRED di atas).
+            ok, message, res_json = zm_post_monitor("monitors.json", payload)
 
-            if res.status_code in [200, 201] or "message" in res_json:
+            if ok:
                 success_count += 1
-                entry = {"name": clean_name, "status": "success", "id": res_json.get("Id", "")}
-                if enc_warnings:
-                    entry["encoding_warnings"] = enc_warnings
+                entry = {
+                    "name": clean_name,
+                    "status": "success",
+                    "id": res_json.get("Id", ""),
+                    "analysis_fps": payload.get("Monitor[AnalysisFPSLimit]", ""),
+                }
+                if path_warnings:
+                    entry["path_warnings"] = path_warnings
 
                 if create_zone:
                     monitor_id = res_json.get("Id")
@@ -894,8 +1027,10 @@ def burst_add_monitors():
 
                 results.append(entry)
             else:
+                # Pesan asli dari ZoneMinder diteruskan apa adanya supaya
+                # operator tahu field mana yang ditolak.
                 fail_count += 1
-                results.append({"name": clean_name, "status": "failed", "error": res.text[:120]})
+                results.append({"name": clean_name, "status": "failed", "error": message})
         except Exception as e:
             fail_count += 1
             results.append({"name": clean_name, "status": "failed", "error": str(e)})
@@ -1068,15 +1203,26 @@ def normalize_monitor(raw):
         else:
             group_ids = raw_groups or ""
 
+    is_deleted = str(m.get("Deleted", "0")).lower() in ("1", "true")
+
     return {
         "id": str(m.get("Id", "")),
         "name": m.get("Name", "Unknown"),
         "function": m.get("Function", "None"),
+        "capturing": m.get("Capturing", "None"),
+        "analysing": m.get("Analysing", "None"),
+        "recording": m.get("Recording", "None"),
         "enabled": str(m.get("Enabled", "0")) == "1",
+        "deleted": is_deleted,
         "width": m.get("Width", ""),
         "height": m.get("Height", ""),
         "capture_fps": m.get("CaptureFPS", ""),
+        "max_fps": m.get("MaxFPS", "10.00"),
+        "analysis_fps": m.get("AnalysisFPSLimit", "8.00"),
+        "decoder": m.get("Decoder", "Auto"),
+        "user": m.get("User", ""),
         "path": _redact_rtsp(m.get("Path", "")),
+        "raw_path": m.get("Path", ""),
         "group_ids": [g.strip() for g in str(group_ids).split(",") if g.strip()],
     }
 
@@ -1092,7 +1238,14 @@ def get_all_monitors_cached():
     if data is None:
         return MONITOR_CACHE["data"] or []
 
-    monitors = [normalize_monitor(m) for m in data.get("monitors", [])]
+    # Saring monitor yang telah di-soft-delete (Deleted=1) oleh ZoneMinder
+    monitors = []
+    for m in data.get("monitors", []):
+        m_dict = m.get("Monitor", m) if isinstance(m, dict) else {}
+        if str(m_dict.get("Deleted", "0")).lower() in ("1", "true"):
+            continue
+        monitors.append(normalize_monitor(m))
+
     MONITOR_CACHE["data"] = monitors
     MONITOR_CACHE["ts"] = now
     return monitors
@@ -1233,30 +1386,57 @@ def api_camera_stream(monitor_id):
 # kontrol massal (bulk-function) dan pemetaan fungsi monitor.
 
 # ==============================================================================
-# 7. BULK CONTROL SELURUH KAMERA
+# 7. BULK CONTROL SELURUH KAMERA — TRIAD NATIVE ZM 1.38.6
 # ==============================================================================
-# ZM memakai "Function" sebagai mode operasi monitor. "None" = kamera mati.
-ZM_OFF_FUNCTION = "None"
-ZM_ACTIVE_FUNCTIONS = ("Monitor", "Modect", "Record", "Mocord", "Nodect")
+# ZM 1.38.6 tidak lagi mengendalikan monitor lewat Function legacy di UI.
+# Kontrol operasional adalah triad: Capturing / Analysing / Recording.
+# Kolom Function hanya dipertahankan skema database (NOT NULL) dan diisi
+# otomatis oleh derive_function_from_triad() — UI tidak pernah memakainya.
 
-# Catatan fungsi terakhir tiap kamera, supaya tombol "Aktifkan Semua" bisa
-# mengembalikan mode asli (mis. Modect) dan bukan selalu jatuh ke Monitor.
+# Catatan triad terakhir tiap kamera, supaya tombol "Pulihkan Triad" bisa
+# mengembalikan mode asli setelah kamera dimatikan massal.
 CAMERA_FUNCTIONS_FILE = os.environ.get("CAMERA_FUNCTIONS_FILE", "/app/data/camera_functions.json")
 
 
-def load_saved_functions():
+def _coerce_saved_triad(value):
+    """Terima bentuk baru (dict triad) maupun lama (string Function) ->
+    dict triad. File lama data/camera_functions.json berisi string Function,
+    jadi migrasi harus berjalan tanpa intervensi operator.
+    """
+    if isinstance(value, dict) and any(k in value for k in ("capturing", "analysing", "recording")):
+        return {
+            "capturing": normalize_capturing(value.get("capturing"), default="Always"),
+            "analysing": normalize_analysing(value.get("analysing"), default="None"),
+            "recording": normalize_recording(value.get("recording"), default="None"),
+        }
+    if isinstance(value, str) and value:
+        tr = build_zm138_triad(function=value)
+        return {
+            "capturing": tr["Capturing"],
+            "analysing": tr["Analysing"],
+            "recording": tr["Recording"],
+        }
+    return None
+
+
+def load_saved_triads():
     if os.path.exists(CAMERA_FUNCTIONS_FILE):
         try:
             with open(CAMERA_FUNCTIONS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
-                return {str(k): str(v) for k, v in data.items()}
+                out = {}
+                for k, v in data.items():
+                    triad = _coerce_saved_triad(v)
+                    if triad:
+                        out[str(k)] = triad
+                return out
         except Exception as e:
             print(f"[ERROR LOAD CAMERA FUNCTIONS] {e}")
     return {}
 
 
-def save_saved_functions(mapping):
+def save_saved_triads(mapping):
     try:
         os.makedirs(os.path.dirname(CAMERA_FUNCTIONS_FILE), exist_ok=True)
         with open(CAMERA_FUNCTIONS_FILE, "w", encoding="utf-8") as f:
@@ -1281,6 +1461,91 @@ def zm_post(path, data, retry=True):
     except Exception as e:
         log.error("ZM POST %s gagal: %s", path, e)
         return 0
+
+
+def _zm_explain_response(res):
+    """Ubah respons JSON ZoneMinder menjadi (sukses: bool, pesan: str).
+
+    ZoneMinder 1.38 membalas HTTP 200 untuk DUA kondisi yang sangat berbeda:
+
+        berhasil : {"message":"Saved"}
+        validasi : {"message":{"Device":["Invalid device path. ..."]}}
+        ditolak  : {"success":false,"data":{"name":"...","message":"..."}}
+
+    Memeriksa status code saja membuat kegagalan validasi terlihat sukses.
+    Fungsi ini membaca isi body dan mengembalikan pesan yang bisa ditampilkan
+    apa adanya ke operator.
+    """
+    try:
+        body = res.json()
+    except Exception:
+        text = (res.text or "").strip()
+        return False, f"ZoneMinder membalas HTTP {res.status_code}: {text[:200] or 'tanpa isi'}"
+
+    if not isinstance(body, dict):
+        return False, f"Respons ZoneMinder tidak dikenali: {str(body)[:200]}"
+
+    # Bentuk gagal eksplisit dari CakePHP Crud.
+    if body.get("success") is False:
+        data = body.get("data") or {}
+        msg = data.get("message") or body.get("message") or "ditolak ZoneMinder"
+        return False, str(msg)
+
+    message = body.get("message")
+
+    if message == "Saved":
+        return True, "Saved"
+
+    if isinstance(message, dict):
+        # Pesan validasi per-field. Ratakan menjadi satu kalimat.
+        parts = []
+        for field, errs in message.items():
+            if isinstance(errs, (list, tuple)):
+                parts.append(f"{field}: " + "; ".join(str(e) for e in errs))
+            else:
+                parts.append(f"{field}: {errs}")
+        return False, "Validasi ZoneMinder gagal — " + " | ".join(parts)
+
+    if isinstance(message, str) and message:
+        # Contoh: "Error <pre>...</pre>" dari cabang edit().
+        return ("Saved" in message), message
+
+    return False, f"Respons ZoneMinder tidak dikenali: {str(body)[:200]}"
+
+
+def zm_post_monitor(path, data, retry=True):
+    """POST monitor/zone ke ZM dan kembalikan (ok: bool, pesan: str, body: dict).
+
+    Dipakai SEMUA jalur pembuatan & pengubahan monitor. Keberhasilan dinilai
+    dari isi respons, bukan dari status HTTP — lihat _zm_explain_response().
+    """
+    session, token = zm_authenticated_session()
+
+    q = {"token": token} if token else {}
+    try:
+        res = session.post(f"{ZM_BASE_URL}/{path}", params=q, data=data, timeout=20)
+        if res.status_code in (401, 403) and retry:
+            global ZM_SESSION_AUTHED
+            ZM_SESSION.cookies.clear()
+            ZM_SESSION_AUTHED = False
+            return zm_post_monitor(path, data, retry=False)
+
+        if res.status_code not in (200, 201):
+            return False, f"ZoneMinder membalas HTTP {res.status_code}.", {}
+
+        ok, msg = _zm_explain_response(res)
+        try:
+            body = res.json()
+        except Exception:
+            body = {}
+        if not ok:
+            log.warning("ZM POST %s ditolak: %s", path, msg)
+        return ok, msg, (body if isinstance(body, dict) else {})
+
+    except Exception as e:
+        log.error("ZM POST %s gagal: %s", path, e)
+        return False, f"Tidak dapat menghubungi ZoneMinder: {e}", {}
+
 
 
 def zm_delete(path, retry=True):
@@ -1883,20 +2148,25 @@ def get_monitor_zones(monitor_id):
     per MonitorId. Jalur bersarang tetap dicoba lebih dulu agar build yang
     menyediakannya (lebih hemat) tetap terpakai.
     """
+    # ZM 1.38.6 TIDAK punya endpoint bersarang ini (balas 404), jadi jalur
+    # utama adalah daftar global. Endpoint bersarang hanya dicoba bila daftar
+    # global gagal, supaya log tidak dipenuhi "HTTP 404" yang wajar terjadi.
     raw = None
-    nested = zm_api_get(f"monitors/{monitor_id}/zones.json")
-    if isinstance(nested, dict):
-        candidate = nested.get("zones")
+    data = zm_api_get("zones.json")
+    if isinstance(data, dict):
+        candidate = data.get("zones")
         if isinstance(candidate, list):
             raw = candidate
 
     if raw is None:
-        data = zm_api_get("zones.json")
-        if not isinstance(data, dict):
-            return None
-        raw = data.get("zones")
-        if not isinstance(raw, list):
-            return None
+        nested = zm_api_get(f"monitors/{monitor_id}/zones.json")
+        if isinstance(nested, dict):
+            candidate = nested.get("zones")
+            if isinstance(candidate, list):
+                raw = candidate
+
+    if raw is None:
+        return None
 
     zones = []
     for item in raw:
@@ -1930,6 +2200,8 @@ def find_monitor_id_by_name(name):
     for item in data.get("monitors", []) or []:
         m = _unwrap_zm(item, "Monitor")
         if isinstance(m, dict) and str(m.get("Name", "")) == want:
+            if str(m.get("Deleted", "0")).lower() in ("1", "true"):
+                continue
             mid = m.get("Id")
             if mid is not None:
                 return str(mid)
@@ -2016,16 +2288,27 @@ def ensure_zone_for_monitor(monitor_id, mode_key=None, overwrite=False, width=No
     # validasi checkMonitorId di model Zone gagal.
     payload["Zone[MonitorId]"] = str(monitor_id)
 
-    # Endpoint bersarang 404 pada ZM 1.36, jadi jalur utama adalah zone global.
-    code = zm_post("zones.json", payload)
-    if code not in (200, 201):
-        code = zm_post(f"monitors/{monitor_id}/zones.json", payload)
+    # ZM 1.38 membalas 200 untuk sukses MAUPUN gagal, jadi hasilnya dibaca
+    # dari isi respons (lihat _zm_explain_response).
+    ok, zone_message, zone_body = zm_post_monitor("zones.json", payload)
+    if not ok:
+        ok, zone_message, zone_body = zm_post_monitor(
+            f"monitors/{monitor_id}/zones.json", payload
+        )
 
-    if code not in (200, 201):
+    if not ok:
         return {
             "created": False, "skipped": False, "mode": mode,
-            "reason": f"ZoneMinder menolak pembuatan zone (HTTP {code}).",
+            "reason": f"ZoneMinder menolak pembuatan zone: {zone_message}",
         }
+
+    # ZM 1.38 menyertakan zone yang baru dibuat: {"zone":{"Zone":{"Id":N,...}}}
+    new_zone_id = None
+    zobj = zone_body.get("zone")
+    if isinstance(zobj, dict):
+        inner = zobj.get("Zone") or zobj
+        if isinstance(inner, dict):
+            new_zone_id = inner.get("Id")
 
     # ------------------------------------------------------------------
     # VERIFIKASI SETELAH SIMPAN — jangan percaya "Saved".
@@ -2043,7 +2326,7 @@ def ensure_zone_for_monitor(monitor_id, mode_key=None, overwrite=False, width=No
             "label": ZONE_MODES[mode]["label"],
             "coords": payload["Zone[Coords]"],
             "width": width, "height": height,
-            "zone_id": verify.get("zone_id"),
+            "zone_id": verify.get("zone_id") or new_zone_id,
             "area": verify.get("area"),
         }
 
@@ -2149,7 +2432,11 @@ def api_save_camera_with_zone():
     Body JSON:
       id        : ID monitor saat mengedit (kosong/null = kamera baru)
       name      : nama kamera
-      path      : URL RTSP
+      path      : URL RTSP (boleh sudah memuat user:pass@host, atau kosong
+                  kredensialnya lalu diisi lewat username/password)
+      username  : opsional — hanya dipakai bila path belum memuat kredensial
+      password  : opsional — di-percent-encode otomatis (@ -> %40)
+      analysisFps: batas laju analisa motion (default ANALYSIS_FPS_DEFAULT = 8)
       function  : Monitor | Modect | Record | Mocord | Nodect
       width     : lebar piksel
       height    : tinggi piksel
@@ -2161,41 +2448,42 @@ def api_save_camera_with_zone():
     body = request.json or {}
 
     name = str(body.get("name", "")).strip()
-    path = str(body.get("path", "")).strip()
+    raw_path = str(body.get("path", "")).strip()
     edit_id = str(body.get("id", "") or "").strip()
 
-    if not name or not path:
+    if not name or not raw_path:
         return jsonify({
             "status": "error",
             "message": "Nama kamera dan RTSP Path wajib diisi.",
         }), 400
 
+    # Perbaiki sekaligus path lama yang terlanjur rusak (user:pass@pass@host).
+    # Saat mengedit, path yang tersimpan di DB akan diperbaiki begitu operator
+    # menekan Simpan — tidak perlu menyunting database.
+    path, path_warnings = normalize_rtsp_path(
+        raw_path, body.get("username"), body.get("password")
+    )
+
     clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name)
     width = str(body.get("width") or "1920")
     height = str(body.get("height") or "1080")
-    function = str(body.get("function") or "Monitor")
-
-    payload = {
-        "Monitor[Name]": clean_name,
-        "Monitor[Type]": "Ffmpeg",
-        "Monitor[Function]": function,
-        "Monitor[Enabled]": "1",
-        "Monitor[Path]": path,
-        "Monitor[Method]": "rtsp",
-        "Monitor[Options]": "rtsp_transport=tcp",
-        "Monitor[Width]": width,
-        "Monitor[Height]": height,
-        "Monitor[Colours]": str(body.get("colorspace") or "4"),
-        "Monitor[TargetColorspace]": "4",
-        "Monitor[ServerId]": "0",
-    }
-
-    # Setelan encoding otomatis (MP4/h264). Saat MENGEDIT field ini tetap
-    # dikirim supaya kamera lama ikut memakai standar encoding yang sama.
-    enc_payload, enc_warnings = build_encoding_payload(
-        read_encoding_overrides(body)
+    # Bangun payload lengkap ZM 1.38.6 native
+    payload = build_zm138_full_payload(
+        name=clean_name,
+        path=path,
+        username=body.get("username") or body.get("user"),
+        password=body.get("password") or body.get("pass"),
+        capturing=body.get("capturing"),
+        analysing=body.get("analysing") or body.get("analysis"),
+        recording=body.get("recording") or body.get("record"),
+        width=width,
+        height=height,
+        max_fps=body.get("maxFps") or body.get("max_fps") or "10.00",
+        analysis_fps_limit=body.get("analysisFps") or body.get("analysis_fps_limit") or "8.00",
+        decoder=body.get("decoder") or "Auto",
+        enabled=body.get("enabled", "1"),
+        function=str(body.get("function") or "Monitor"),
     )
-    payload.update(enc_payload)
 
     # ID kustom hanya dipakai saat membuat kamera baru. Saat mengedit, ID
     # sudah ditentukan oleh URL target.
@@ -2208,12 +2496,16 @@ def api_save_camera_with_zone():
     else:
         target = "monitors.json"
 
-    code = zm_post(target, payload)
-    if code not in (200, 201):
+    # Sukses dinilai dari isi respons, bukan status HTTP — ZM 1.38 membalas 200
+    # untuk kegagalan validasi juga (lihat DEVICE_REQUIRED di atas).
+    # Saat MENGEDIT, jalur edit() CakePHP membalas {"message":"Saved"} bila
+    # berhasil dan "Error <pre>...</pre>" bila gagal.
+    ok, save_message, _save_body = zm_post_monitor(target, payload)
+    if not ok:
         return jsonify({
             "status": "error",
-            "message": f"ZoneMinder menolak penyimpanan kamera (HTTP {code}).",
-        }), 502
+            "message": f"ZoneMinder menolak penyimpanan kamera: {save_message}",
+        }), 400
 
     MONITOR_CACHE["ts"] = 0
 
@@ -2247,7 +2539,8 @@ def api_save_camera_with_zone():
 
     return jsonify({
         "status": "success",
-        "encoding_warnings": enc_warnings,
+        "path_warnings": path_warnings,
+        "analysis_fps": payload.get("Monitor[AnalysisFPSLimit]", "8.00"),
         "monitor_id": monitor_id,
         "name": clean_name,
         "editing": bool(edit_id),
@@ -2258,16 +2551,19 @@ def api_save_camera_with_zone():
 @app.route("/api/cameras/bulk-function", methods=["POST"])
 def bulk_set_function():
     """
-    Mengubah Function seluruh kamera sekaligus (enable/disable massal).
+    Kontrol massal triad native ZM 1.38.6 (Capturing, Analysing, Recording).
 
     Body JSON:
-      action  : "on" | "off" | "custom"
-      function: dipakai saat action="custom", mis. "Monitor" / "Mocord"
+      action  : "restore" | "off" | "triad"
       ids     : opsional, daftar ID kamera. Kosong = semua kamera.
+      triad   : wajib saat action="triad":
+                  { capturing: None|Always|Ondemand,
+                    analysing: None|Always,
+                    recording: None|OnMotion|Always }
 
-    Saat action="on", kamera yang sebelumnya "None" dikembalikan ke Fungsi
-    terakhir yang tersimpan di data/camera_functions.json. Bila belum ada
-    catatan, dipakai "Monitor" (aman: tanpa motion detection).
+    action="off"   -> Capturing=None (analisa & rekam otomatis berhenti);
+                      triad lama disimpan agar bisa dipulihkan.
+    action="restore" -> kembalikan triad terakhir yang tersimpan.
     """
     body = request.json or {}
     action = str(body.get("action", "")).strip().lower()
@@ -2281,59 +2577,77 @@ def bulk_set_function():
     if not monitors:
         return jsonify({"status": "error", "message": "Tidak ada kamera yang diproses."}), 400
 
-    saved = load_saved_functions()
+    saved = load_saved_triads()
 
-    if action == "on":
-        # Hidupkan kembali sesuai fungsi terakhir yang tercatat
+    if action == "off":
         jobs = []
         for m in monitors:
-            fn = saved.get(m["id"], "Monitor")
-            if fn not in ZM_ACTIVE_FUNCTIONS:
-                fn = "Monitor"
-            jobs.append((m["id"], fn, m["function"]))
-    elif action == "off":
+            # Ingat triad yang sedang aktif sebelum dimatikan, supaya
+            # "Pulihkan Triad Asli" tetap bisa mengembalikannya.
+            if m.get("capturing") and m["capturing"] != "None":
+                saved[m["id"]] = {
+                    "capturing": m["capturing"],
+                    "analysing": m.get("analysing", "None"),
+                    "recording": m.get("recording", "None"),
+                }
+            jobs.append((m["id"], {"capturing": "None", "analysing": "None", "recording": "None"}))
+    elif action == "restore":
         jobs = []
         for m in monitors:
-            # Ingat fungsi yang sedang aktif sebelum dimatikan, supaya
-            # "Pulihkan Fungsi Asli" tetap bisa mengembalikannya.
-            if m["function"] in ZM_ACTIVE_FUNCTIONS:
-                saved[m["id"]] = m["function"]
-            jobs.append((m["id"], ZM_OFF_FUNCTION, m["function"]))
-    elif action == "custom":
-        fn = str(body.get("function", "")).strip()
-        if fn not in ZM_ACTIVE_FUNCTIONS and fn != ZM_OFF_FUNCTION:
-            return jsonify({
-                "status": "error",
-                "message": f"Function '{fn}' tidak valid. Pilihan: {', '.join(ZM_ACTIVE_FUNCTIONS + (ZM_OFF_FUNCTION,))}"
-            }), 400
-        jobs = [(m["id"], fn, m["function"]) for m in monitors]
+            triad = saved.get(m["id"])
+            if not triad or triad.get("capturing", "None") == "None":
+                # Tidak ada catatan: pakai default aman.
+                triad = {"capturing": "Always", "analysing": "Always", "recording": "OnMotion"}
+            jobs.append((m["id"], triad))
+    elif action == "triad":
+        triad_in = body.get("triad") or {}
+        triad = {
+            "capturing": normalize_capturing(triad_in.get("capturing"), default="Always"),
+            "analysing": normalize_analysing(triad_in.get("analysing"), default="None"),
+            "recording": normalize_recording(triad_in.get("recording"), default="None"),
+        }
+        jobs = [(m["id"], triad) for m in monitors]
     else:
-        return jsonify({"status": "error", "message": "action harus 'on', 'off', atau 'custom'."}), 400
+        return jsonify({
+            "status": "error",
+            "message": "action harus 'triad', 'off', atau 'restore'."
+        }), 400
 
     results = []
     ok_count = 0
     fail_count = 0
 
-    for mon_id, new_fn, old_fn in jobs:
-        wants_enabled = new_fn != ZM_OFF_FUNCTION
-        code = zm_post(f"monitors/{mon_id}.json", {
-            "Monitor[Function]": new_fn,
-            "Monitor[Enabled]": "1" if wants_enabled else "0",
+    for mon_id, triad in jobs:
+        # Isi respons yang menentukan, bukan status HTTP (ZM 1.38 membalas 200
+        # untuk kegagalan validasi juga).
+        payload = zm138_monitor_payload({
+            "Function": derive_function_from_triad(triad["capturing"], triad["analysing"], triad["recording"]),
+            "Capturing": triad["capturing"],
+            "Analysing": triad["analysing"],
+            "Recording": triad["recording"],
+            "Enabled": "1" if triad["capturing"] != "None" else "0",
         })
+        ok, fn_message, _fn_body = zm_post_monitor(f"monitors/{mon_id}.json", payload)
 
-        if code in (200, 201):
+        if ok:
             ok_count += 1
-            results.append({"id": mon_id, "status": "ok", "function": new_fn})
-            # Catat fungsi AKTIF terakhir. Saat kamera dimatikan ("None"),
+            results.append({
+                "id": mon_id,
+                "status": "ok",
+                "capturing": triad["capturing"],
+                "analysing": triad["analysing"],
+                "recording": triad["recording"],
+            })
+            # Catat triad AKTIF terakhir. Saat kamera dimatikan (Capturing=None),
             # catatan LAMA sengaja tidak dihapus agar tombol
-            # "Pulihkan Fungsi Asli" bisa mengembalikan mode sebelumnya.
-            if wants_enabled:
-                saved[mon_id] = new_fn
+            # "Pulihkan Triad Asli" bisa mengembalikan mode sebelumnya.
+            if triad["capturing"] != "None":
+                saved[mon_id] = triad
         else:
             fail_count += 1
-            results.append({"id": mon_id, "status": "failed", "http": code})
+            results.append({"id": mon_id, "status": "failed", "error": fn_message})
 
-    save_saved_functions(saved)
+    save_saved_triads(saved)
     # Paksa refresh cache agar panggilan berikutnya membaca kondisi terbaru
     MONITOR_CACHE["ts"] = 0
 

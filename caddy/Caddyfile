@@ -20,6 +20,25 @@
     @root path /
     redir @root /zm/ 302
 
+    # go2rtc: bawaan image resmi ZoneMinder 1.38, listen internal di
+    # 127.0.0.1:1984 dan diproksikan Apache ke /zm/go2rtc/.
+    # Masalahnya: API go2rtc TIDAK punya autentikasi (login ZoneMinder tidak
+    # menaunginya) dan HLS-nya "Require all granted". Karena blok ini
+    # meneruskan SELURUH path ke ZoneMinder, tanpa pengecualian ini
+    # /zm/go2rtc/api/hls/* akan terbuka untuk publik di :443.
+    # Stack ini memakai MJPEG (/zm/cgi-bin/nph-zms) untuk wall dashboard,
+    # jadi go2rtc tidak diperlukan di permukaan publik.
+    # DIPAKSA jadi blok "handle": Caddy mengurutkan direktif "respond" SETELAH
+    # "handle" pada versi ini, sehingga "respond @matcher" tidak pernah tercapai
+    # (reverse_proxy di handle{} sudah menulis respons lebih dulu — terbukti di
+    # caddy adapt + access log). Blok handle dievaluasi sesuai urutan penulisan,
+    # jadi blok ini HARUS tetap di atas handle{} yang menangkap semua path.
+    handle /zm/go2rtc* {
+        respond "Not found" 404
+    }
+    # (baris respond lama dihapus — sudah digantikan blok handle di atas)
+
+
     # Sisanya (termasuk /zm*, /cgi-bin*, /css*, /js*, /graphics*, /ajax*)
     # seluruhnya milik ZoneMinder.
     handle {

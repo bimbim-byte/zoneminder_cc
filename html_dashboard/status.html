@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Status Server - ZoneMinder</title>
+  <link rel="stylesheet" href="app_ui.css">
+  <style>
+    .service-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      transition: background-color 0.15s;
+    }
+    .service-row:last-child { border-bottom: none; }
+    .service-row:hover { background-color: var(--bg-surface-hover); }
+    .service-info { display: flex; align-items: center; gap: 12px; }
+    .service-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-surface-alt);
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+    .service-name { font-weight: 600; font-size: 13.5px; }
+    .service-desc { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+  </style>
+</head>
+<body>
+  <header id="dashHeader"></header>
+
+  <div class="container">
+    <div class="flex items-center justify-between flex-wrap gap-3" style="margin-bottom: 24px;">
+      <div>
+        <h1 style="font-size: 20px;">Status Server</h1>
+        <p class="text-sm text-secondary" style="margin-top: 3px;">
+          Kesehatan ZoneMinder, beban server, jumlah monitor, dan kondisi stack Docker.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="checker.html" class="btn btn-outline btn-sm">&#9881;&#65039; Kontrol Checker</a>
+        <label class="checkbox-label" style="font-size: 12px; background: var(--bg-surface); padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+          <input type="checkbox" id="chkAutoRefresh" checked onchange="toggleAutoRefresh()">
+          <span>Auto Refresh (5s)</span>
+        </label>
+        <button class="btn btn-outline btn-sm" onclick="refreshAll(true)" id="btnManualRefresh">
+          <span>&#8635; Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Stat Cards -->
+    <div class="grid grid-4" style="margin-bottom: 24px;">
+      <div class="stat-box">
+        <div class="stat-icon stat-icon--info">&#128737;&#65039;</div>
+        <div class="stat-content">
+          <div class="stat-label">ZoneMinder Core</div>
+          <div class="stat-value" id="valZmStatus" style="font-size: 18px;"><span class="status-dot"></span> Memeriksa...</div>
+          <div class="stat-desc" id="valZmDesc">Versi: -</div>
+        </div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-icon stat-icon--success">&#128202;</div>
+        <div class="stat-content">
+          <div class="stat-label">Beban CPU Server</div>
+          <div class="stat-value" id="valCpuLoad" style="font-size: 18px;">-</div>
+          <div class="stat-desc" id="valCpuDesc">Load 1m | 5m | 15m</div>
+        </div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-icon stat-icon--warning">&#9881;&#65039;</div>
+        <div class="stat-content">
+          <div class="stat-label">CCTV Health Checker</div>
+          <div class="stat-value" id="valCheckerStatus" style="font-size: 18px;">-</div>
+          <div class="stat-desc" id="valCheckerDesc">Interval: -</div>
+        </div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-icon stat-icon--purple">&#128249;</div>
+        <div class="stat-content">
+          <div class="stat-label">Monitor Kamera</div>
+          <div class="stat-value" id="valCamTotal" style="font-size: 18px;">-</div>
+          <div class="stat-desc" id="valCamBreakdown">Aktif: - | Nonaktif: -</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">&#128187; Infrastruktur &amp; Layanan</div>
+          <div class="card-subtitle">Kondisi kesehatan stack microservices Docker</div>
+        </div>
+        <span class="badge badge-success">&#9679; Stack Sehat</span>
+      </div>
+
+      <div class="card-body" style="padding: 0;">
+        <div class="service-row">
+          <div class="service-info">
+            <div class="service-icon">&#128737;&#65039;</div>
+            <div>
+              <div class="service-name">ZoneMinder Core NVR</div>
+              <div class="service-desc">v1.38.6 resmi &bull; Apache Prefork</div>
+            </div>
+          </div>
+          <span id="srvZmBadge" class="badge badge-success">Terhubung</span>
+        </div>
+
+        <div class="service-row">
+          <div class="service-info">
+            <div class="service-icon">&#128451;&#65039;</div>
+            <div>
+              <div class="service-name">MariaDB 11.8 (zm_db)</div>
+              <div class="service-desc">Internal cctv_net &bull; Pool 2GB</div>
+            </div>
+          </div>
+          <span id="srvDbBadge" class="badge badge-success">Aktif</span>
+        </div>
+
+        <div class="service-row">
+          <div class="service-info">
+            <div class="service-icon">&#128274;</div>
+            <div>
+              <div class="service-name">Caddy Reverse Proxy</div>
+              <div class="service-desc">HTTPS :443 (ZM) &bull; :9443 (Dashboard)</div>
+            </div>
+          </div>
+          <span class="badge badge-success">Port Aktif</span>
+        </div>
+
+        <div class="service-row">
+          <div class="service-info">
+            <div class="service-icon">&#128187;</div>
+            <div>
+              <div class="service-name">Web Dashboard (Flask)</div>
+              <div class="service-desc">Waitress WSGI &bull; Auth PBKDF2</div>
+            </div>
+          </div>
+          <span class="badge badge-success">Online</span>
+        </div>
+
+        <div class="service-row">
+          <div class="service-info">
+            <div class="service-icon">&#128373;&#65039;</div>
+            <div>
+              <div class="service-name">CCTV Checker Service</div>
+              <div class="service-desc">TCP Socket RTSP :554 &bull; Log tersensor</div>
+            </div>
+          </div>
+          <span id="srvCheckerBadge" class="badge badge-neutral">Memuat</span>
+        </div>
+      </div>
+
+      <div class="card-footer" style="flex-direction: column; align-items: stretch; gap: 8px;">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-secondary">&#128196; Panduan Memantau Log Container</span>
+          <span class="text-xs text-muted mono">Terminal</span>
+        </div>
+        <div class="terminal-box" style="padding: 10px 12px; font-size: 11.5px;">
+          <div class="terminal-line"><span class="muted"># Pantau log CCTV Health Checker:</span></div>
+          <div class="terminal-line">docker logs -f cctv_checker_service</div>
+          <div class="terminal-line"><span class="muted"># Pantau log ZoneMinder NVR:</span></div>
+          <div class="terminal-line">docker logs -f zoneminder</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    ZoneMinder Central CCTV Management &mdash; Status Server
+  </footer>
+
+  <script src="app_shell.js"></script>
+  <script>
+    let autoRefreshTimer = null;
+    let checkerConfig = { enabled: false, interval: 600 };
+
+    async function loadChecker() {
+      try {
+        const res = await fetch('/api/checker/config');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        checkerConfig = await res.json();
+      } catch (err) {
+        console.error('Gagal memuat checker:', err);
+      }
+      const isEnabled = Boolean(checkerConfig.enabled);
+      const valStatus = document.getElementById('valCheckerStatus');
+      const valDesc = document.getElementById('valCheckerDesc');
+      const srvBadge = document.getElementById('srvCheckerBadge');
+
+      if (isEnabled) {
+        valStatus.innerHTML = '<span class="status-dot online pulse"></span> Running';
+        srvBadge.className = 'badge badge-success';
+        srvBadge.textContent = 'Running';
+      } else {
+        valStatus.innerHTML = '<span class="status-dot offline"></span> Paused';
+        srvBadge.className = 'badge badge-warning';
+        srvBadge.textContent = 'Paused';
+      }
+      valDesc.textContent = 'Interval: ' + (checkerConfig.interval || 600) + 's';
+    }
+
+    async function loadServerHealth() {
+      try {
+        const res = await fetch('/api/zm/health.json');
+        const data = await res.json();
+        const valZm = document.getElementById('valZmStatus');
+        const valZmDesc = document.getElementById('valZmDesc');
+        const srvZmBadge = document.getElementById('srvZmBadge');
+        if (res.ok && data.connected) {
+          valZm.innerHTML = '<span class="status-dot online"></span> Terhubung';
+          valZmDesc.textContent = 'Versi: ' + (data.version || '1.38.6');
+          srvZmBadge.className = 'badge badge-success';
+          srvZmBadge.textContent = 'Terhubung';
+        } else {
+          valZm.innerHTML = '<span class="status-dot offline"></span> Masalah Koneksi';
+          valZmDesc.textContent = data.message || 'Cek kredensial di Pengaturan';
+          srvZmBadge.className = 'badge badge-danger';
+          srvZmBadge.textContent = 'Gagal Login';
+        }
+      } catch (err) {
+        document.getElementById('valZmStatus').innerHTML = '<span class="status-dot offline"></span> Offline';
+      }
+
+      try {
+        const res = await fetch('/api/zm/host/getLoad.json');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.load) {
+            document.getElementById('valCpuLoad').textContent = data.load[0] + ' | ' + data.load[1];
+            document.getElementById('valCpuDesc').textContent =
+              '1m: ' + data.load[0] + ' · 5m: ' + data.load[1] + ' · 15m: ' + (data.load[2] || '-');
+          }
+        }
+      } catch (e) {
+        document.getElementById('valCpuLoad').textContent = 'N/A';
+      }
+
+      try {
+        const res = await fetch('/api/zm/monitors.json');
+        if (res.ok) {
+          const data = await res.json();
+          const monitors = data.monitors || [];
+          let total = 0, active = 0, capOn = 0, anaOn = 0, recOn = 0;
+          monitors.forEach(m => {
+            const mon = m.Monitor || m;
+            if (!mon) return;
+            if (mon.Deleted == 1 || mon.Deleted == '1' || mon.Deleted === true) return;
+            total++;
+            if (mon.Capturing === 'Always') { active++; capOn++; }
+            if (mon.Analysing === 'Always') anaOn++;
+            if (mon.Recording === 'Always' || mon.Recording === 'OnMotion') recOn++;
+          });
+          document.getElementById('valCamTotal').textContent = total + ' Kamera';
+          document.getElementById('valCamBreakdown').textContent =
+            'Aktif: ' + active + ' · Cap:' + capOn + ' Ana:' + anaOn + ' Rec:' + recOn;
+        }
+      } catch (e) {
+        document.getElementById('valCamTotal').textContent = '-';
+      }
+    }
+
+    async function refreshAll(showNotify) {
+      const btn = document.getElementById('btnManualRefresh');
+      if (btn) btn.disabled = true;
+      await Promise.all([loadChecker(), loadServerHealth()]);
+      if (btn) btn.disabled = false;
+      if (showNotify) window.showToast('Data status server diperbarui.', 'info');
+    }
+
+    function toggleAutoRefresh() {
+      if (document.getElementById('chkAutoRefresh').checked) startAutoRefresh();
+      else stopAutoRefresh();
+    }
+
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      autoRefreshTimer = setInterval(() => refreshAll(false), 5000);
+    }
+
+    function stopAutoRefresh() {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      refreshAll(false);
+      startAutoRefresh();
+    });
+  </script>
+</body>
+</html>

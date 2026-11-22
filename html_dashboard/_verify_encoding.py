@@ -1,8 +1,12 @@
-"""Verifikasi encoding default terhadap ZoneMinder 1.36.32 yang berjalan.
+"""Verifikasi encoding default terhadap ZoneMinder 1.38.6 yang berjalan.
 
 Dijalankan DI DALAM container camera-dashboard. Membuat monitor uji melalui
 tiga jalur (payload tunggal, burst, save-camera), lalu membaca kembali nilai
 yang benar-benar tersimpan di ZoneMinder.
+
+Catatan sumber RTSP: tipe monitor Ffmpeg di ZM 1.38 hanya mengenali Method
+rtpRtsp / rtpUni / rtpMulti / rtpRtspHttp. Transport dikodekan oleh Method,
+bukan oleh Monitor[Options] — lihat komentar ZM_FFMPEG_METHOD di app.py.
 """
 import sys
 import time
@@ -76,9 +80,12 @@ p1 = {
     "Monitor[Type]": "Ffmpeg",
     "Monitor[Function]": "Monitor",
     "Monitor[Enabled]": "1",
+    # WAJIB walau kosong: tanpa kunci ini ZM 1.38 menolak validasi Device
+    # (pesan "Invalid device path"), padahal balasannya tetap HTTP 200.
+    "Monitor[Device]": "",
     "Monitor[Path]": "rtsp://127.0.0.1:8554/probe",
-    "Monitor[Method]": "rtsp",
-    "Monitor[Options]": "rtsp_transport=tcp",
+    "Monitor[Method]": dash.ZM_FFMPEG_METHOD,
+    "Monitor[Options]": dash.ZM_FFMPEG_OPTIONS,
     "Monitor[Width]": "1280",
     "Monitor[Height]": "720",
     "Monitor[Colours]": "4",
@@ -113,9 +120,12 @@ p2 = {
     "Monitor[Type]": "Ffmpeg",
     "Monitor[Function]": "Monitor",
     "Monitor[Enabled]": "1",
+    # WAJIB walau kosong: tanpa kunci ini ZM 1.38 menolak validasi Device
+    # (pesan "Invalid device path"), padahal balasannya tetap HTTP 200.
+    "Monitor[Device]": "",
     "Monitor[Path]": "rtsp://127.0.0.1:8554/probe",
-    "Monitor[Method]": "rtsp",
-    "Monitor[Options]": "rtsp_transport=tcp",
+    "Monitor[Method]": dash.ZM_FFMPEG_METHOD,
+    "Monitor[Options]": dash.ZM_FFMPEG_OPTIONS,
     "Monitor[Width]": "1280",
     "Monitor[Height]": "720",
     "Monitor[Colours]": "4",
@@ -153,4 +163,3 @@ if FAILS:
         print("  -", f)
     sys.exit(1)
 print("SEMUA JALUR LULUS - encoding default tersimpan sesuai permintaan")
- 
