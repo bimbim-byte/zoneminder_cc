@@ -4,7 +4,12 @@ import sys
 sys.path.insert(0, "/app")
 import app as dash  # noqa: E402
 
-TEST_PREFIXES = ("EVF_SINGLE_TEST", "EVF_BURST_TEST", "E2E_TESTCAM", "PARITY_TEST")
+TEST_PREFIXES = (
+    "EVF_SINGLE_TEST", "EVF_BURST_TEST", "E2E_TESTCAM", "PARITY_TEST",
+    # Monitor uji jalur encoding / Excel / burst.
+    "XL_A_", "XL_B_", "XL_C_", "XL_D_", "Enc_Single_", "Enc_Burst_",
+    "KW_PROBE", "BROWSER_PROBE", "BURST_TEST", "ZONE_TEST", "ZMFIELD",
+)
 
 data = dash.zm_api_get("monitors.json") or {}
 removed = 0

@@ -64,6 +64,190 @@
         if (current) setDecoderValue(select, current);
     }
 
+    /* ======================================================================
+       ENCODING VIDEO ZM 1.38.6 — DAFTAR BERSAMA
+       Nilai di bawah mengikuti konsol ZoneMinder 1.38.6 apa adanya. Halaman
+       hanya mengisinya, tidak menyalin, supaya pilihan di jalur satuan,
+       burst, dan impor Excel tidak pernah berbeda.
+       ====================================================================== */
+
+    /* VideoWriter: 0=Disabled, 1=Encode, 2=Camera Passthrough (Ffmpeg). */
+    var ZM_VIDEO_WRITERS = [
+        { value: '1', label: 'Encode (Rekam & Encode Video)' },
+        { value: '0', label: 'Disabled (Tanpa Penulisan Video)' },
+        { value: '2', label: 'Camera Passthrough (Simpan Stream Asli)' }
+    ];
+
+    /* OutputCodec dikirim BERPASANGAN dengan OutputCodecName: API ZM
+       memvalidasi kode int, sedangkan UI ZM membaca nama. */
+    var ZM_OUTPUT_CODECS = [
+        { value: 'auto', label: 'Auto (mengikuti sumber)', code: '0' },
+        { value: 'h264', label: 'H.264 / AVC (paling kompatibel)', code: '27' },
+        { value: 'hevc', label: 'H.265 / HEVC (lebih hemat bitrate)', code: '173' },
+        { value: 'vp9', label: 'VP9 (WebM-friendly)', code: '167' },
+        { value: 'av1', label: 'AV1 (paling efisien, CPU berat)', code: '226' }
+    ];
+
+    /* OutputContainer: HANYA auto/mp4/mkv yang diterima API ZM 1.38.6.
+       'webm' ditolak dan menggagalkan SELURUH penyimpanan monitor. */
+    var ZM_OUTPUT_CONTAINERS = [
+        { value: 'mp4', label: 'MP4 (disarankan)' },
+        { value: 'mkv', label: 'MKV (Matroska)' },
+        { value: 'auto', label: 'Auto (biarkan ZM)' }
+    ];
+
+    var ZM_ENCODERS = [
+        'auto', 'libx264', 'h264', 'h264_nvenc', 'h264_omx', 'h264_qsv',
+        'h264_vaapi', 'h264_v4l2m2m', 'libx265', 'hevc_nvenc', 'hevc_qsv',
+        'hevc_vaapi', 'libvpx-vp9', 'vp9-qsv', 'libsvtav1', 'libaom-av1',
+        'av1_qsv', 'av1_vaapi', 'av1_nvenc'
+    ];
+
+    var ZM_ENCODER_PARAMETERS_DEFAULT = 'crf=23';
+
+    /* Isi sebuah <select> dari daftar {value,label}. Nilai yang sedang aktif
+       dipertahankan bila masih ada; nilai lama yang tidak ada di daftar
+       ditambahkan sebagai opsi agar form edit tidak merusak konfigurasi. */
+    function fillSelect(select, items, preferred) {
+        if (!select) return;
+        var current = preferred !== undefined ? preferred : select.value;
+        select.innerHTML = '';
+        items.forEach(function (item) {
+            var opt = document.createElement('option');
+            opt.value = String(item.value);
+            opt.textContent = item.label;
+            select.appendChild(opt);
+        });
+        if (current !== undefined && current !== null && String(current) !== '') {
+            var found = false;
+            for (var i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === String(current)) { found = true; break; }
+            }
+            if (!found) {
+                var extra = document.createElement('option');
+                extra.value = String(current);
+                extra.textContent = String(current);
+                select.appendChild(extra);
+            }
+            select.value = String(current);
+        }
+    }
+
+    function fillVideoWriterOptions(select, preferred) {
+        fillSelect(select, ZM_VIDEO_WRITERS, preferred);
+    }
+
+    function fillOutputCodecOptions(select, preferred) {
+        fillSelect(select, ZM_OUTPUT_CODECS, preferred);
+    }
+
+    function fillOutputContainerOptions(select, preferred) {
+        fillSelect(select, ZM_OUTPUT_CONTAINERS, preferred);
+    }
+
+    function fillEncoderOptions(select, preferred) {
+        fillSelect(select, ZM_ENCODERS.map(function (e) {
+            return { value: e, label: e === 'auto' ? 'auto (pilih otomatis)' : e };
+        }), preferred);
+    }
+
+    /* Blok encoding (Codec/Encoder/Parameters/Container) hanya relevan saat
+       VideoWriter = Encode (1). Saat Disabled/Passthrough, ZM mengabaikan
+       nilai di dalamnya — jadi kontrolnya disembunyikan supaya operator
+       tidak menyetel sesuatu yang tidak akan dipakai. */
+    function toggleEncodingBlock(writerSelect, blockEl) {
+        if (!blockEl) return;
+        var isEncode = String(writerSelect && writerSelect.value) === '1';
+        blockEl.style.display = isEncode ? '' : 'none';
+    }
+
+    /* Isi semua kontrol encoding pada satu wadah (form tunggal atau panel
+       default burst). Setiap id diberi awalan yang sama supaya halaman bisa
+       memakai satu fungsi untuk beberapa lokasi. */
+    function fillEncodingControls(root, values) {
+        if (!root) return;
+        var v = values || {};
+        fillVideoWriterOptions(root.querySelector('[data-encoding="videoWriter"]'), v.videoWriter);
+        fillOutputCodecOptions(root.querySelector('[data-encoding="outputCodec"]'), v.outputCodec);
+        fillEncoderOptions(root.querySelector('[data-encoding="encoder"]'), v.encoder);
+        fillOutputContainerOptions(root.querySelector('[data-encoding="outputContainer"]'), v.outputContainer);
+
+        var params = root.querySelector('[data-encoding="encoderParameters"]');
+        if (params) params.value = v.encoderParameters || ZM_ENCODER_PARAMETERS_DEFAULT;
+
+        var storage = root.querySelector('[data-encoding="storageId"]');
+        if (storage && v.storageId !== undefined && v.storageId !== null) {
+            storage.value = String(v.storageId);
+        }
+
+        var writer = root.querySelector('[data-encoding="videoWriter"]');
+        toggleEncodingBlock(writer, root.querySelector('[data-encoding-block="encode"]'));
+    }
+
+    /* Baca nilai encoding dari satu wadah menjadi objek siap kirim ke API.
+       Field yang tidak ada di DOM (blok tersembunyi) sengaja dikirim dengan
+       nilai default yang SAH agar backend tidak pernah menerima enum kosong
+       — nilai enum kosong membuat ZM menolak seluruh simpan. */
+    function readEncodingControls(root) {
+        if (!root) return {};
+        var out = {};
+        var writer = root.querySelector('[data-encoding="videoWriter"]');
+        out.videoWriter = writer ? writer.value : '1';
+
+        var storage = root.querySelector('[data-encoding="storageId"]');
+        if (storage && storage.value !== '') out.storageId = storage.value;
+
+        var isEncode = String(out.videoWriter) === '1';
+        var codec = root.querySelector('[data-encoding="outputCodec"]');
+        var encoder = root.querySelector('[data-encoding="encoder"]');
+        var params = root.querySelector('[data-encoding="encoderParameters"]');
+        var container = root.querySelector('[data-encoding="outputContainer"]');
+
+        out.outputCodec = (isEncode && codec && codec.value) ? codec.value : 'auto';
+        out.encoder = (isEncode && encoder && encoder.value) ? encoder.value : 'auto';
+        out.encoderParameters = (params && params.value.trim())
+            ? params.value.trim() : ZM_ENCODER_PARAMETERS_DEFAULT;
+        out.outputContainer = (container && container.value) ? container.value : 'mp4';
+        return out;
+    }
+
+    /* Muat area penyimpanan ZoneMinder (endpoint dashboard, bukan ZM
+       langsung, supaya kredensial tetap di server). Kegagalan tidak pernah
+       memblokir pendaftaran: dropdown diisi Default/1 sebagai fallback. */
+    function loadStorageAreas(select, preferred) {
+        if (!select) return Promise.resolve([]);
+        var fallback = [{ id: '1', name: 'Default' }];
+
+        function apply(items) {
+            var current = preferred !== undefined && preferred !== null && String(preferred) !== ''
+                ? String(preferred) : select.value;
+            select.innerHTML = '';
+            items.forEach(function (s) {
+                var opt = document.createElement('option');
+                opt.value = String(s.id);
+                opt.textContent = s.name + ' (ID ' + s.id + ')' + (s.path ? ' — ' + s.path : '');
+                select.appendChild(opt);
+            });
+            if (!select.options.length) {
+                var opt2 = document.createElement('option');
+                opt2.value = '1';
+                opt2.textContent = 'Default (ID 1)';
+                select.appendChild(opt2);
+            }
+            select.value = current && select.querySelector('option[value="' + current + '"]')
+                ? current : select.options[0].value;
+            return items;
+        }
+
+        return fetch('/api/zm/storageareas')
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var items = (d && Array.isArray(d.storages)) ? d.storages : [];
+                return apply(items.length ? items : fallback);
+            })
+            .catch(function () { return apply(fallback); });
+    }
+
     var NAV = [
         { href: '/',                 label: 'Portal',            icon: '&#127968;' },
         { href: '/zoneminder.html',  label: 'Kelola Kamera',     icon: '&#128737;&#65039;' },
@@ -282,6 +466,21 @@
     window.decoderLabel = decoderLabel;
     window.setDecoderValue = setDecoderValue;
     window.fillDecoderOptions = fillDecoderOptions;
+
+    /* Utilitas Encoding Video ZM 1.38.6 — satu daftar untuk semua halaman. */
+    window.ZM_VIDEO_WRITERS = ZM_VIDEO_WRITERS;
+    window.ZM_OUTPUT_CODECS = ZM_OUTPUT_CODECS;
+    window.ZM_OUTPUT_CONTAINERS = ZM_OUTPUT_CONTAINERS;
+    window.ZM_ENCODERS = ZM_ENCODERS;
+    window.ZM_ENCODER_PARAMETERS_DEFAULT = ZM_ENCODER_PARAMETERS_DEFAULT;
+    window.fillVideoWriterOptions = fillVideoWriterOptions;
+    window.fillOutputCodecOptions = fillOutputCodecOptions;
+    window.fillOutputContainerOptions = fillOutputContainerOptions;
+    window.fillEncoderOptions = fillEncoderOptions;
+    window.toggleEncodingBlock = toggleEncodingBlock;
+    window.fillEncodingControls = fillEncodingControls;
+    window.readEncodingControls = readEncodingControls;
+    window.loadStorageAreas = loadStorageAreas;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', mount);

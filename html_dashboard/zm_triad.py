@@ -104,6 +104,72 @@ VALID_DECODERS = (
     "av1_cuvid",
 )
 
+# VideoWriter ZM 1.38.6 (lihat skins/classic/views/monitor.php):
+#   0 = Disabled, 1 = Encode, 2 = Camera Passthrough (khusus tipe Ffmpeg).
+VIDEO_WRITER_VALUES = {
+    "0": "Disabled",
+    "1": "Encode",
+    "2": "Camera Passthrough",
+}
+
+# OutputCodec di tabel Monitors adalah int (divalidasi CakePHP: 0/27/173/167/226),
+# sedangkan UI ZoneMinder 1.38.6 memakai kolom OutputCodecName (varchar).
+# Keduanya DIKIRIM BERPASANGAN supaya konsisten: monitor tetap bisa dibaca
+# dengan benar dari konsol ZM maupun API.
+OUTPUT_CODECS = {
+    "auto": ("auto", "0"),
+    "h264": ("h264", "27"),
+    "hevc": ("hevc", "173"),
+    "vp9": ("vp9", "167"),
+    "av1": ("av1", "226"),
+}
+
+# Label UI -> kunci kanonik. 'h265' adalah sebutan umum untuk hevc.
+OUTPUT_CODEC_ALIASES = {
+    "auto": "auto",
+    "h264": "h264",
+    "h265": "hevc",
+    "hevc": "hevc",
+    "vp9": "vp9",
+    "av1": "av1",
+}
+
+# OutputContainer: MySQL mengizinkan 'auto','mp4','mkv','webm', TAPI validasi
+# CakePHP API ZM 1.38.6 hanya menerima Auto/Mp4/Mkv — 'webm' ditolak dan
+# menggagalkan SELURUH penyimpanan (terbukti lewat probe ke ZM hidup).
+# Karena itu 'webm' TIDAK ditawarkan di dashboard.
+OUTPUT_CONTAINERS = {
+    "": "auto (biarkan ZM)",
+    "auto": "auto",
+    "mp4": "mp4",
+    "mkv": "mkv",
+}
+
+# Daftar encoder mengikuti halaman Monitor ZM 1.38.6 apa adanya.
+VALID_ENCODERS = (
+    "auto",
+    "libx264",
+    "h264",
+    "h264_nvenc",
+    "h264_omx",
+    "h264_qsv",
+    "h264_vaapi",
+    "h264_v4l2m2m",
+    "libx265",
+    "hevc_nvenc",
+    "hevc_qsv",
+    "hevc_vaapi",
+    "libvpx-vp9",
+    "vp9-qsv",
+    "libsvtav1",
+    "libaom-av1",
+    "av1_qsv",
+    "av1_vaapi",
+    "av1_nvenc",
+)
+
+DEFAULT_ENCODER_PARAMETERS = "crf=23"
+
 ZM_OFF_FUNCTION = "None"
 ZM_ACTIVE_FUNCTIONS = ("Monitor", "Modect", "Record", "Mocord", "Nodect")
 
@@ -120,7 +186,11 @@ ZM_TRIAD_DEFAULTS = {
 ZM138_BASE_DEFAULTS = {
     "Type": "Ffmpeg",
     "ServerId": "0",
-    "StorageId": "0",
+    # Area penyimpanan rekaman. 1 = 'Default' (storage bawaan ZM). Nilai 0
+    # berarti "tanpa area" dan membuat ZM memakai lokasi global — operator
+    # hampir selalu ingin rekaman masuk ke area Default, jadi 1 dipakai
+    # sebagai default. Daftar sah diambil dari /zm/api/storage.json.
+    "StorageId": "1",
     "Method": "rtpRtsp",
     "Options": "",
     "AnalysisSource": "Primary",
@@ -209,6 +279,102 @@ ZM138_BASE_DEFAULTS = {
     "MQTT_Subscriptions": "",
     "StartupDelay": "0",
 }
+
+
+def normalize_storage_id(val, default="1"):
+    """Normalisasi StorageId: angka area penyimpanan ZM.
+
+    Nilai kosong/negatif/tidak valid jatuh ke default (1 = area 'Default').
+    Daftar sah diambil dari API /zm/api/storage.json oleh endpoint dashboard;
+    di sini hanya dijaga agar tipenya benar-benar bilangan bulat.
+    """
+    try:
+        n = int(float(str(val).strip()))
+    except (ValueError, TypeError):
+        return str(default)
+    if n < 0 or n > 65535:
+        return str(default)
+    return str(n)
+
+
+def normalize_video_writer(val, default="1"):
+    """Normalisasi VideoWriter ZM 1.38: 0=Disabled, 1=Encode, 2=Camera Passthrough.
+
+    Menerima juga label UI ('Encode', 'Camera Passthrough', 'Disabled') supaya
+    nilai dari Excel yang diisi manusia tetap terbaca.
+    """
+    v = str(val if val is not None else "").strip().lower()
+    if v in ("0", "disabled", "off", "none", "false", "no"):
+        return "0"
+    if v in ("1", "encode", "enabled", "on", "true", "yes"):
+        return "1"
+    if v in ("2", "camera passthrough", "camera-passthrough", "passthrough", "pass-through"):
+        return "2"
+    return str(default)
+
+
+def normalize_output_codec(val, default="auto"):
+    """Normalisasi OutputCodec ke kunci kanonik (auto|h264|hevc|vp9|av1).
+
+    Menerima kode integer ZM (0/27/173/167/226) maupun nama ('h265', 'HEVC').
+    Mengembalikan KUNCI, bukan kode int — pemetaan ke pasangan
+    (OutputCodec, OutputCodecName) dilakukan di build_zm138_full_payload()
+    supaya keduanya tidak pernah terpisah.
+    """
+    v = str(val if val is not None else "").strip().lower()
+    if not v:
+        return default
+    if v in OUTPUT_CODEC_ALIASES:
+        return OUTPUT_CODEC_ALIASES[v]
+    for key, (_, code) in OUTPUT_CODECS.items():
+        if v == code:
+            return key
+    return default
+
+
+def normalize_encoder(val, default="auto"):
+    """Normalisasi Encoder FFmpeg.
+
+    Hanya nilai yang ada di daftar ZM yang dipakai; nilai tak dikenal jatuh ke
+    default ('auto'). Berbeda dari Decoder (yang nilainya bebas karena bisa
+    memuat akselerator khusus), kolom Encoder divalidasi konsol ZM, sehingga
+    nilai asing akan menyulitkan operator saat membuka form di ZM.
+    """
+    v = str(val if val is not None else "").strip()
+    if not v:
+        return default
+    for enc in VALID_ENCODERS:
+        if enc.lower() == v.lower():
+            return enc
+    return default
+
+
+def normalize_encoder_parameters(val, default=DEFAULT_ENCODER_PARAMETERS):
+    """Normalisasi EncoderParameters (teks bebas, mis. 'crf=23').
+
+    Nilai kosong jatuh ke default. Baris baru dibuang karena kolomnya TEXT
+    dan hanya dipakai FFmpeg sebagai satu rangkaian argumen.
+    """
+    v = str(val if val is not None else "").strip()
+    if not v:
+        return default
+    return v.replace("\r", " ").replace("\n", " ")
+
+
+def normalize_output_container(val, default="mp4"):
+    """Normalisasi OutputContainer ke nilai yang DITERIMA API ZM 1.38.6.
+
+    MySQL mengizinkan 'webm', tapi validasi CakePHP API hanya menerima
+    Auto/Mp4/Mkv dan menolak 'webm' dengan menggagalkan seluruh penyimpanan.
+    Karena itu 'webm' dipetakan ke default supaya satu nilai Excel yang salah
+    tidak mematikan pembuatan monitor.
+    """
+    v = str(val if val is not None else "").strip().lower()
+    if v in ("auto", ""):
+        return "auto" if v == "auto" else default
+    if v in ("mp4", "mkv"):
+        return v
+    return default
 
 
 def normalize_capturing(val, default="Always"):
@@ -423,10 +589,26 @@ def build_zm138_full_payload(
     fps_report_interval=250,
     importance="Normal",
     startup_delay=0,
+    storage_id=1,
+    video_writer=1,
+    output_codec="auto",
+    encoder="auto",
+    encoder_parameters=DEFAULT_ENCODER_PARAMETERS,
+    output_container="mp4",
 ):
     """
     Membangun dictionary payload POST ke ZM API v1.38.6 ('Monitor[Key]': Value)
     yang persis cocok dengan struktur monitor native ZoneMinder 1.38.6.
+
+    Parameter encoding (storage_id, video_writer, output_codec, encoder,
+    encoder_parameters, output_container) mengikuti aturan ZM 1.38.6:
+      * OutputCodec (int) dan OutputCodecName (varchar) selalu dikirim
+        BERPASANGAN — kodec int 0/27/173/167/226 divalidasi CakePHP.
+      * OutputContainer hanya boleh auto/mp4/mkv; 'webm' ditolak API dan
+        menggagalkan seluruh simpan (lihat normalize_output_container).
+      * Bila VideoWriter bukan Encode (0=Disabled, 2=Camera Passthrough),
+        kodec dan encoder tidak dipakai ZM, jadi dikembalikan ke auto agar
+        tidak ada setelan lama yang tertinggal dan membingungkan operator.
     """
     clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(name or "CCTV").strip())
 
@@ -465,6 +647,29 @@ def build_zm138_full_payload(
         "Importance": normalize_importance(importance),
     }
 
+    # Field encoding: tipe di sini WAJIB sesuai kolom tabel Monitors.
+    # OutputCodec = int (0/27/173/167/226), OutputCodecName = varchar
+    # (auto/h264/hevc/vp9/av1). Keduanya dikirim berpasangan supaya konsol
+    # ZM dan API membaca setelan yang sama.
+    writer_val = normalize_video_writer(video_writer)
+    codec_key = normalize_output_codec(output_codec)
+    enc_val = normalize_encoder(encoder)
+    if writer_val != "1":
+        # Disabled / Camera Passthrough: kodec dan encoder tidak dipakai ZM.
+        codec_key = "auto"
+        enc_val = "auto"
+    codec_name, codec_code = OUTPUT_CODECS[codec_key]
+
+    encoding_fields = {
+        "StorageId": normalize_storage_id(storage_id),
+        "VideoWriter": writer_val,
+        "OutputCodec": codec_code,
+        "OutputCodecName": codec_name,
+        "Encoder": enc_val,
+        "EncoderParameters": normalize_encoder_parameters(encoder_parameters),
+        "OutputContainer": normalize_output_container(output_container),
+    }
+
     # Salin default dasar
     monitor_fields = dict(ZM138_BASE_DEFAULTS)
 
@@ -491,6 +696,11 @@ def build_zm138_full_payload(
     # Diterapkan setelah field utama, sebelum overrides, sehingga nilai dari
     # form selalu menang atas default ZM138_BASE_DEFAULTS.
     monitor_fields.update(event_fields)
+
+    # Field encoding video DITERAPKAN di sini. Tanpa baris ini nilai default
+    # ZM138_BASE_DEFAULTS selalu menang dan pilihan operator (Storage,
+    # VideoWriter, kodec, encoder, container) diam-diam hilang.
+    monitor_fields.update(encoding_fields)
 
     # Terapkan overrides jika ada
     if isinstance(overrides, dict):

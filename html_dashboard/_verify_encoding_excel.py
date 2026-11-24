@@ -1,8 +1,18 @@
 """Uji ujung-ke-ujung jalur Excel/Burst terhadap ZoneMinder yang berjalan.
 
 Menirukan persis apa yang dikirim burst.html setelah berkas Excel dibaca:
-satu objek Monitor per baris, dengan kolom encoding ikut sebagai field datar.
-Lalu menegaskan nilai yang benar-benar tersimpan di database ZoneMinder.
+satu objek Monitor per baris, dengan kolom encoding ikut sebagai field datar
+(Storage, Video Writer, Output Codec, Encoder, Encoder Parameters,
+Output Container). Lalu menegaskan nilai yang benar-benar tersimpan di
+database ZoneMinder.
+
+Yang diperiksa:
+  1. Kolom encoding per baris MENANG atas default panel.
+  2. Baris tanpa kolom encoding mewarisi default (bukan dikosongkan).
+  3. VideoWriter bukan Encode -> kodec & encoder dikunci 'auto' (0/'auto'),
+     karena ZM tidak memakainya.
+  4. OutputContainer selalu bernilai sah (auto/mp4/mkv), tidak pernah NULL.
+  5. Peringatan preflight encoding dilaporkan, bukan menggagalkan simpan.
 """
 import sys
 import time
@@ -35,8 +45,8 @@ def db_row(name):
 
 c = client()
 
-# Baris ini meniru hasil pembacaan Excel: kolom encoding sudah dipetakan
-# oleh readEncodingCells() di browser menjadi kunci tanpa spasi.
+# Baris ini meniru hasil pembacaan Excel. Kolom encoding ditulis seperti di
+# template (dengan spasi) supaya variasi nama kolom ikut teruji.
 rows = [
     {
         "Name": "XL_A_" + STAMP,
@@ -44,8 +54,12 @@ rows = [
         "Width": "1920",
         "Height": "1080",
         "ZoneMode": "medium",
+        "Storage": 1,
+        "Video Writer": "Encode",
+        "Output Codec": "h264",
         "Encoder": "libx264",
-        "EncoderParameters": "crf=23",
+        "Encoder Parameters": "crf=23",
+        "Output Container": "mp4",
         "SectionLength": "300",
     },
     {
@@ -54,8 +68,12 @@ rows = [
         "Width": "1280",
         "Height": "720",
         "ZoneMode": "light",
+        "Storage": 1,
+        "Video Writer": "Encode",
+        "Output Codec": "h265",
         "Encoder": "libx265",
-        "EncoderParameters": "crf=28",
+        "Encoder Parameters": "crf=28",
+        "Output Container": "mkv",
         "SectionLength": "90",
     },
     {
@@ -64,6 +82,19 @@ rows = [
         "Path": "rtsp://127.0.0.1:8554/c",
         "Width": "1280",
         "Height": "720",
+    },
+    {
+        # VideoWriter Disabled -> kodec & encoder tidak dipakai ZM.
+        "Name": "XL_D_" + STAMP,
+        "Path": "rtsp://127.0.0.1:8554/d",
+        "Width": "1280",
+        "Height": "720",
+        "Storage": 1,
+        "Video Writer": "Disabled",
+        "Output Codec": "h264",
+        "Encoder": "libx264",
+        "Encoder Parameters": "crf=23",
+        "Output Container": "mp4",
     },
 ]
 
@@ -81,14 +112,43 @@ if data.get("fail_count"):
     FAILS.append("ada baris gagal: " + str(data.get("details")))
 
 EXPECT = {
-    "XL_A_" + STAMP: {"Encoder": "libx264", "EncoderParameters": "crf=23",
-                      "SectionLength": "300"},
-    "XL_B_" + STAMP: {"Encoder": "libx265", "EncoderParameters": "crf=28",
-                      "SectionLength": "90"},
-    # Baris tanpa kolom encoding harus memakai nilai default.
-    "XL_C_" + STAMP: {"Encoder": d.MONITOR_ENCODING_DEFAULTS["Encoder"],
-                      "EncoderParameters": d.MONITOR_ENCODING_DEFAULTS["EncoderParameters"],
-                      "SectionLength": d.MONITOR_ENCODING_DEFAULTS["SectionLength"]},
+    "XL_A_" + STAMP: {
+        "Encoder": "libx264",
+        "EncoderParameters": "crf=23",
+        "SectionLength": "300",
+        "VideoWriter": "1",
+        "OutputCodec": "27",
+        "OutputCodecName": "h264",
+        "OutputContainer": "mp4",
+    },
+    "XL_B_" + STAMP: {
+        "Encoder": "libx265",
+        "EncoderParameters": "crf=28",
+        "SectionLength": "90",
+        "VideoWriter": "1",
+        "OutputCodec": "173",
+        "OutputCodecName": "hevc",
+        "OutputContainer": "mkv",
+    },
+    # Tanpa kolom encoding: seluruh nilai default 1.38.6.
+    "XL_C_" + STAMP: {
+        "Encoder": d.MONITOR_ENCODING_DEFAULTS["Encoder"],
+        "EncoderParameters": d.MONITOR_ENCODING_DEFAULTS["EncoderParameters"],
+        "SectionLength": d.MONITOR_ENCODING_DEFAULTS["SectionLength"],
+        "VideoWriter": d.MONITOR_ENCODING_DEFAULTS["VideoWriter"],
+        "OutputCodec": d.MONITOR_ENCODING_DEFAULTS["OutputCodec"],
+        "OutputCodecName": d.MONITOR_ENCODING_DEFAULTS["OutputCodecName"],
+        "OutputContainer": d.MONITOR_ENCODING_DEFAULTS["OutputContainer"],
+    },
+    # VideoWriter Disabled: kodec/encoder 'auto', container tetap sah.
+    "XL_D_" + STAMP: {
+        "Encoder": "auto",
+        "EncoderParameters": "crf=23",
+        "VideoWriter": "0",
+        "OutputCodec": "0",
+        "OutputCodecName": "auto",
+        "OutputContainer": "mp4",
+    },
 }
 
 print()
@@ -107,30 +167,25 @@ for name, want in EXPECT.items():
         if not ok:
             FAILS.append(name + "." + field)
 
-    # Setiap kolom encoding lain harus tetap terisi default.
-    for field, default in d.MONITOR_ENCODING_DEFAULTS.items():
-        got = mon.get(field)
-        got_s = "" if got is None else str(got)
-        if got_s != str(default) and field not in want:
-            print("  WARN " + field + " = " + repr(got_s) + " (default "
-                  + repr(str(default)) + ")")
-            FAILS.append(name + ".default." + field)
-
     container = mon.get("OutputContainer")
     print("  OutputContainer =", repr(container))
-    if container not in (None, ""):
-        FAILS.append(name + ".OutputContainer tidak NULL")
+    if container in (None, ""):
+        FAILS.append(name + ".OutputContainer kosong/NULL")
 
     # Kolom non-encoding tidak boleh rusak.
     for field in ("Name", "Path", "Width", "Height"):
         print("  " + field + " =", repr(mon.get(field)))
 
-# Peringatan preflight harus muncul untuk baris SectionLength=90 (<100 frame).
-warns = data["details"][1].get("encoding_warnings") if len(data["details"]) > 1 else None
+# Peringatan preflight harus muncul untuk baris SectionLength=90 (< pre+post 50+50).
+details = data.get("details") or []
 print()
-print("encoding_warnings baris kedua:", warns)
-if not warns:
-    FAILS.append("peringatan preflight tidak muncul untuk SectionLength=90")
+if len(details) > 1:
+    warns = details[1].get("encoding_warnings")
+    print("encoding_warnings baris kedua:", warns)
+    if not warns:
+        FAILS.append("peringatan preflight tidak muncul untuk SectionLength=90")
+else:
+    FAILS.append("detail baris kedua tidak ada")
 
 print()
 print("--- bersihkan ---")
@@ -145,5 +200,5 @@ if FAILS:
     for f in FAILS:
         print("  -", f)
     sys.exit(1)
-print("JALUR EXCEL LULUS - penimpaan per baris dan pewarisan default benar")
- 
+print("JALUR EXCEL LULUS - penimpaan per baris, pewarisan default, dan "
+      "pasangan kodec benar")

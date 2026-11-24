@@ -105,4 +105,45 @@ print("")
 if FAILED:
     print("GAGAL: %d pemeriksaan" % len(FAILED))
     sys.exit(1)
+print("[5] Field encoding video (Storage/VideoWriter/Codec/Encoder/Container)")
+ENC_UI = ["storageId", "videoWriter", "outputCodec", "encoder",
+          "encoderParameters", "outputContainer"]
+add_src = read("add_camera.html")
+missing = [f for f in ENC_UI if ('id="%s"' % f) not in add_src]
+check(not missing, "add_camera.html memuat 6 kontrol encoding (%s)" % (missing or "lengkap"))
+check('data-encoding-section' in add_src and 'data-encoding-block="encode"' in add_src,
+      "kontrol model encoding hanya tampil saat VideoWriter=Encode")
+check("readEncodingControls" in add_src, "add_camera.html mengirim field encoding saat submit")
+
+burst_src = read("burst.html")
+for token in ["defaultStorageId", "defaultVideoWriter", "defaultOutputCodec",
+              "defaultOutputContainer", "defaultEncoder",
+              "defaultEncoderParameters"]:
+    check(token in burst_src, "burst.html punya kontrol %s" % token)
+check("ENCODING_DEFAULTS" in burst_src and "readEncodingDefaults" in burst_src,
+      "burst.html memakai default encoding panel")
+for col in ['"Storage"', '"Video Writer"', '"Output Codec"', '"Encoder"',
+            '"Encoder Parameters"', '"Output Container"']:
+    check(col in burst_src, "kolom Excel %s dibaca" % col)
+check("encodingSummary" in burst_src, "tabel pratinjau menampilkan ringkasan encoding")
+check("ENCODING_TEMPLATE_COLUMNS" in burst_src, "template Excel memuat kolom encoding")
+
+shell = read("app_shell.js")
+for token in ["ZM_VIDEO_WRITERS", "ZM_OUTPUT_CODECS", "ZM_OUTPUT_CONTAINERS",
+              "ZM_ENCODERS", "fillEncodingControls", "readEncodingControls",
+              "toggleEncodingBlock", "loadStorageAreas"]:
+    check(token in shell, "app_shell.js menyediakan %s" % token)
+
+app_src2 = read("app.py")
+check("def read_encoding_fields" in app_src2, "app.py punya pembaca field encoding")
+check(app_src2.count("**read_encoding_fields(") == 3,
+      "ketiga jalur memakai pembaca field encoding")
+check('"/api/zm/storageareas"' in app_src2, "endpoint daftar storage area ada")
+check('zm_api_get("storage.json")' in app_src2, "storage.json (bukan storages.json) dipakai")
+check("normalize_output_container" in app_src2, "'webm' dipetakan ke container sah")
+
+print("")
+if FAILED:
+    print("GAGAL: %d pemeriksaan" % len(FAILED))
+    sys.exit(1)
 print("SEMUA PEMERIKSAAN TIGA JALUR LULUS")

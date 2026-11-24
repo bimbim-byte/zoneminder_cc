@@ -129,16 +129,27 @@ from rtsp_path import (  # noqa: E402  (setelah konstanta, bukan di blok import 
     normalize_rtsp_path,
 )
 from zm_triad import (  # noqa: E402
+    DEFAULT_ENCODER_PARAMETERS,
+    OUTPUT_CODECS,
+    OUTPUT_CONTAINERS,
     VALID_ANALYSING,
     VALID_CAPTURING,
     VALID_DECODERS,
+    VALID_ENCODERS,
     VALID_RECORDING,
+    VIDEO_WRITER_VALUES,
     build_zm138_full_payload,
     build_zm138_triad,
     derive_function_from_triad,
     normalize_analysing,
     normalize_capturing,
+    normalize_encoder,
+    normalize_encoder_parameters,
+    normalize_output_codec,
+    normalize_output_container,
     normalize_recording,
+    normalize_storage_id,
+    normalize_video_writer,
     zm138_monitor_payload,
 )
 
@@ -778,6 +789,192 @@ def _pick(data, *keys, default=None):
     return default
 
 
+# ==============================================================================
+# FIELD ENCODING VIDEO — DIBACA SERAGAM DARI KETIGA JALUR
+# ==============================================================================
+# Enam field di bawah menentukan ke mana rekaman disimpan dan bagaimana video
+# dikodekan. Ketiganya (tunggal, burst, Excel) memakai pembaca ini supaya satu
+# kamera yang didaftarkan lewat jalur mana pun menghasilkan setelan identik.
+ENCODING_FIELD_KEYS = {
+    # nama argumen build_zm138_full_payload -> variasi nama yang diterima
+    "storage_id": ("storageId", "storage_id", "StorageId", "Storage", "Storage Area"),
+    "video_writer": ("videoWriter", "video_writer", "VideoWriter", "Video Writer", "VideoWriterMode"),
+    "output_codec": ("outputCodec", "output_codec", "OutputCodec", "Output Codec", "OutputCodecName"),
+    "encoder": ("encoder", "Encoder", "Video Encoder"),
+    "encoder_parameters": ("encoderParameters", "encoder_parameters", "EncoderParameters", "Encoder Parameters"),
+    "output_container": ("outputContainer", "output_container", "OutputContainer", "Output Container", "Container"),
+}
+
+# Default aman saat field tidak dikirim sama sekali (mis. baris Excel lama).
+# OutputCodec 0/'auto' dipakai ketika VideoWriter bukan Encode, sesuai aturan
+# ZM 1.38.6: kodec tidak dipakai sehingga tidak boleh meninggalkan sisa nilai.
+ENCODING_FIELD_DEFAULTS = {
+    "storage_id": 1,
+    "video_writer": 1,
+    "output_codec": "h264",
+    "encoder": "libx264",
+    "encoder_parameters": DEFAULT_ENCODER_PARAMETERS,
+    "output_container": "mp4",
+}
+
+
+def read_encoding_fields(source, video_writer_default=1):
+    """Baca enam field encoding video dari body JSON atau baris Excel.
+
+    Selalu mengembalikan dict lengkap siap dioper sebagai kwargs
+    build_zm138_full_payload(). Nilai yang tidak dikenal TIDAK menggagalkan
+    pendaftaran: normalizer di zm_triad memetakannya ke default yang sah,
+    karena satu sel Excel salah ketik tidak boleh mematikan pembuatan monitor.
+
+    Bila VideoWriter bukan Encode (0=Disabled, 2=Camera Passthrough), kodec
+    dan encoder dikunci ke 'auto' — ZM tidak memakainya dan nilai lama akan
+    menyesatkan operator yang membuka monitor di konsol ZM.
+    """
+    if not isinstance(source, dict):
+        source = {}
+
+    writer_raw = _pick(source, *ENCODING_FIELD_KEYS["video_writer"],
+                       default=video_writer_default)
+    writer = normalize_video_writer(writer_raw, default=str(video_writer_default))
+
+    fields = {
+        "storage_id": normalize_storage_id(
+            _pick(source, *ENCODING_FIELD_KEYS["storage_id"],
+                  default=ENCODING_FIELD_DEFAULTS["storage_id"])
+        ),
+        "video_writer": writer,
+    }
+
+    if writer == "1":
+        fields["output_codec"] = normalize_output_codec(
+            _pick(source, *ENCODING_FIELD_KEYS["output_codec"],
+                  default=ENCODING_FIELD_DEFAULTS["output_codec"])
+        )
+        fields["encoder"] = normalize_encoder(
+            _pick(source, *ENCODING_FIELD_KEYS["encoder"],
+                  default=ENCODING_FIELD_DEFAULTS["encoder"])
+        )
+        fields["encoder_parameters"] = normalize_encoder_parameters(
+            _pick(source, *ENCODING_FIELD_KEYS["encoder_parameters"],
+                  default=ENCODING_FIELD_DEFAULTS["encoder_parameters"])
+        )
+    else:
+        fields["output_codec"] = "auto"
+        fields["encoder"] = "auto"
+        fields["encoder_parameters"] = normalize_encoder_parameters(
+            _pick(source, *ENCODING_FIELD_KEYS["encoder_parameters"],
+                  default=ENCODING_FIELD_DEFAULTS["encoder_parameters"])
+        )
+
+    # OutputContainer: hanya Auto/Mp4/Mkv yang diterima API ZM 1.38.6.
+    # 'webm' dan nilai asing dipetakan ke mp4 oleh normalize_output_container.
+    fields["output_container"] = normalize_output_container(
+        _pick(source, *ENCODING_FIELD_KEYS["output_container"],
+              default=ENCODING_FIELD_DEFAULTS["output_container"])
+    )
+    return fields
+
+
+def encoding_fields_public():
+    """Daftar nilai sah encoding untuk dikirim ke browser.
+
+    Sumber tunggal: konstanta di zm_triad.py. UI tidak menyalin daftar ini
+    supaya penambahan encoder/kodec baru cukup diubah di satu tempat.
+    """
+    return {
+        "video_writers": [
+            {"value": key, "label": label}
+            for key, label in VIDEO_WRITER_VALUES.items()
+        ],
+        "output_codecs": [
+            {"value": key, "label": name, "code": code}
+            for key, (name, code) in OUTPUT_CODECS.items()
+        ],
+        # Kunci kosong dan 'auto' sama-sama berarti 'auto'; kirim sekali saja
+        # supaya dropdown tidak punya dua pilihan yang identik.
+        "output_containers": [
+            {"value": key or "auto", "label": label}
+            for key, label in OUTPUT_CONTAINERS.items()
+            if key != "auto"
+        ],
+        "encoders": list(VALID_ENCODERS),
+        "default_encoder_parameters": DEFAULT_ENCODER_PARAMETERS,
+        "defaults": {
+            "storage_id": ENCODING_FIELD_DEFAULTS["storage_id"],
+            "video_writer": ENCODING_FIELD_DEFAULTS["video_writer"],
+            "output_codec": ENCODING_FIELD_DEFAULTS["output_codec"],
+            "encoder": ENCODING_FIELD_DEFAULTS["encoder"],
+            "encoder_parameters": ENCODING_FIELD_DEFAULTS["encoder_parameters"],
+            "output_container": ENCODING_FIELD_DEFAULTS["output_container"],
+        },
+    }
+
+
+STORAGE_CACHE = {"data": None, "ts": 0.0}
+
+
+def get_zm_storages():
+    """Daftar area penyimpanan ZoneMinder, di-cache singkat.
+
+    Endpoint ZM bernama `storage.json` (TUNGGAL) — `storages.json` membalas
+    404. Di instalasi bawaan hanya ada satu baris: Id=1, Name='Default'.
+    Bila API tidak menjawab, dikembalikan daftar fallback berisi Default/1
+    agar dropdown tetap terisi dan pendaftaran tidak pernah gagal hanya
+    karena pembacaan daftar storage bermasalah.
+    """
+    import time
+    now = time.time()
+    if STORAGE_CACHE["data"] and (now - STORAGE_CACHE["ts"]) < 300:
+        return STORAGE_CACHE["data"]
+
+    data = zm_api_get("storage.json")
+    items = []
+    if isinstance(data, dict):
+        raw = data.get("storage") or data.get("storages") or data.get("Storage")
+        if isinstance(raw, dict):
+            raw = [raw]
+        if isinstance(raw, list):
+            for entry in raw:
+                node = entry.get("Storage", entry) if isinstance(entry, dict) else None
+                if not isinstance(node, dict):
+                    continue
+                sid = node.get("Id")
+                if sid is None:
+                    continue
+                items.append({
+                    "id": str(sid),
+                    "name": str(node.get("Name") or ("Storage %s" % sid)),
+                    "path": str(node.get("Path") or ""),
+                    "type": str(node.get("Type") or ""),
+                    "enabled": str(node.get("Enabled", "1")),
+                })
+
+    if not items:
+        items = [{"id": "1", "name": "Default", "path": "", "type": "", "enabled": "1"}]
+
+    STORAGE_CACHE["data"] = items
+    STORAGE_CACHE["ts"] = now
+    return items
+
+
+@app.route("/api/zm/storageareas", methods=["GET"])
+def api_storage_areas():
+    """Area penyimpanan ZM untuk dropdown Storage pada form pendaftaran."""
+    items = get_zm_storages()
+    return jsonify({
+        "status": "ok",
+        "count": len(items),
+        "default_id": items[0]["id"] if items else "1",
+        "storages": items,
+    })
+
+
+@app.route("/api/zm/encoding-options", methods=["GET"])
+def api_encoding_options():
+    """Nilai sah VideoWriter / OutputCodec / Encoder / OutputContainer."""
+    return jsonify(encoding_fields_public())
+
+
 @app.route("/api/zoneminder/add-camera", methods=["POST"])
 def add_single_camera():
     """Mendaftarkan kamera langsung dengan RTSP URL ke ZoneMinder (Triad ZM 1.38.6)."""
@@ -827,6 +1024,8 @@ def add_single_camera():
         fps_report_interval=_pick(data, "fpsReportInterval", "fps_report_interval", "FPSReportInterval", default=250),
         importance=_pick(data, "importance", "Importance", default="Normal"),
         startup_delay=_pick(data, "startupDelay", "startup_delay", "StartupDelay", default=0),
+        # Konfigurasi encoding video (default: 1 / 1 / h264 / libx264 / crf=23 / mp4)
+        **read_encoding_fields(data),
     )
 
     try:
@@ -897,6 +1096,18 @@ def add_single_camera():
                 "zone": zone_result,
                 "path_warnings": path_warnings,
                 "analysis_fps": zm_payload.get("Monitor[AnalysisFPSLimit]", "8.00"),
+                # Peringatan preflight encoding (mis. Pre/PostEventCount lebih
+                # besar dari SectionLength) — bukan kegagalan, hanya catatan.
+                "encoding_warnings": validate_encoding_payload(zm_payload),
+                "encoding": {
+                    "storage_id": zm_payload.get("Monitor[StorageId]", ""),
+                    "video_writer": zm_payload.get("Monitor[VideoWriter]", ""),
+                    "output_codec": zm_payload.get("Monitor[OutputCodec]", ""),
+                    "output_codec_name": zm_payload.get("Monitor[OutputCodecName]", ""),
+                    "encoder": zm_payload.get("Monitor[Encoder]", ""),
+                    "encoder_parameters": zm_payload.get("Monitor[EncoderParameters]", ""),
+                    "output_container": zm_payload.get("Monitor[OutputContainer]", ""),
+                },
                 "data": res_data
             }), 200
         else:
@@ -1005,6 +1216,9 @@ def burst_add_monitors():
             fps_report_interval=_pick(monitor_data, "FPSReportInterval", "fpsReportInterval", "fps_report_interval", "FPS report interval", "FPS Report Interval", default=250),
             importance=_pick(monitor_data, "Importance", "importance", default="Normal"),
             startup_delay=_pick(monitor_data, "StartupDelay", "startupDelay", "startup_delay", "Startup Delay", default=0),
+            # Konfigurasi encoding video per baris (dari Excel) — kolom kosong
+            # mewarisi default 1.38.6, bukan mengosongkan setelan kamera.
+            **read_encoding_fields(monitor_data),
         )
 
         try:
@@ -1019,6 +1233,17 @@ def burst_add_monitors():
                     "status": "success",
                     "id": res_json.get("Id", ""),
                     "analysis_fps": payload.get("Monitor[AnalysisFPSLimit]", ""),
+                    # Peringatan preflight encoding per baris (bukan kegagalan).
+                    "encoding_warnings": validate_encoding_payload(payload),
+                    "encoding": {
+                        "storage_id": payload.get("Monitor[StorageId]", ""),
+                        "video_writer": payload.get("Monitor[VideoWriter]", ""),
+                        "output_codec": payload.get("Monitor[OutputCodec]", ""),
+                        "output_codec_name": payload.get("Monitor[OutputCodecName]", ""),
+                        "encoder": payload.get("Monitor[Encoder]", ""),
+                        "encoder_parameters": payload.get("Monitor[EncoderParameters]", ""),
+                        "output_container": payload.get("Monitor[OutputContainer]", ""),
+                    },
                 }
                 if path_warnings:
                     entry["path_warnings"] = path_warnings
@@ -1842,8 +2067,13 @@ def normalize_zone_mode(value):
 # pemblokiran, supaya nilai tidak lazim tetap bisa dipakai.
 MONITOR_ENCODING_DEFAULTS = {
     "SaveJPEGs": "0",            # 0 = jangan simpan JPEG, MP4 saja
+    "StorageId": "1",            # 1 = area 'Default' bawaan ZM
     "VideoWriter": "1",          # 1 = aktifkan penulis video
-    "OutputCodec": "27",         # 27 = h264 (terverifikasi di ZM 1.36.32)
+    "OutputCodec": "27",         # 27 = h264 (terverifikasi di ZM 1.38.6)
+    # OutputCodecName WAJIB berpasangan dengan OutputCodec: API memvalidasi
+    # kode int, sedangkan konsol ZM membaca nama. 27 <-> h264.
+    "OutputCodecName": "h264",
+    "OutputContainer": "mp4",     # hanya auto/mp4/mkv yang diterima API
     "Encoder": "libx264",
     "EncoderParameters": "crf=23",
     "PreEventCount": "50",       # frame sebelum alarm disertakan
@@ -1860,16 +2090,21 @@ MONITOR_ENCODING_DEFAULTS = {
 # Field yang SEKALI-KALI tidak boleh dikirim ke API ZoneMinder. Mengirim
 # OutputContainer dengan nilai kosong membuat ZM menolak SELURUH permintaan
 # simpan, jadi field ini dibuang di satu tempat saja: build_encoding_payload().
-ENCODING_SKIP_FIELDS = ("OutputContainer",)
+# OutputContainer kini SELALU dikirim dengan nilai sah (auto/mp4/mkv), jadi
+# tidak ada lagi field yang perlu dibuang. Tuple dipertahankan supaya mekanisme
+# penyaring di build_encoding_payload() tetap bekerja bila nanti ada field yang
+# memang tidak boleh dikirim.
+ENCODING_SKIP_FIELDS = ()
 
 # Field yang boleh ditimpa per kamera dari UI maupun kolom Excel.
 # Urutannya sekaligus menjadi daftar kunci yang diterima dari berkas Excel.
 ENCODING_OVERRIDE_FIELDS = (
-    "Encoder", "OutputCodec", "EncoderParameters",
+    "Encoder", "OutputCodec", "OutputCodecName", "EncoderParameters",
     "PreEventCount", "PostEventCount", "AlarmFrameCount",
     "SectionLength", "MinSectionLength",
     "DefaultRate", "DefaultScale", "DefaultCodec",
-    "VideoWriter", "SaveJPEGs", "StreamReplayBuffer",
+    "StorageId", "VideoWriter", "OutputContainer",
+    "SaveJPEGs", "StreamReplayBuffer",
 )
 
 # Field numerik untuk sanity check di validate_encoding_defaults().
@@ -1970,10 +2205,10 @@ def validate_encoding_defaults(values):
         warnings.append("DefaultRate (%s) negatif." % rate)
 
     codec = str(values.get("OutputCodec", "")).strip()
-    if codec and codec not in ("0", "27", "173"):
-        # 0=Auto, 27=h264, 173=h265 pada ZM 1.36.32. Kode lain tetap diterima
-        # ZM bila memang terdaftar, jadi ini hanya catatan.
-        warnings.append("OutputCodec=%s bukan 0/27/173 (Auto/h264/h265)." % codec)
+    if codec and codec not in ("0", "27", "173", "167", "226"):
+        # 0=Auto, 27=h264, 173=h265, 167=vp9, 226=av1 pada ZM 1.38.6. Kode lain
+        # tetap diterima ZM bila memang terdaftar, jadi ini hanya catatan.
+        warnings.append("OutputCodec=%s bukan 0/27/173/167/226 (Auto/h264/h265/vp9/av1)." % codec)
 
     if str(values.get("VideoWriter", "")).strip() in ("0", "") \
             and str(values.get("SaveJPEGs", "")).strip() == "0":
@@ -1985,6 +2220,23 @@ def validate_encoding_defaults(values):
     return warnings
 
 
+def validate_encoding_payload(payload):
+    """Peringatan preflight untuk payload Monitor[...] ZM 1.38.6.
+
+    Dipakai jalur pendaftaran (tunggal & burst) supaya operator melihat
+    peringatan yang sama dengan yang diperiksa validate_encoding_defaults()
+    pada jalur lama — mis. Pre/PostEventCount yang lebih besar dari
+    SectionLength sehingga potongan rekaman bisa terpangkas.
+    """
+    if not isinstance(payload, dict):
+        return []
+    values = {}
+    for key, value in payload.items():
+        if key.startswith("Monitor[") and key.endswith("]"):
+            values[key[len("Monitor["):-1]] = value
+    return validate_encoding_defaults(values)
+
+
 def build_encoding_payload(overrides=None):
     """Bentuk pasangan Monitor[*] siap kirim untuk field encoding.
 
@@ -1994,6 +2246,27 @@ def build_encoding_payload(overrides=None):
     kosong lalu menggagalkan seluruh penyimpanan.
     """
     values = resolve_encoding_defaults(overrides)
+
+    # Pasangan kodec dijaga di SATU tempat ini: OutputCodec (int) dan
+    # OutputCodecName (varchar) tidak boleh terpisah, karena API ZM memvalidasi
+    # kode sedangkan konsol ZM membaca nama. Bila VideoWriter bukan Encode
+    # (0/2), kodec dan encoder tidak dipakai ZM sehingga dikunci ke 'auto'.
+    writer_key = normalize_video_writer(values.get("VideoWriter"))
+    codec_key = normalize_output_codec(
+        values.get("OutputCodecName") or values.get("OutputCodec")
+    )
+    if writer_key != "1":
+        codec_key = "auto"
+        values["Encoder"] = "auto"
+    codec_name, codec_code = OUTPUT_CODECS[codec_key]
+    values["VideoWriter"] = writer_key
+    values["OutputCodec"] = codec_code
+    values["OutputCodecName"] = codec_name
+    values["StorageId"] = normalize_storage_id(values.get("StorageId"))
+    values["Encoder"] = normalize_encoder(values.get("Encoder"))
+    values["EncoderParameters"] = normalize_encoder_parameters(values.get("EncoderParameters"))
+    values["OutputContainer"] = normalize_output_container(values.get("OutputContainer"))
+
     payload = {}
     for key in values:
         if key in ENCODING_SKIP_FIELDS:
@@ -2005,17 +2278,44 @@ def build_encoding_payload(overrides=None):
     return payload, validate_encoding_defaults(values)
 
 
+def _key_aliases(key):
+    """Variasi nama kolom untuk satu kunci camelCase.
+
+    Excel ditulis manusia, jadi "OutputContainer" bisa muncul sebagai
+    "Output Container", "output_container", atau "outputcontainer". Semua
+    bentuk itu menunjuk field yang sama supaya satu kolom tidak diam-diam
+    diabaikan hanya karena beda spasi.
+    """
+    spaced = re.sub(r"(?<!^)(?=[A-Z])", " ", key)
+    merged = key.replace("_", "")
+    return (
+        key,
+        spaced,
+        spaced.lower(),
+        key.lower(),
+        merged,
+        merged.lower(),
+    )
+
+
 def read_encoding_overrides(source):
     """Ambil penimpaan encoding dari body request maupun baris Excel.
 
     Menerima bentuk bersarang {"encoding": {...}} yang dipakai UI, dan bentuk
-    datar {"Encoder": "...", "SectionLength": "300"} yang dipakai kolom Excel.
+    datar {"Encoder": "...", "Output Container": "mkv"} yang dipakai kolom
+    Excel. Nilai kosong diabaikan agar sel kosong tidak mengosongkan setelan.
     """
     if not isinstance(source, dict):
         return {}
     nested = source.get("encoding")
     flat = nested if isinstance(nested, dict) else source
-    return {key: flat[key] for key in ENCODING_OVERRIDE_FIELDS if key in flat}
+    out = {}
+    for key in ENCODING_OVERRIDE_FIELDS:
+        value = _pick(flat, *_key_aliases(key), default=None)
+        if value is None:
+            continue
+        out[key] = value
+    return out
 
 
   
@@ -2531,6 +2831,8 @@ def api_save_camera_with_zone():
         fps_report_interval=_pick(body, "fpsReportInterval", "fps_report_interval", "FPSReportInterval", default=250),
         importance=_pick(body, "importance", "Importance", default="Normal"),
         startup_delay=_pick(body, "startupDelay", "startup_delay", "StartupDelay", default=0),
+        # Konfigurasi encoding video (default: 1 / 1 / h264 / libx264 / crf=23 / mp4)
+        **read_encoding_fields(body),
     )
 
     # ID kustom hanya dipakai saat membuat kamera baru. Saat mengedit, ID
@@ -2556,6 +2858,24 @@ def api_save_camera_with_zone():
         )
         if not any(k in body for k in _EVENT_BODY_KEYS):
             for k in _EVENT_PAYLOAD_KEYS:
+                payload.pop(k, None)
+
+        # Prinsip yang sama untuk 6 field encoding: modal edit yang tidak
+        # menampilkan Storage/VideoWriter/Codec/Encoder/Container tidak boleh
+        # diam-diam menimpa setelan kustom yang sudah tersimpan di ZM.
+        _ENCODING_PAYLOAD_KEYS = (
+            "Monitor[StorageId]", "Monitor[VideoWriter]",
+            "Monitor[OutputCodec]", "Monitor[OutputCodecName]",
+            "Monitor[Encoder]", "Monitor[EncoderParameters]",
+            "Monitor[OutputContainer]",
+        )
+        _ENCODING_BODY_KEYS = (
+            "storageId", "storage_id", "StorageId", "videoWriter", "video_writer",
+            "outputCodec", "output_codec", "encoder", "encoderParameters",
+            "encoder_parameters", "outputContainer", "output_container",
+        )
+        if not any(k in body for k in _ENCODING_BODY_KEYS):
+            for k in _ENCODING_PAYLOAD_KEYS:
                 payload.pop(k, None)
 
     if edit_id:

@@ -244,6 +244,56 @@
               </div>
             </div>
 
+            <!-- Konfigurasi Encoding Video ZM 1.38.6 -->
+            <div class="triad-card" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px;" data-encoding-section>
+              <div class="text-xs font-bold text-primary" style="margin-bottom: 12px;">
+                &#127916; Encoding Video ZoneMinder v1.38.6
+              </div>
+
+              <div class="grid grid-2">
+                <div class="form-group">
+                  <label class="form-label" for="storageId">Storage Area</label>
+                  <select id="storageId" class="form-select" data-encoding="storageId"></select>
+                  <div class="form-hint">Area penyimpanan rekaman. Default <b>Default</b> (ID 1).</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="videoWriter">Video Writer</label>
+                  <select id="videoWriter" class="form-select" data-encoding="videoWriter" onchange="updateEncodingBlock()"></select>
+                  <div class="form-hint">Encode = rekam &amp; encode video (disarankan). Disabled = tanpa penulisan video.</div>
+                </div>
+              </div>
+
+              <!-- Blok ini hanya dipakai saat Video Writer = Encode -->
+              <div id="encodingBlock" data-encoding-block="encode">
+                <div class="grid grid-3" style="margin-top: -4px;">
+                  <div class="form-group">
+                    <label class="form-label" for="outputCodec">Output Codec</label>
+                    <select id="outputCodec" class="form-select" data-encoding="outputCodec"></select>
+                    <div class="form-hint">H.264 paling kompatibel dengan pemutar dan dashboard.</div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="outputContainer">Output Container</label>
+                    <select id="outputContainer" class="form-select" data-encoding="outputContainer"></select>
+                    <div class="form-hint">ZoneMinder 1.38.6 hanya menerima MP4/MKV.</div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="encoder">Encoder FFmpeg</label>
+                    <select id="encoder" class="form-select" data-encoding="encoder"></select>
+                    <div class="form-hint">Pilih akselerasi hardware yang tersedia di server.</div>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-top: -4px;">
+                  <label class="form-label" for="encoderParameters">Encoder Parameters</label>
+                  <input type="text" id="encoderParameters" class="form-control" value="crf=23" data-encoding="encoderParameters">
+                  <div class="form-hint">Argumen tambahan FFmpeg. Default <code>crf=23</code>.</div>
+                </div>
+              </div>
+            </div>
+
             <!-- Zone Deteksi Otomatis -->
             <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px;">
               <label class="form-label" for="zoneMode">Mode Zone Deteksi Otomatis</label>
@@ -328,6 +378,69 @@
       };
     }
 
+    // ----------------------------------------------------------------
+    // Nilai default encoding video ZM 1.38.6.
+    // Sumber daftar pilihan ada di app_shell.js (satu tempat); di sini hanya
+    // nilai awal supaya form HTML dan nilai aktual selalu sinkron saat reset.
+    // ----------------------------------------------------------------
+    const ENCODING_DEFAULTS = {
+      storageId: '1',
+      videoWriter: '1',
+      outputCodec: 'h264',
+      encoder: 'libx264',
+      encoderParameters: 'crf=23',
+      outputContainer: 'mp4'
+    };
+
+    function encodingSection() {
+      return document.querySelector('[data-encoding-section]');
+    }
+
+    function applyEncodingDefaults() {
+      if (window.fillEncodingControls) {
+        window.fillEncodingControls(encodingSection(), ENCODING_DEFAULTS);
+      }
+    }
+
+    function updateEncodingBlock() {
+      const root = encodingSection();
+      if (!root) return;
+      const writer = root.querySelector('[data-encoding="videoWriter"]');
+      const block = root.querySelector('[data-encoding-block="encode"]');
+      if (window.toggleEncodingBlock) window.toggleEncodingBlock(writer, block);
+    }
+
+    function loadCameraEncodingFields() {
+      const root = encodingSection();
+      if (!root) return;
+      if (window.fillEncodingControls) {
+        window.fillEncodingControls(root, ENCODING_DEFAULTS);
+      }
+      const storage = root.querySelector('[data-encoding="storageId"]');
+      if (window.loadStorageAreas) {
+        window.loadStorageAreas(storage, ENCODING_DEFAULTS.storageId);
+      }
+      updateEncodingBlock();
+    }
+
+    // Nama fungsi ini SENGAJA tidak sama dengan window.readEncodingControls
+    // milik app_shell.js: nama yang sama akan menimpa fungsi bersama itu dan
+    // membuat pemanggilan di dalamnya berulang tanpa henti (stack overflow).
+    function readCameraEncodingFields() {
+      const root = encodingSection();
+      if (!root || !window.readEncodingControls) {
+        return {
+          storageId: ENCODING_DEFAULTS.storageId,
+          videoWriter: ENCODING_DEFAULTS.videoWriter,
+          outputCodec: ENCODING_DEFAULTS.outputCodec,
+          encoder: ENCODING_DEFAULTS.encoder,
+          encoderParameters: ENCODING_DEFAULTS.encoderParameters,
+          outputContainer: ENCODING_DEFAULTS.outputContainer
+        };
+      }
+      return window.readEncodingControls(root);
+    }
+
     async function loadZoneModes() {
       const select = document.getElementById('zoneMode');
       const hint = document.getElementById('zoneModeHint');
@@ -385,6 +498,7 @@
     }
 
     loadZoneModes();
+    loadCameraEncodingFields();
     updateTriadPreview();
     applyEventDefaults();
 
@@ -418,6 +532,7 @@
       const analysisFps = document.getElementById('analysisFps').value.trim() || '8.00';
       const decoder = document.getElementById('camDecoder').value;
       const eventFields = readEventFields();
+      const encodingFields = readCameraEncodingFields();
 
       if (!source.toLowerCase().startsWith('rtsp://')) {
         addLog('URL harus diawali dengan rtsp://', 'err');
@@ -454,6 +569,15 @@
             fpsReportInterval: eventFields.fpsReportInterval,
             importance: eventFields.importance,
             startupDelay: eventFields.startupDelay,
+            // Konfigurasi encoding video: Storage, VideoWriter, Codec, Encoder,
+            // EncoderParameters, OutputContainer. Dikirim eksplisit supaya
+            // backend tidak pernah menerima enum kosong (ZM menolak seluruh simpan).
+            storageId: encodingFields.storageId,
+            videoWriter: encodingFields.videoWriter,
+            outputCodec: encodingFields.outputCodec,
+            encoder: encodingFields.encoder,
+            encoderParameters: encodingFields.encoderParameters,
+            outputContainer: encodingFields.outputContainer,
             zoneMode: document.getElementById('zoneMode').value,
             createZone: document.getElementById('createZone').checked,
             overwriteZone: document.getElementById('overwriteZone').checked
@@ -470,6 +594,14 @@
           }
           addLog(`[CONFIG] Cap=${capturing} | Ana=${analysing} | Rec=${recording} | Decoder=${decoder} | MaxFPS=${maxFps} | AnalysisFPS=${analysisFps}`, 'info');
           addLog(`[EVENT] SectionLength=${eventFields.sectionLength}s | MinSectionLength=${eventFields.minSectionLength}s | CloseMode=${eventFields.eventCloseMode} | FrameSkip=${eventFields.frameSkip} | AnalysisUpdateDelay=${eventFields.analysisUpdateDelay}s | FPSReportInterval=${eventFields.fpsReportInterval} | Importance=${eventFields.importance} | StartupDelay=${eventFields.startupDelay}s`, 'info');
+
+          if (data.encoding) {
+            const e = data.encoding;
+            addLog(`[ENCODING] Storage=${e.storage_id} | VideoWriter=${e.video_writer} | Codec=${e.output_codec}/${e.output_codec_name} | Encoder=${e.encoder} (${e.encoder_parameters}) | Container=${e.output_container}`, 'info');
+          }
+          if (Array.isArray(data.encoding_warnings)) {
+            data.encoding_warnings.forEach(w => addLog(`[ENCODING] ${w}`, 'warn'));
+          }
 
           const zone = data.zone || {};
           if (zone.created) {
@@ -490,6 +622,7 @@
           document.getElementById('camRecording').value = 'OnMotion';
           document.getElementById('createZone').checked = true;
           applyEventDefaults();
+          loadCameraEncodingFields();
           updateTriadPreview();
         } else {
           addLog(`[ERROR] ${data.message || 'Gagal mendaftarkan kamera'}`, 'err');

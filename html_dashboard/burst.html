@@ -261,6 +261,39 @@
             </div>
           </div>
 
+          <!-- Encoding Video ZM 1.38.6 (default untuk semua kamera baru) -->
+          <div id="encodingDefaults" data-encoding-section style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px;">
+            <div class="grid grid-2">
+              <div class="form-group">
+                <label class="form-label text-xs">Storage Area</label>
+                <select id="defaultStorageId" class="form-select text-xs" data-encoding="storageId"></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label text-xs">Video Writer</label>
+                <select id="defaultVideoWriter" class="form-select text-xs" data-encoding="videoWriter" onchange="updateEncodingDefaultsBlock()"></select>
+              </div>
+            </div>
+
+            <div class="grid grid-4" data-encoding-block="encode" style="margin-top: -6px;">
+              <div class="form-group">
+                <label class="form-label text-xs">Output Codec</label>
+                <select id="defaultOutputCodec" class="form-select text-xs" data-encoding="outputCodec"></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label text-xs">Output Container</label>
+                <select id="defaultOutputContainer" class="form-select text-xs" data-encoding="outputContainer"></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label text-xs">Encoder FFmpeg</label>
+                <select id="defaultEncoder" class="form-select text-xs" data-encoding="encoder"></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label text-xs">Encoder Parameters</label>
+                <input type="text" id="defaultEncoderParameters" class="form-control text-xs" value="crf=23" data-encoding="encoderParameters">
+              </div>
+            </div>
+          </div>
+
           <!-- Kredensial Default & Zone -->
           <div class="grid grid-2" style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px;">
             <div class="form-group" style="margin-bottom: 0;">
@@ -324,6 +357,7 @@
                 <th style="width: 65px;">AnaFPS</th>
                 <th style="width: 95px;">Decoder</th>
                 <th style="width: 130px;" title="SectionLength / MinSectionLength / EventCloseMode">Event</th>
+                <th style="width: 150px;" title="Storage / VideoWriter / OutputCodec / Encoder / OutputContainer">Encoding</th>
                 <th style="width: 120px;">Mode Zone</th>
                 <th style="width: 90px;">Status</th>
                 <th style="width: 40px; text-align: center;">Aksi</th>
@@ -331,7 +365,7 @@
             </thead>
             <tbody id="cameraTableBody">
               <tr>
-                <td colspan="16" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                <td colspan="17" style="text-align: center; color: var(--text-muted); padding: 40px;">
                   Belum ada data kamera. Silakan paste URL RTSP atau unggah file Excel di atas.
                 </td>
               </tr>
@@ -435,6 +469,144 @@
       return `<span class="mono text-xs" title="${detail}">${sl}/${min}/${mode}</span>`;
     }
 
+    // ----------------------------------------------------------------
+    // Encoding video ZM 1.38.6 — nilai default panel, dibaca oleh Quick
+    // Paste, impor Excel, dan payload. Daftar pilihan berasal dari
+    // app_shell.js (satu tempat untuk semua halaman).
+    // ----------------------------------------------------------------
+    const ENCODING_DEFAULTS = {
+      StorageId: '1',
+      VideoWriter: '1',
+      OutputCodec: 'h264',
+      Encoder: 'libx264',
+      EncoderParameters: 'crf=23',
+      OutputContainer: 'mp4'
+    };
+
+    function encodingPanel() {
+      return document.getElementById('encodingDefaults');
+    }
+
+    function applyEncodingDefaults() {
+      if (window.fillEncodingControls) {
+        window.fillEncodingControls(encodingPanel(), {
+          storageId: ENCODING_DEFAULTS.StorageId,
+          videoWriter: ENCODING_DEFAULTS.VideoWriter,
+          outputCodec: ENCODING_DEFAULTS.OutputCodec,
+          encoder: ENCODING_DEFAULTS.Encoder,
+          encoderParameters: ENCODING_DEFAULTS.EncoderParameters,
+          outputContainer: ENCODING_DEFAULTS.OutputContainer
+        });
+      }
+    }
+
+    function updateEncodingDefaultsBlock() {
+      const panel = encodingPanel();
+      if (!panel || !window.toggleEncodingBlock) return;
+      window.toggleEncodingBlock(
+        panel.querySelector('[data-encoding="videoWriter"]'),
+        panel.querySelector('[data-encoding-block]')
+      );
+    }
+
+    async function loadEncodingPanel() {
+      applyEncodingDefaults();
+      const panel = encodingPanel();
+      if (panel && window.loadStorageAreas) {
+        await window.loadStorageAreas(
+          panel.querySelector('[data-encoding="storageId"]'),
+          ENCODING_DEFAULTS.StorageId
+        );
+      }
+      updateEncodingDefaultsBlock();
+    }
+
+    function readEncodingDefaults() {
+      const panel = encodingPanel();
+      if (!panel || !window.readEncodingControls) {
+        return {
+          StorageId: ENCODING_DEFAULTS.StorageId,
+          VideoWriter: ENCODING_DEFAULTS.VideoWriter,
+          OutputCodec: ENCODING_DEFAULTS.OutputCodec,
+          Encoder: ENCODING_DEFAULTS.Encoder,
+          EncoderParameters: ENCODING_DEFAULTS.EncoderParameters,
+          OutputContainer: ENCODING_DEFAULTS.OutputContainer
+        };
+      }
+      const v = window.readEncodingControls(panel);
+      return {
+        StorageId: v.storageId,
+        VideoWriter: v.videoWriter,
+        OutputCodec: v.outputCodec,
+        Encoder: v.encoder,
+        EncoderParameters: v.encoderParameters,
+        OutputContainer: v.outputContainer
+      };
+    }
+
+    function encodingSummary(cam) {
+      const writer = String(cam.VideoWriter ?? ENCODING_DEFAULTS.VideoWriter);
+      const storage = cam.StorageId ?? ENCODING_DEFAULTS.StorageId;
+      if (writer !== '1') {
+        return `<span class="mono text-xs" title="Penulisan video tidak di-encode">S${storage} / off</span>`;
+      }
+      const codec = cam.OutputCodec ?? ENCODING_DEFAULTS.OutputCodec;
+      const container = cam.OutputContainer ?? ENCODING_DEFAULTS.OutputContainer;
+      const detail = [
+        `StorageId=${storage}`,
+        `VideoWriter=${writer}`,
+        `OutputCodec=${codec}`,
+        `Encoder=${cam.Encoder ?? ENCODING_DEFAULTS.Encoder}`,
+        `EncoderParameters=${cam.EncoderParameters ?? ENCODING_DEFAULTS.EncoderParameters}`,
+        `OutputContainer=${container}`
+      ].join(' | ');
+      return `<span class="mono text-xs" title="${detail}">S${storage} / ${codec}/${container}</span>`;
+    }
+
+    // Normalisasi nilai kolom Excel encoding ke bentuk kanonik ZM 1.38.6.
+    // Sel kosong/tidak dikenal jatuh ke default panel, bukan menggagalkan
+    // seluruh pendaftaran.
+    function toVideoWriterOrDefault(value, fallback) {
+      const v = String(value ?? '').trim().toLowerCase();
+      if (v === '0' || v === 'disabled' || v === 'off' || v === 'none') return '0';
+      if (v === '2' || v === 'camera passthrough' || v === 'passthrough') return '2';
+      if (v === '1' || v === 'encode' || v === 'enabled' || v === 'on') return '1';
+      return String(fallback ?? ENCODING_DEFAULTS.VideoWriter);
+    }
+
+    function toOutputCodecOrDefault(value, fallback) {
+      const v = String(value ?? '').trim().toLowerCase();
+      const byCode = { '0': 'auto', '27': 'h264', '173': 'hevc', '167': 'vp9', '226': 'av1' };
+      if (v in byCode) return byCode[v];
+      if (v === 'h265') return 'hevc';
+      if (['auto', 'h264', 'hevc', 'vp9', 'av1'].includes(v)) return v;
+      return String(fallback ?? ENCODING_DEFAULTS.OutputCodec);
+    }
+
+    function toEncoderOrDefault(value, fallback) {
+      const list = (window.ZM_ENCODERS || []);
+      const v = String(value ?? '').trim();
+      const fallbackValue = String(fallback ?? ENCODING_DEFAULTS.Encoder);
+      if (!v) return fallbackValue;
+      const hit = list.find(e => e.toLowerCase() === v.toLowerCase());
+      return hit || fallbackValue;
+    }
+
+    function toStorageOrDefault(value, fallback) {
+      const fallbackValue = String(fallback ?? ENCODING_DEFAULTS.StorageId);
+      const text = String(value ?? '').trim();
+      if (!text) return fallbackValue;
+      const n = parseInt(text, 10);
+      if (!Number.isFinite(n) || n < 0 || n > 65535) return fallbackValue;
+      return String(n);
+    }
+
+    function toOutputContainerOrDefault(value, fallback) {
+      const v = String(value ?? '').trim().toLowerCase();
+      if (v === 'auto' || v === 'mp4' || v === 'mkv') return v;
+      return String(fallback ?? ENCODING_DEFAULTS.OutputContainer);
+    }
+
     const DECODER_OPTIONS = [
       'Auto', 'h264', 'h264_cuvid', 'h264_vaapi', 'h264_qsv',
       'hevc', 'hevc_cuvid', 'hevc_vaapi', 'hevc_qsv'
@@ -456,6 +628,7 @@
 
     loadZoneModes();
     applyEventDefaults();
+    loadEncodingPanel();
 
     function switchTab(tab) {
       document.getElementById('tabQuick').classList.toggle('active', tab === 'quick');
@@ -532,6 +705,7 @@
               </select>
             </td>
             <td>${eventSummary(cam)}</td>
+            <td>${encodingSummary(cam)}</td>
             <td>
               <select class="form-select text-xs" style="min-width:110px;" onchange="updateCamField(${idx}, 'ZoneMode', this.value)">
                 <option value="" ${inherited ? 'selected' : ''}>↳ Global (${globalLabel})</option>
@@ -582,6 +756,7 @@
       const defUser = document.getElementById('defaultUser').value.trim();
       const defPass = document.getElementById('defaultPass').value;
       const eventDefaults = readEventDefaults();
+      const encodingDefaults = readEncodingDefaults();
 
       const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       lines.forEach((url, i) => {
@@ -608,7 +783,13 @@
           AnalysisUpdateDelay: eventDefaults.AnalysisUpdateDelay,
           FPSReportInterval: eventDefaults.FPSReportInterval,
           Importance: eventDefaults.Importance,
-          StartupDelay: eventDefaults.StartupDelay
+          StartupDelay: eventDefaults.StartupDelay,
+          StorageId: encodingDefaults.StorageId,
+          VideoWriter: encodingDefaults.VideoWriter,
+          OutputCodec: encodingDefaults.OutputCodec,
+          Encoder: encodingDefaults.Encoder,
+          EncoderParameters: encodingDefaults.EncoderParameters,
+          OutputContainer: encodingDefaults.OutputContainer
         });
       });
 
@@ -616,6 +797,37 @@
       renderTable();
       window.showToast(`${lines.length} kamera berhasil ditambahkan ke pratinjau.`, 'success');
     }
+
+    // Kolom encoding contoh per baris template. Nilainya HARUS bentuk kanonik
+    // yang diterima API ZM 1.38.6 (Storage ID, VideoWriter 0/1/2, auto|h264|
+    // hevc|vp9|av1, nama encoder FFmpeg, mp4|mkv) supaya berkas contoh yang
+    // diunggah kembali tidak ditolak.
+    const ENCODING_TEMPLATE_COLUMNS = [
+      {
+        "Storage": 1,
+        "Video Writer": "Encode",
+        "Output Codec": "h264",
+        "Encoder": "libx264",
+        "Encoder Parameters": "crf=23",
+        "Output Container": "mp4"
+      },
+      {
+        "Storage": 1,
+        "Video Writer": "Encode",
+        "Output Codec": "hevc",
+        "Encoder": "libx265",
+        "Encoder Parameters": "crf=28",
+        "Output Container": "mkv"
+      },
+      {
+        "Storage": 1,
+        "Video Writer": "Disabled",
+        "Output Codec": "auto",
+        "Encoder": "auto",
+        "Encoder Parameters": "crf=23",
+        "Output Container": "mp4"
+      }
+    ];
 
     function downloadExcelTemplate() {
       const data = [
@@ -689,13 +901,20 @@
           "Startup Delay": 0
         }
       ];
-      const ws = XLSX.utils.json_to_sheet(data);
+      // Kolom encoding video ditambahkan ke setiap baris contoh supaya
+      // template menunjukkan bentuk yang benar (mp4/h264), bukan sel kosong.
+      const rowsWithEncoding = data.map((row, i) => Object.assign(
+        {}, row, ENCODING_TEMPLATE_COLUMNS[i] || ENCODING_TEMPLATE_COLUMNS[0]
+      ));
+      const ws = XLSX.utils.json_to_sheet(rowsWithEncoding);
       ws['!cols'] = [
         { wch: 18 }, { wch: 32 }, { wch: 12 }, { wch: 14 },
         { wch: 12 }, { wch: 12 }, { wch: 12 },
         { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 14 },
         { wch: 14 }, { wch: 20 }, { wch: 16 }, { wch: 11 },
-        { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 13 }
+        { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 13 },
+        { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+        { wch: 20 }, { wch: 16 }
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Format CCTV ZM 1.38");
@@ -751,6 +970,29 @@
           const importanceCell = r['Importance'] ?? r['importance'];
           const startupDelayCell = r['Startup Delay'] ?? r['StartupDelay'] ?? r['startup_delay'];
 
+          // Konfigurasi encoding video per baris. Kolom kosong mewarisi
+          // default panel — berkas Excel lama (tanpa kolom ini) tetap
+          // menghasilkan setelan yang sama seperti sebelumnya.
+          const encDefaults = readEncodingDefaults();
+          const storageCell = r['Storage'] ?? r['StorageId'] ?? r['Storage Area'] ?? r['storage'];
+          const writerCell = r['Video Writer'] ?? r['VideoWriter'] ?? r['video_writer'];
+          const codecCell = r['Output Codec'] ?? r['OutputCodec'] ?? r['OutputCodecName'] ?? r['output_codec'];
+          const encoderCell = r['Encoder'] ?? r['encoder'] ?? r['Video Encoder'];
+          const encoderParamsCell = r['Encoder Parameters'] ?? r['EncoderParameters'] ?? r['encoder_parameters'];
+          const containerCell = r['Output Container'] ?? r['OutputContainer'] ?? r['output_container'];
+
+          // Bila VideoWriter bukan Encode, kodec & encoder tidak dipakai ZM:
+          // nilai baris/panel diabaikan dan 'auto' yang dikirim.
+          const rowWriter = toVideoWriterOrDefault(writerCell, encDefaults.VideoWriter);
+          const rowCodec = rowWriter === '1'
+            ? toOutputCodecOrDefault(codecCell, encDefaults.OutputCodec)
+            : 'auto';
+          const rowEncoder = rowWriter === '1'
+            ? toEncoderOrDefault(encoderCell, encDefaults.Encoder)
+            : 'auto';
+          const rowEncoderParams = String(encoderParamsCell ?? '').trim()
+            || encDefaults.EncoderParameters;
+
           cameraList.push({
             Name: r['Name'] || `CCTV_${cameraList.length + 1}`,
             Type: 'Ffmpeg',
@@ -774,7 +1016,13 @@
             AnalysisUpdateDelay: toIntOrDefault(anaUpdateDelayCell, EVENT_DEFAULTS.AnalysisUpdateDelay),
             FPSReportInterval: toIntOrDefault(fpsReportCell, EVENT_DEFAULTS.FPSReportInterval),
             Importance: toImportanceOrDefault(importanceCell),
-            StartupDelay: toIntOrDefault(startupDelayCell, EVENT_DEFAULTS.StartupDelay)
+            StartupDelay: toIntOrDefault(startupDelayCell, EVENT_DEFAULTS.StartupDelay),
+            StorageId: toStorageOrDefault(storageCell, encDefaults.StorageId),
+            VideoWriter: rowWriter,
+            OutputCodec: rowCodec,
+            Encoder: rowEncoder,
+            EncoderParameters: rowEncoderParams,
+            OutputContainer: toOutputContainerOrDefault(containerCell, encDefaults.OutputContainer)
           });
         });
 
@@ -796,6 +1044,9 @@
 
       submitBtn.disabled = true;
       progressBox.style.display = 'flex';
+
+      // Default encoding panel dipakai untuk baris yang tidak membawa nilai.
+      const panelEncoding = readEncodingDefaults();
       progressFill.style.width = '20%';
       progressPercent.textContent = '20%';
       progressText.textContent = `Mendaftarkan ${cameraList.length} kamera ke ZoneMinder...`;
@@ -825,7 +1076,16 @@
             AnalysisUpdateDelay: c.AnalysisUpdateDelay ?? EVENT_DEFAULTS.AnalysisUpdateDelay,
             FPSReportInterval: c.FPSReportInterval ?? EVENT_DEFAULTS.FPSReportInterval,
             Importance: c.Importance ?? EVENT_DEFAULTS.Importance,
-            StartupDelay: c.StartupDelay ?? EVENT_DEFAULTS.StartupDelay
+            StartupDelay: c.StartupDelay ?? EVENT_DEFAULTS.StartupDelay,
+            // Encoding video: selalu dikirim dengan nilai SAH. Bila baris
+            // tidak membawanya, default panel dipakai (bukan string kosong —
+            // enum kosong membuat ZM menolak seluruh simpan).
+            StorageId: c.StorageId ?? panelEncoding.StorageId,
+            VideoWriter: c.VideoWriter ?? panelEncoding.VideoWriter,
+            OutputCodec: c.OutputCodec ?? panelEncoding.OutputCodec,
+            Encoder: c.Encoder ?? panelEncoding.Encoder,
+            EncoderParameters: c.EncoderParameters ?? panelEncoding.EncoderParameters,
+            OutputContainer: c.OutputContainer ?? panelEncoding.OutputContainer
           }
         }));
 
