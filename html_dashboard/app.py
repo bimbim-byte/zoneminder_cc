@@ -2316,9 +2316,12 @@ ZONE_PRESET_ORDER = (
     "Fast, low sensitivity",
     "Fast, medium sensitivity",
     "Fast, high sensitivity",
+    "Fast, ultra sensitivity",
     "Best, low sensitivity",
     "Best, medium sensitivity",
     "Best, high sensitivity",
+    "Best, balanced high sensitivity",
+    "Ultra, high sensitivity",
 )
 
 ZONE_PRESET_DEFAULT = "Default"
@@ -2394,6 +2397,40 @@ ZONE_PRESETS = {
         "MinFilterPixels": 6, "MaxFilterPixels": None,
         "MinBlobPixels": 5, "MaxBlobPixels": None,
         "MinBlobs": 1, "MaxBlobs": None,
+        "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+    },
+    # --- Preset tambahan ------------------------------------------------
+    # Preset di bawah memakai 0 (bukan None) pada field yang di UI
+    # ZoneMinder dibiarkan kosong. Nilainya TETAP dikirim ke API dan
+    # tersimpan sebagai 0, bukan NULL — lihat _probe_zone_zero.py.
+    "Fast, ultra sensitivity": {
+        "CheckMethod": "AlarmedPixels",
+        "MinPixelThreshold": 16, "MaxPixelThreshold": 0,
+        "MinAlarmPixels": 3, "MaxAlarmPixels": 0,
+        "FilterX": 0, "FilterY": 0,
+        "MinFilterPixels": 0, "MaxFilterPixels": 0,
+        "MinBlobPixels": 0, "MaxBlobPixels": 0,
+        "MinBlobs": 0, "MaxBlobs": 0,
+        "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+    },
+    "Best, balanced high sensitivity": {
+        "CheckMethod": "Blobs",
+        "MinPixelThreshold": 18, "MaxPixelThreshold": 0,
+        "MinAlarmPixels": 5, "MaxAlarmPixels": 0,
+        "FilterX": 4, "FilterY": 4,
+        "MinFilterPixels": 4, "MaxFilterPixels": 0,
+        "MinBlobPixels": 3, "MaxBlobPixels": 0,
+        "MinBlobs": 1, "MaxBlobs": 0,
+        "OverloadFrames": 0, "ExtendAlarmFrames": 0,
+    },
+    "Ultra, high sensitivity": {
+        "CheckMethod": "Blobs",
+        "MinPixelThreshold": 15, "MaxPixelThreshold": 0,
+        "MinAlarmPixels": 2, "MaxAlarmPixels": 85,
+        "FilterX": 3, "FilterY": 3,
+        "MinFilterPixels": 2, "MaxFilterPixels": 85,
+        "MinBlobPixels": 1, "MaxBlobPixels": 0,
+        "MinBlobs": 1, "MaxBlobs": 0,
         "OverloadFrames": 0, "ExtendAlarmFrames": 0,
     },
 }
