@@ -304,8 +304,9 @@
               </div>
             </div>
             <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label text-xs" for="zoneMode">Mode Zone Deteksi Otomatis</label>
-              <select id="zoneMode" class="form-select text-xs"></select>
+              <label class="form-label text-xs" for="zonePreset">Zone Preset (Zone "All" dibuat otomatis)</label>
+              <select id="zonePreset" class="form-select text-xs" data-zone-preset></select>
+            </div>
             </div>
           </div>
 
@@ -358,14 +359,14 @@
                 <th style="width: 95px;">Decoder</th>
                 <th style="width: 130px;" title="SectionLength / MinSectionLength / EventCloseMode">Event</th>
                 <th style="width: 150px;" title="Storage / VideoWriter / OutputCodec / Encoder / OutputContainer">Encoding</th>
-                <th style="width: 120px;">Mode Zone</th>
+                <th style="width: 130px;">Zone Preset</th>
                 <th style="width: 90px;">Status</th>
                 <th style="width: 40px; text-align: center;">Aksi</th>
               </tr>
             </thead>
             <tbody id="cameraTableBody">
               <tr>
-                <td colspan="17" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                <td colspan="16" style="text-align: center; color: var(--text-muted); padding: 40px;">
                   Belum ada data kamera. Silakan paste URL RTSP atau unggah file Excel di atas.
                 </td>
               </tr>
@@ -383,7 +384,7 @@
   <script src="app_shell.js"></script>
   <script>
     let cameraList = [];
-    let ZONE_MODES = [];
+    let ZONE_PRESETS = [];
 
     // Nilai default konfigurasi Event & Analisis ZoneMinder 1.38.6.
     // Sumber yang sama dipakai saat halaman dimuat, saat reset, dan saat
@@ -612,21 +613,43 @@
       'hevc', 'hevc_cuvid', 'hevc_vaapi', 'hevc_qsv'
     ];
 
-    async function loadZoneModes() {
-      const select = document.getElementById('zoneMode');
+    // Zone Preset native ZoneMinder 1.38.6: daftar & urutan dari server,
+    // sama dengan halaman tambah kamera satuan.
+    async function loadZonePresets() {
+      const select = document.getElementById('zonePreset');
+      if (!select) return;
       try {
-        const res = await fetch('/api/zones/modes');
+        const res = await fetch('/api/zones/zone-presets');
         const data = await res.json();
-        ZONE_MODES = data.modes || [];
-        select.innerHTML = ZONE_MODES
-          .map(m => `<option value="${m.key}" ${m.key === data.default_mode ? 'selected' : ''}>${m.label}</option>`)
+        ZONE_PRESETS = data.presets || [];
+        select.innerHTML = ZONE_PRESETS
+          .map(p => `<option value="${p.name}" ${p.name === data.default ? 'selected' : ''}>${p.name}</option>`)
           .join('');
       } catch (err) {
-        select.innerHTML = '<option value="light">2. Ringan</option>';
+        select.innerHTML = '<option value="Default" selected>Default</option>';
       }
+      renderTable();
     }
 
-    loadZoneModes();
+    function normalizePresetCell(value) {
+      // Kolom Excel "Zone Preset": kosong -> ikut panel default;
+      // nama tak dikenal -> 'Default' + peringatan di console.
+      if (value === undefined || value === null) return { value: '', warn: '' };
+      const raw = String(value).trim();
+      if (!raw) return { value: '', warn: '' };
+      if (raw.toLowerCase() === 'default') return { value: 'Default', warn: '' };
+      const key = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const hit = (ZONE_PRESETS || []).find(p => key(p.name) === key(raw));
+      if (hit) return { value: hit.name, warn: '' };
+      return { value: 'Default', warn: raw };
+    }
+
+    function currentPanelPreset() {
+      const select = document.getElementById('zonePreset');
+      return select && select.value ? select.value : 'Default';
+    }
+
+    loadZonePresets();
     applyEventDefaults();
     loadEncodingPanel();
 
@@ -641,7 +664,6 @@
       const tbody = document.getElementById('cameraTableBody');
       const submitBtn = document.getElementById('btnSubmitAll');
       const summary = document.getElementById('summaryCounter');
-
       if (cameraList.length === 0) {
         tbody.innerHTML = `<tr><td colspan="16" style="text-align: center; color: var(--text-muted); padding: 40px;">Belum ada data kamera. Silakan paste URL RTSP atau unggah Excel di atas.</td></tr>`;
         submitBtn.disabled = true;
@@ -649,8 +671,8 @@
         return;
       }
 
-      const globalMode = document.getElementById('zoneMode').value;
-      const globalLabel = (ZONE_MODES.find(m => m.key === globalMode) || {}).label || globalMode;
+      const globalPreset = currentPanelPreset();
+      const globalLabel = globalPreset;
 
       let html = '';
       cameraList.forEach((cam, idx) => {
@@ -659,11 +681,21 @@
           ? (cam.executionStatus === 'SUCCESS' ? '<span class="badge badge-success">&#9989; Sukses</span>' : `<span class="badge badge-danger" title="${cam.executionError || ''}">&#10060; Gagal</span>`)
           : (isUrlOk ? '<span class="badge badge-neutral">Siap</span>' : '<span class="badge badge-danger">URL Salah</span>');
 
-        const rowMode = cam.ZoneMode || '';
-        const zoneOptions = ZONE_MODES.map(m =>
-          `<option value="${m.key}" ${rowMode === m.key ? 'selected' : ''}>${m.short || m.label}</option>`
+        // Status zone per baris: dibuat / dilewati / gagal, beserta preset
+        // yang benar-benar dipakai backend. Ditampilkan terpisah dari status
+        // monitor karena keduanya bisa berbeda (monitor tersimpan, zone gagal).
+        if (cam.zoneStatus === 'created') {
+          badgeStatus += '<div class="text-xs" style="margin-top:4px;"><span class="badge badge-success">Zone dibuat</span></div>';
+        } else if (cam.zoneStatus === 'failed') {
+          badgeStatus += '<div class="text-xs" style="margin-top:4px;"><span class="badge badge-danger" title="' + (cam.zoneReason || '') + '">Zone GAGAL</span></div>';
+        } else if (cam.zoneStatus === 'skipped') {
+          badgeStatus += '<div class="text-xs" style="margin-top:4px;"><span class="badge badge-neutral" title="' + (cam.zoneReason || '') + '">Zone dilewati</span></div>';
+        }
+
+        const presetOptions = (ZONE_PRESETS || []).map(p =>
+          `<option value="${p.name}" ${(cam.ZonePreset || '') === p.name ? 'selected' : ''}>${p.name}</option>`
         ).join('');
-        const inherited = !rowMode;
+        const presetInherited = !cam.ZonePreset;
 
         const decoderOpts = DECODER_OPTIONS.map(d =>
           `<option value="${d}" ${(cam.Decoder || 'Auto') === d ? 'selected' : ''}>${d}</option>`
@@ -707,9 +739,9 @@
             <td>${eventSummary(cam)}</td>
             <td>${encodingSummary(cam)}</td>
             <td>
-              <select class="form-select text-xs" style="min-width:110px;" onchange="updateCamField(${idx}, 'ZoneMode', this.value)">
-                <option value="" ${inherited ? 'selected' : ''}>↳ Global (${globalLabel})</option>
-                ${zoneOptions}
+              <select class="form-select text-xs" style="min-width:130px;" onchange="updateCamField(${idx}, 'ZonePreset', this.value)">
+                <option value="" ${presetInherited ? 'selected' : ''}>↳ Panel (${globalPreset})</option>
+                ${presetOptions}
               </select>
             </td>
             <td>${badgeStatus}</td>
@@ -763,6 +795,7 @@
         const num = String(cameraList.length + 1).padStart(2, '0');
         cameraList.push({
           Name: `${prefix}${num}`,
+          ZonePreset: currentPanelPreset(),
           Type: 'Ffmpeg',
           Path: url,
           User: defUser,
@@ -844,7 +877,7 @@
           "Max FPS": 10.00,
           "Analysis FPS": 8.00,
           "Decoder": "Auto",
-          "Zone": "medium",
+          "Zone Preset": "Best, low sensitivity",
           "Section Length": 300,
           "Minimum Section Length": 60,
           "Event Close Mode": "System",
@@ -867,7 +900,7 @@
           "Max FPS": 10.00,
           "Analysis FPS": 8.00,
           "Decoder": "h264",
-          "Zone": "light",
+          "Zone Preset": "",
           "Section Length": 600,
           "Minimum Section Length": 60,
           "Event Close Mode": "Duration",
@@ -890,7 +923,7 @@
           "Max FPS": 10.00,
           "Analysis FPS": 8.00,
           "Decoder": "Auto",
-          "Zone": "",
+          "Zone Preset": "Fast, high sensitivity",
           "Section Length": 300,
           "Minimum Section Length": 60,
           "Event Close Mode": "System",
@@ -921,23 +954,6 @@
       XLSX.writeFile(wb, "Template_Burst_Add_CCTV_ZM138.xlsx");
     }
 
-    const ZONE_ALIASES = {
-      '1': 'lightest', 'paling ringan': 'lightest', 'lightest': 'lightest',
-      '2': 'light', 'ringan': 'light', 'light': 'light',
-      '3': 'medium', 'sedang': 'medium', 'medium': 'medium',
-      '4': 'heavy', 'berat': 'heavy', 'heavy': 'heavy',
-      '5': 'heaviest', 'paling berat': 'heaviest', 'heaviest': 'heaviest',
-      'none': '', '-': '', 'tidak': '', 'off': '', 'skip': ''
-    };
-
-    function normalizeZoneCell(value) {
-      if (value === undefined || value === null) return '';
-      const key = String(value).trim().toLowerCase().replace(/\s+/g, ' ');
-      if (!key) return '';
-      const cleaned = key.replace(/^zone\s*:\s*/, '').replace(/^\d+\.\s*/, '');
-      return cleaned in ZONE_ALIASES ? ZONE_ALIASES[cleaned] : (key in ZONE_ALIASES ? ZONE_ALIASES[key] : '');
-    }
-
     function handleExcelUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -950,8 +966,9 @@
         const rows = XLSX.utils.sheet_to_json(firstSheet);
 
         rows.forEach((r) => {
-          const rawZone = r['Zone'] ?? r['Zone Mode'] ?? r['zone'] ?? r['Mode Zone'];
-          const zone = normalizeZoneCell(rawZone);
+          const rawPreset = r['Zone Preset'] ?? r['ZonePreset'] ?? r['zone preset'] ?? r['zonePreset'];
+          const presetCell = normalizePresetCell(rawPreset);
+          if (presetCell.warn) console.warn('Preset zone tidak dikenal pada baris Excel:', presetCell.warn, '-> memakai Default');
           const maxFpsCell = r['Max FPS'] ?? r['MaxFPS'] ?? r['max_fps'] ?? '10.00';
           const anaFpsCell = r['Analysis FPS'] ?? r['AnalysisFPS'] ?? r['AnalysisFPSLimit'] ?? '8.00';
           const capCell = r['Capturing'] ?? r['capturing'] ?? 'Always';
@@ -1008,7 +1025,7 @@
             AnalysisFPS: String(anaFpsCell).trim() || '8.00',
             Decoder: String(decCell).trim() || 'Auto',
             Colours: '4',
-            ZoneMode: zone,
+            ZonePreset: presetCell.value,
             SectionLength: toIntOrDefault(sectionLenCell, EVENT_DEFAULTS.SectionLength),
             MinSectionLength: toIntOrDefault(minSectionLenCell, EVENT_DEFAULTS.MinSectionLength),
             EventCloseMode: toCloseModeOrDefault(closeModeCell),
@@ -1068,7 +1085,7 @@
             AnalysisFPS: c.AnalysisFPS || '8.00',
             Decoder: c.Decoder || 'Auto',
             Colours: '4',
-            ZoneMode: c.ZoneMode || '',
+            ZonePreset: c.ZonePreset || '',
             SectionLength: c.SectionLength ?? EVENT_DEFAULTS.SectionLength,
             MinSectionLength: c.MinSectionLength ?? EVENT_DEFAULTS.MinSectionLength,
             EventCloseMode: c.EventCloseMode ?? EVENT_DEFAULTS.EventCloseMode,
@@ -1094,7 +1111,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             monitors: payload,
-            zoneMode: document.getElementById('zoneMode').value,
+            zonePreset: currentPanelPreset(),
             createZone: document.getElementById('createZone').checked,
             overwriteZone: document.getElementById('overwriteZone').checked
           })
@@ -1114,6 +1131,9 @@
                 cameraList[idx].executionError = det.error || '';
                 cameraList[idx].zoneStatus = det.zone || '';
                 cameraList[idx].zoneReason = det.zone_reason || '';
+                cameraList[idx].zonePresetResult = det.zone_preset
+                  ? (det.zone === 'created' ? `created (Id=${det.zone_id || '?'})` : det.zone_preset)
+                  : '';
               }
             });
           }

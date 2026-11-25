@@ -296,9 +296,10 @@
 
             <!-- Zone Deteksi Otomatis -->
             <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px;">
-              <label class="form-label" for="zoneMode">Mode Zone Deteksi Otomatis</label>
-              <select id="zoneMode" class="form-select"></select>
-              <div class="form-hint" id="zoneModeHint" style="margin-top: 5px;">Memuat konfigurasi mode zone...</div>
+              <label class="form-label" for="zonePreset">Zone Preset (Zone "All" dibuat otomatis)</label>
+              <select id="zonePreset" class="form-select" data-zone-preset></select>
+              <div class="form-hint" id="zonePresetHint" style="margin-top: 5px;">Zone aktif layar penuh (Units: Percent, Area 100%, Alarm 255/0/0, Overload 0, Extend 0) dibuat otomatis sesudah kamera terdaftar, memakai parameter preset yang dipilih.</div>
+
 
               <div class="flex items-center gap-4 flex-wrap" style="margin-top: 12px;">
                 <label class="checkbox-label">
@@ -342,7 +343,7 @@
 
   <script src="app_shell.js"></script>
   <script>
-    let ZONE_MODES = [];
+    let ZONE_PRESETS = [];
 
     // Nilai default konfigurasi Event & Analisis ZoneMinder 1.38.6.
     // Dipakai untuk mengisi form saat halaman dimuat DAN saat form di-reset,
@@ -441,29 +442,50 @@
       return window.readEncodingControls(root);
     }
 
-    async function loadZoneModes() {
-      const select = document.getElementById('zoneMode');
-      const hint = document.getElementById('zoneModeHint');
+    // ----------------------------------------------------------------
+    // Zone Preset native ZoneMinder 1.38.6. Daftar dan urutannya datang
+    // dari server (/api/zones/zone-presets) supaya pilihan di halaman ini
+    // tidak pernah menyimpang dari nilai yang benar-benar dikirim ke ZM.
+    // ----------------------------------------------------------------
+    async function loadZonePresets() {
+      const select = document.getElementById('zonePreset');
+      if (!select) return;
       try {
-        const res = await fetch('/api/zones/modes');
+        const res = await fetch('/api/zones/zone-presets');
         const data = await res.json();
-        ZONE_MODES = data.modes || [];
-        select.innerHTML = ZONE_MODES
-          .map(m => `<option value="${m.key}" ${m.key === data.default_mode ? 'selected' : ''}>${m.label}</option>`)
+        ZONE_PRESETS = data.presets || [];
+        select.innerHTML = ZONE_PRESETS
+          .map(p => `<option value="${p.name}" ${p.name === data.default ? 'selected' : ''}>${p.name}</option>`)
           .join('');
-        renderZoneHint();
+        renderZonePresetHint();
       } catch (err) {
-        select.innerHTML = '<option value="light">2. Ringan</option>';
-        hint.innerText = 'Gagal memuat mode dari server. Memakai mode default.';
+        select.innerHTML = '<option value="Default" selected>Default</option>';
+        const hint = document.getElementById('zonePresetHint');
+        if (hint) hint.innerText = 'Gagal memuat preset dari server. Memakai preset Default.';
       }
     }
 
-    function renderZoneHint() {
-      const key = document.getElementById('zoneMode').value;
-      const hint = document.getElementById('zoneModeHint');
-      const mode = ZONE_MODES.find(m => m.key === key);
-      if (!mode) { hint.innerText = ''; return; }
-      hint.innerHTML = `${mode.description} &bull; <b>Efektif:</b> CheckMethod=${mode.check_method}, MinPixelThreshold=${mode.min_pixel_threshold}, Units=${mode.units}.`;
+    function renderZonePresetHint() {
+      const select = document.getElementById('zonePreset');
+      const hint = document.getElementById('zonePresetHint');
+      if (!select || !hint) return;
+      const preset = ZONE_PRESETS.find(p => p.name === select.value);
+      if (!preset) return;
+      const blank = v => (v === null || v === undefined) ? 'blank' : v;
+      hint.innerHTML = '<b>Efektif:</b> CheckMethod=' + preset.check_method
+        + ', MinPixelThreshold=' + preset.min_pixel_threshold
+        + ', MaxPixelThreshold=' + blank(preset.max_pixel_threshold) + ' (blank)'
+        + ' &bull; Alarm Area ' + preset.min_alarm_pct + '/' + blank(preset.max_alarm_pct)
+        + ' &bull; Filter ' + blank(preset.filter_x) + 'x' + blank(preset.filter_y)
+        + ' &bull; Filter Area ' + blank(preset.min_filter_pct) + '/' + blank(preset.max_filter_pct)
+        + ' &bull; Blob Area ' + blank(preset.min_blob_pct) + '/' + blank(preset.max_blob_pct)
+        + ' &bull; Min Blobs ' + blank(preset.min_blobs)
+        + '. Angka area = persen luas zone; dikonversi ke piksel oleh server.';
+    }
+
+    function currentZonePreset() {
+      const select = document.getElementById('zonePreset');
+      return select && select.value ? select.value : 'Default';
     }
 
     function updateTriadPreview() {
@@ -489,7 +511,7 @@
       }
     }
 
-    document.getElementById('zoneMode').addEventListener('change', renderZoneHint);
+    document.getElementById('zonePreset').addEventListener('change', renderZonePresetHint);
 
     // Decoder: satu daftar bersama (app_shell.js) supaya pilihan di sini
     // identik dengan Burst Add, impor Excel, dan form edit.
@@ -497,7 +519,7 @@
       window.fillDecoderOptions(document.getElementById('camDecoder'));
     }
 
-    loadZoneModes();
+    loadZonePresets();
     loadCameraEncodingFields();
     updateTriadPreview();
     applyEventDefaults();
@@ -578,7 +600,7 @@
             encoder: encodingFields.encoder,
             encoderParameters: encodingFields.encoderParameters,
             outputContainer: encodingFields.outputContainer,
-            zoneMode: document.getElementById('zoneMode').value,
+            zonePreset: currentZonePreset(),
             createZone: document.getElementById('createZone').checked,
             overwriteZone: document.getElementById('overwriteZone').checked
           })
@@ -605,7 +627,9 @@
 
           const zone = data.zone || {};
           if (zone.created) {
-            addLog(`[ZONE] Zone "${zone.name || 'All'}" dibuat (${zone.label || zone.mode}) @ ${zone.width}x${zone.height}.`, 'success');
+            if (zone.preset) {
+              addLog(`[ZONE] Zone "${zone.zone_name || 'All'}" dibuat dengan preset '${zone.preset}'` + (zone.zone_id ? ` (Zone Id=${zone.zone_id})` : '') + '.', 'success');
+            }
           } else if (zone.skipped) {
             addLog(`[ZONE] Dilewati: ${zone.reason || '-'}`, 'info');
           } else {
@@ -621,6 +645,11 @@
           document.getElementById('camAnalysing').value = 'Always';
           document.getElementById('camRecording').value = 'OnMotion';
           document.getElementById('createZone').checked = true;
+          const presetSelect = document.getElementById('zonePreset');
+          if (presetSelect) {
+            presetSelect.value = 'Default';
+            renderZonePresetHint();
+          }
           applyEventDefaults();
           loadCameraEncodingFields();
           updateTriadPreview();

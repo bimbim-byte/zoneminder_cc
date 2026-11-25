@@ -7,7 +7,7 @@ Diperiksa untuk setiap jalur (single add, burst add, Excel import):
   1. UI menyediakan Capturing, Analysing, Recording, Path, Username, Password,
      Width, Height, MaxFPS, AnalysisFPSLimit, Decoder.
   2. Decoder mencakup 9 pilihan inti (incl. hevc_qsv).
-  3. Pilihan pembuatan zone tetap ada (createZone / zoneMode).
+  3. Zone Preset native ZM 1.38.6 tersedia (createZone / zonePreset).
   4. Backend meneruskan nilai triad ke payload Monitor[Capturing] dst.
 
 Catatan: daftar decoder tidak lagi hardcode di halaman tambah. Sejak portal
@@ -57,7 +57,7 @@ check(all(d in shell for d in DECODERS),
       "9 pilihan decoder inti ada di app_shell.js (ZM_DECODERS)")
 check("fillDecoderOptions" in src,
       "add_camera.html mengisi decoder dari daftar bersama")
-check("createZone" in src and "zoneMode" in src, "pilihan pembuatan zone ada")
+check("createZone" in src and "zonePreset" in src, "pilihan pembuatan zone preset ada")
 
 print("[2] Jalur burst add + impor Excel (burst.html)")
 src = read("burst.html")
@@ -77,7 +77,7 @@ for token, label in [
     check(token in src, "kontrol %s ada" % label)
 check(all(d in src for d in ["h264_qsv", "hevc_qsv", "hevc_vaapi"]),
       "pilihan decoder burst mencakup varian qsv/vaapi")
-check("createZone" in src and "zoneMode" in src, "pilihan pembuatan zone ada")
+check("createZone" in src and "zonePreset" in src, "pilihan pembuatan zone preset ada")
 check("XLSX.utils.sheet_to_json" in src, "impor Excel/CSV aktif")
 
 print("[3] Field event & analisis ZM 1.38.6 di ketiga jalur")
@@ -98,7 +98,7 @@ for token in ["section_length=", "min_section_length=", "event_close_mode=",
               "frame_skip=", "analysis_update_delay=", "fps_report_interval=",
               "importance=", "startup_delay="]:
     check(token in app_src, "app.py meneruskan %s" % token)
-check(app_src.count("ensure_zone_for_monitor") >= 3,
+check(app_src.count("ensure_zone_with_preset") >= 3,
       "zone creation dipanggil di ketiga jalur")
 
 print("")

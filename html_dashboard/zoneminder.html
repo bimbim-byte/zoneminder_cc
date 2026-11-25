@@ -125,18 +125,6 @@
 
       <span style="border-left: 1px solid var(--border); height: 22px; margin: 0 4px;"></span>
 
-      <div class="flex items-center gap-2 flex-wrap">
-        <select id="bulkZoneModeSelect" class="form-select text-xs" style="width: auto; height: 32px; padding: 0 10px;">
-          <option value="lightest">🎯 Zone: Paling Ringan</option>
-          <option value="light" selected>🎯 Zone: Ringan</option>
-          <option value="medium">🎯 Zone: Sedang</option>
-          <option value="heavy">🎯 Zone: Berat</option>
-          <option value="heaviest">🎯 Zone: Paling Berat</option>
-        </select>
-        <button id="btnBulkZone" class="btn btn-warning btn-sm" onclick="bulkSetZoneMode()">
-          🎯 Buat Zone Semua
-        </button>
-      </div>
 
       <div class="flex-1 text-xs font-semibold" id="bulkStatusText" style="text-align: right; color: var(--text-secondary);"></div>
     </div>
@@ -275,8 +263,8 @@
           </div>
 
           <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 6px;">
-            <label class="form-label" for="editCamZoneMode">Mode Zone Deteksi Otomatis</label>
-            <select id="editCamZoneMode" class="form-select"></select>
+            <label class="form-label" for="editCamZonePreset">Zone Preset (untuk kamera baru)</label>
+            <select id="editCamZonePreset" class="form-select"></select>
             <div class="flex items-center gap-4 flex-wrap" style="margin-top: 10px;">
               <label class="checkbox-label text-xs">
                 <input type="checkbox" id="editCamCreateZone" checked> Buat zone otomatis
@@ -308,7 +296,7 @@
     let allMonitorsCache = [];
     let cameraDataStore = {};
     let existingIds = [];
-    let ZONE_MODES = [];
+    let ZONE_PRESETS = [];
 
     function escapeHtml(text) {
       if (!text) return '';
@@ -320,19 +308,19 @@
         .replace(/'/g, '&#39;');
     }
 
-    async function loadZoneModes() {
+    async function loadZonePresets() {
       try {
-        const res = await fetch('/api/zones/modes');
+        const res = await fetch('/api/zones/zone-presets');
         const data = await res.json();
-        ZONE_MODES = data.modes || [];
-        const select = document.getElementById('editCamZoneMode');
+        ZONE_PRESETS = data.presets || [];
+        const select = document.getElementById('editCamZonePreset');
         if (select) {
-          select.innerHTML = ZONE_MODES
-            .map(m => `<option value="${m.key}" ${m.key === data.default_mode ? 'selected' : ''}>${m.label}</option>`)
+          select.innerHTML = ZONE_PRESETS
+            .map(p => `<option value="${p.name}" ${p.name === data.default ? 'selected' : ''}>${p.name}</option>`)
             .join('');
         }
       } catch (e) {
-        console.error('Gagal memuat zone modes:', e);
+        console.error('Gagal memuat zone presets:', e);
       }
     }
 
@@ -575,34 +563,6 @@
       }
     }
 
-    async function bulkSetZoneMode() {
-      const mode = document.getElementById('bulkZoneModeSelect').value;
-      if (!confirm(`Terapkan mode zone "${mode}" ke SELURUH kamera terdaftar?`)) return;
-
-      const btn = document.getElementById('btnBulkZone');
-      btn.disabled = true;
-      btn.textContent = 'Membuat...';
-
-      try {
-        const res = await fetch('/api/zones/bulk-set-mode', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: mode, overwrite: true })
-        });
-        const data = await res.json();
-        if (res.ok && data.status === 'success') {
-          window.showToast(`Zone berhasil diterapkan pada ${data.success_count} kamera.`, 'success', 'Zone Massal');
-        } else {
-          throw new Error(data.message || 'Gagal');
-        }
-      } catch (err) {
-        window.showToast(err.message, 'error', 'Gagal Buat Zone');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '🎯 Buat Zone Semua';
-      }
-    }
-
     /* Modal Edit — ringkasan triad ZM 1.38.6.
        ZM 1.38.6 tidak lagi memakai Function di UI, jadi modal hanya
        menampilkan triad yang sedang dipilih dan tidak menyinkronkan dropdown
@@ -707,7 +667,7 @@
             width: w || '1280',
             height: h || '720',
             colorspace: document.getElementById('editColorspace').value || '4',
-            zoneMode: document.getElementById('editCamZoneMode').value,
+            zonePreset: (document.getElementById('editCamZonePreset') || {}).value || 'Default',
             createZone: document.getElementById('editCamCreateZone').checked,
             overwriteZone: document.getElementById('editCamOverwriteZone').checked
           })
@@ -746,7 +706,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      loadZoneModes();
+      loadZonePresets();
       loadCameras();
     });
   </script>
